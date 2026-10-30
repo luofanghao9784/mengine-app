@@ -7,7 +7,7 @@ import com.dreamcore.workspace.context.*;
 import com.dreamcore.workspace.feedback.FeedbackService;
 import com.dreamcore.workspace.identity.*;
 import com.dreamcore.workspace.retention.RetentionClock;
-import java.net.*;import java.net.http.*;import java.time.*;import java.util.*;import java.util.concurrent.*;
+import java.net.*;import java.net.http.*;import java.time.*;import java.time.temporal.ChronoUnit;import java.util.*;import java.util.concurrent.*;
 import org.junit.jupiter.api.*;import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,7 +24,7 @@ class ProfileMethodLifecycleIntegrationTest {
  @MockitoBean RetentionClock clock;
  UUID tenant,owner,admin,reader,platform,space,shared;Instant now;static String encoded;JsonMapper json=new JsonMapper();
  @BeforeEach void setup(){
-  now=Instant.now();when(clock.now()).thenReturn(now);tenant=UUID.randomUUID();owner=UUID.randomUUID();admin=UUID.randomUUID();reader=UUID.randomUUID();platform=UUID.randomUUID();space=UUID.randomUUID();shared=UUID.randomUUID();
+  now=Instant.now().truncatedTo(ChronoUnit.MICROS);when(clock.now()).thenReturn(now);tenant=UUID.randomUUID();owner=UUID.randomUUID();admin=UUID.randomUUID();reader=UUID.randomUUID();platform=UUID.randomUUID();space=UUID.randomUUID();shared=UUID.randomUUID();
   if(encoded==null)encoded=passwords.encode("synthetic-version-maintenance");
   for(UUID id:List.of(owner,admin,reader,platform))db.update("INSERT INTO accounts(id,email,display_name,password_hash) VALUES (?,?,?,?)",id,id+"@version.test","合成维护",encoded);
   db.update("INSERT INTO platform_roles(account_id,role) VALUES (?,'PLATFORM_ADMIN')",platform);
@@ -112,6 +112,17 @@ class ProfileMethodLifecycleIntegrationTest {
  }
  @Test void legacyUnregisteredVersionsAreNotAutomaticallyQueuedByTheNewCatalogue(){
   var p=profile();supersede(p);db.update("DELETE FROM object_lifecycle WHERE kind='PROFILE_VERSION' AND object_id=?",p.versionId());db.update("UPDATE profile_versions SET created_at=? WHERE id=?",java.sql.Timestamp.from(now.minus(Duration.ofDays(3650))),p.versionId());lifecycle.bindPolicies();lifecycle.enqueueDue();assertEquals(0,db.queryForObject("SELECT count(*) FROM object_lifecycle WHERE kind='PROFILE_VERSION' AND object_id=?",Integer.class,p.versionId()));assertEquals(p.value(),profiles.get(owner,tenant,p.id(),1).value());assertEquals(0,lifecycle.get(owner,tenant,"PROFILE_VERSION",p.versionId()).revision());
+ }
+ @Test void repeatedIsolationWithNanosecondBoundariesKeepsSameScope(){
+  var p=profile();UUID execution=UUID.randomUUID();
+  Instant effectiveAt=now.truncatedTo(ChronoUnit.SECONDS).plusNanos(123456789);
+  Instant deadline=effectiveAt.plus(Duration.ofDays(30));
+  var first=assertDoesNotThrow(()->scopes.isolateScope(tenant,owner,execution,effectiveAt,deadline,100));
+  var repeated=assertDoesNotThrow(()->scopes.isolateScope(tenant,owner,execution,effectiveAt,deadline,100));
+  assertEquals(first,repeated);assertFalse(gate.active("PROFILE_VERSION",p.versionId()));
+  var stored=db.queryForMap("SELECT effective_at,deadline FROM object_lifecycle_scopes WHERE execution_id=?",execution);
+  assertEquals(effectiveAt.truncatedTo(ChronoUnit.MICROS),((java.sql.Timestamp)stored.get("effective_at")).toInstant());
+  assertEquals(deadline.truncatedTo(ChronoUnit.MICROS),((java.sql.Timestamp)stored.get("deadline")).toInstant());
  }
  @Test void explicitDepartureScopeUsesSameClockAndCanPurgeItsCurrentPrivateProfiles(){
   var p=profile();UUID execution=UUID.randomUUID();Instant deadline=now.plus(Duration.ofDays(30));scopes.isolateScope(tenant,owner,execution,now,deadline,100);assertFalse(gate.active("PROFILE_VERSION",p.versionId()));denied(409,()->scopes.purgeScope(tenant,owner,execution,100));when(clock.now()).thenReturn(deadline.plusSeconds(1));scopes.purgeScope(tenant,owner,execution,100);cleanup.clean(record("PROFILE_VERSION",p.versionId()));assertEquals("",db.queryForObject("SELECT value FROM profile_versions WHERE id=?",String.class,p.versionId()));assertTrue(scopes.status(tenant,execution).complete());
