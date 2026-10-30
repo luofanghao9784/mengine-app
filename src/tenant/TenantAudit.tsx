@@ -1,9 +1,9 @@
+import { actionLabel, actorLabel, displayText } from '../admin/display-labels';
 import { useState } from 'react';
 import { History, RefreshCw, Search } from 'lucide-react';
 import { Button, Empty } from '../shared/ui';
 import { Failure, Loading, Pager, useRemote } from '../shared/admin';
 import { tenantClient } from './client';
-import { auditActions } from './audit-labels';
 import './audit.css';
 
 export function TenantAudit({ tenant }: { tenant: string }) {
@@ -47,7 +47,7 @@ export function TenantAudit({ tenant }: { tenant: string }) {
           搜索记录
           <input
             aria-label="搜索审计记录"
-            placeholder="操作人、对象或事件代码"
+            placeholder="操作人、对象或事件"
             maxLength={160}
             value={draft.q}
             onChange={(e) => setDraft({ ...draft, q: e.target.value })}
@@ -131,13 +131,12 @@ export function TenantAudit({ tenant }: { tenant: string }) {
               <tbody>
                 {data.value.slice(0, 20).map((r) => (
                   <tr key={r.id}>
-                    <td>{r.actorName}</td>
+                    <td>{actorLabel(r.actorName)}</td>
                     <td>
-                      <strong>{auditActions[r.action] || r.action}</strong>
-                      <small>{r.action}</small>
+                      <strong>{actionLabel(r.action)}</strong>
                     </td>
                     <td>
-                      {r.targetName || '对象标识：' + r.targetId}
+                      {displayText(r.targetName) || '其他记录'}
                       {r.relatedAccountName && <small>关联成员：{r.relatedAccountName}</small>}
                     </td>
                     <td>

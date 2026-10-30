@@ -1,32 +1,9 @@
+import { displayText, fieldLabel, recordLabel, versionLabel } from '../display-labels';
 import { useEffect, useRef, useState } from 'react';
 import { processingClient, type FoundationProcessing as Result } from './processing-client';
 import { date } from './foundation-api';
 import './processing-products.css';
 
-const states: Record<string, string> = {
-  READY: '已完成',
-  PARTIAL: '部分完成',
-  WAITING: '尚未完成',
-  NOT_STARTED: '尚未开始',
-  QUEUED: '排队中',
-  RUNNING: '处理中',
-  FAILED: '失败',
-  UNSUPPORTED: '格式不支持',
-  CANCELLED: '已取消',
-  ATTENTION: '需核对',
-  CHECKED: '已检查',
-  SUCCEEDED: '已完成',
-  INTERRUPTED: '已中断',
-  NOT_PUBLISHED: '尚未发布',
-  PUBLISHED: '已发布',
-  ARCHIVED: '已下架',
-  STALE: '来源已变化',
-};
-const origins: Record<string, string> = {
-  SOURCE_COLUMN: '来源原有字段',
-  PARSER_OUTPUT: '解析生成字段',
-  SOURCE_METADATA: '来源追溯字段',
-};
 export function FoundationProcessing({
   tenant,
   asset,
@@ -89,13 +66,13 @@ export function FoundationProcessing({
         data && (
           <>
             <p>
-              来源 v{data.version} · {data.recordCount} 条
+              来源{versionLabel(data.version)} · {data.recordCount} 条
               {data.recordKind === 'DOCUMENT_CHUNKS' ? '解析片段记录' : '结构化记录'} · {data.fields.length}{' '}
               个字段
             </p>
             {data.notes.map((note) => (
-              <p className="product-note" key={note}>
-                {note}
+              <p className="product-note" key={displayText(note)}>
+                {displayText(note)}
               </p>
             ))}
             <h4>具体字段 · {data.fields.length}</h4>
@@ -117,15 +94,15 @@ export function FoundationProcessing({
                     {data.fields.map((f) => (
                       <tr key={f.name}>
                         <th scope="row">
-                          <code>{f.name}</code>
+                          {fieldLabel(f.name)}
                         </th>
-                        <td>{f.type}</td>
+                        <td>{recordLabel(f.type)}</td>
                         <td>
                           {f.meaning}
                           {f.unit && <small>单位：{f.unit}</small>}
                         </td>
-                        <td>{origins[f.origin] || f.origin}</td>
-                        <td>{f.evidence}</td>
+                        <td>{recordLabel(f.origin)}</td>
+                        <td>{displayText(f.evidence)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -143,7 +120,7 @@ export function FoundationProcessing({
                     <tr>
                       <th>序号</th>
                       {data.fields.map((f) => (
-                        <th key={f.name}>{f.name}</th>
+                        <th key={f.name}>{fieldLabel(f.name)}</th>
                       ))}
                     </tr>
                   </thead>
@@ -164,13 +141,13 @@ export function FoundationProcessing({
                 {data.records.map((row, index) => (
                   <details key={row[0] || index} open={index === 0}>
                     <summary>
-                      记录 {data.offset + index + 1} · {row[2]} · {row[3]}
+                      记录 {data.offset + index + 1} · {displayText(row[2])} · {recordLabel(row[3])}
                     </summary>
                     <dl>
                       {data.fields.map((field, i) =>
                         field.name === 'content' ? null : (
                           <div key={field.name}>
-                            <dt>{field.name}</dt>
+                            <dt>{fieldLabel(field.name)}</dt>
                             <dd>{row[i]}</dd>
                           </div>
                         ),
@@ -196,13 +173,13 @@ export function FoundationProcessing({
               {data.stages.map((stage) => (
                 <li key={stage.key}>
                   <div>
-                    <strong>{stage.name}</strong>
-                    <span>{states[stage.state] || stage.state}</span>
+                    <strong>{displayText(stage.name)}</strong>
+                    <span>{recordLabel(stage.state)}</span>
                   </div>
-                  <p>{stage.detail}</p>
+                  <p>{displayText(stage.detail)}</p>
                   <small>{stage.at ? date(stage.at) : '尚无独立完成时间记录'}</small>
-                  {!!stage.outputs.length && <p>产物：{stage.outputs.join('；')}</p>}
-                  {!!stage.fields.length && <p>涉及字段：{stage.fields.join('、')}</p>}
+                  {!!stage.outputs.length && <p>产物：{stage.outputs.map(text => displayText(text)).join('；')}</p>}
+                  {!!stage.fields.length && <p>涉及字段：{stage.fields.map(name => fieldLabel(name)).join('、')}</p>}
                 </li>
               ))}
             </ol>
@@ -214,9 +191,9 @@ export function FoundationProcessing({
                 {data.history.map((h) => (
                   <li key={h.id}>
                     <strong>
-                      {h.stage} · {states[h.state] || h.state}
+                      {displayText(h.stage)} · {recordLabel(h.state)}
                     </strong>
-                    <p>{h.detail}</p>
+                    <p>{displayText(h.detail)}</p>
                     <small>
                       创建：{date(h.createdAt)} · 完成：{h.finishedAt ? date(h.finishedAt) : '尚无完成回执'}
                     </small>

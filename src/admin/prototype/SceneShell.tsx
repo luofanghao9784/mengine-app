@@ -1,3 +1,4 @@
+import { displayText, isDeploymentIdentifier } from '../display-labels';
 import { GovernanceProgress } from './GovernanceProgress';
 import { TenantConsole } from '../TenantConsole';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -466,11 +467,11 @@ export function SceneShell({ tenant = null, name }: { tenant?: string | null; na
         if (el.dataset.html !== html) {
           el.dataset.html = html;
           const title = document.createElement('b');
-          title.textContent = l.text;
+          title.textContent = displayText(l.text);
           el.replaceChildren(title);
           if (l.sub) {
             const sub = document.createElement('span');
-            sub.textContent = l.sub;
+            sub.textContent = displayText(l.sub);
             el.appendChild(sub);
           }
         }
@@ -867,8 +868,8 @@ function Home({
               <button type="button" onClick={() => go(t.place, t.id)}>
                 <span className="n">{i + 1}</span>
                 <span className="t">
-                  <b>{t.title}</b>
-                  <span>{t.sub}</span>
+                  <b>{displayText(t.title)}</b>
+                  <span>{displayText(t.sub)}</span>
                 </span>
                 <span className="tag">{places[t.place].name}</span>
                 <span className="go">{t.act} →</span>
@@ -955,7 +956,7 @@ function Usage() {
     <section className="cards usage glass" aria-label="用量与运行">
       {usage.readings.map(([label, value, note]) => (
         <article key={label} className="card stat">
-          <span className="label">{label}</span>
+          <span className="label">{displayText(label)}</span>
           <span className="value">{value}</span>
           <span className="note">{note}</span>
         </article>
@@ -973,8 +974,8 @@ function Usage() {
         </header>
         {usage.parts.map(([label, value, share]) => (
           <div key={label} className="fact share">
-            <span>{label}</span>
-            <b>{value}</b>
+            <span>{displayText(label)}</span>
+            <b>{displayText(value)}</b>
             <i>
               <i style={{ width: `${share}%` }} />
             </i>
@@ -987,8 +988,8 @@ function Usage() {
         </header>
         {usage.quality.map(([label, value, tone]) => (
           <div key={label} className="fact">
-            <span>{label}</span>
-            <b className={`tone-${tone}-text`}>{value}</b>
+            <span>{displayText(label)}</span>
+            <b className={`tone-${tone}-text`}>{displayText(value)}</b>
           </div>
         ))}
         <header>
@@ -1173,10 +1174,10 @@ function Work({
 
       <article className="card detail" aria-live="polite">
         <header>
-          <h2>{current.name}</h2>
+          <h2>{displayText(current.name)}</h2>
           <span>
-            {current.group}
-            {current.side && ` · ${current.side}`}
+            {displayText(current.group)}
+            {current.side && ` · ${displayText(current.side)}`}
           </span>
         </header>
         <div className="card-scroll">
@@ -1184,7 +1185,7 @@ function Work({
             {actionError ||
               (place === 'knowledge' &&
                 (knowledge.error || (knowledge.busy ? '正在同步知识与关联…' : ''))) ||
-              current.verdict}
+              displayText(current.verdict)}
           </p>
           {flow && (
             <ol className="flow">
@@ -1206,11 +1207,11 @@ function Work({
                 </tr>
               </thead>
               <tbody>
-                {current.kv.map(([a, b, c, tone], i) => (
+                {current.kv.filter(([a, b, c]) => !isDeploymentIdentifier([a, b, c])).map(([a, b, c, tone], i) => (
                   <tr key={`${a}-${i}`}>
-                    <th>{a}</th>
-                    <td>{b}</td>
-                    <td className={`${toneClass(tone)}-text`}>{c}</td>
+                    <th>{displayText(a)}</th>
+                    <td>{displayText(b)}</td>
+                    <td className={`${toneClass(tone)}-text`}>{displayText(c)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1228,8 +1229,8 @@ function Work({
                     pick(r.id);
                   }}
                 >
-                  <b>{r.name}</b>
-                  <span>{r.why}</span>
+                  <b>{displayText(r.name)}</b>
+                  <span>{displayText(r.why)}</span>
                 </button>
               ))}
               {links.length === 0 && (
@@ -1262,7 +1263,7 @@ function Work({
       <div className="side">
         <article className="card facts">
           <header>
-            <h2>{side.title}</h2>
+            <h2>{displayText(side.title)}</h2>
           </header>
           {side.rows.map(([label, value, note], i) =>
             place === 'data' && note ? (
@@ -1273,27 +1274,27 @@ function Work({
                 aria-pressed={gate === i}
                 onClick={() => setGate(gate === i ? null : i)}
               >
-                <span>{label}</span>
-                <b>{value}</b>
-                <small>{note}</small>
+                <span>{displayText(label)}</span>
+                <b>{displayText(value)}</b>
+                <small>{displayText(note)}</small>
               </button>
             ) : (
               <div key={`${label}-${i}`} className="fact">
-                <span>{label}</span>
-                <b>{value}</b>
-                {note && <small>{note}</small>}
+                <span>{displayText(label)}</span>
+                <b>{displayText(value)}</b>
+                {note && <small>{displayText(note)}</small>}
               </div>
             ),
           )}
         </article>
         <article className="card facts more">
           <header>
-            <h2>{more.title}</h2>
+            <h2>{displayText(more.title)}</h2>
           </header>
           {more.rows.map(([label, value, tone], i) => (
             <div key={`${label}-${i}`} className="fact line">
-              <span>{label}</span>
-              <small className={tone ? `tone-${tone}-text` : undefined}>{value}</small>
+              <span>{displayText(label)}</span>
+              <small className={tone ? `tone-${tone}-text` : undefined}>{displayText(value)}</small>
             </div>
           ))}
         </article>
@@ -1334,8 +1335,8 @@ function Palette({
         ).map((x) => ({
           place: p,
           id: x.id as string | undefined,
-          label: x.name,
-          sub: `${places[p].name} · ${x.why}`,
+          label: displayText(x.name),
+          sub: `${places[p].name} · ${displayText(x.why)}`,
         })),
       ),
     ],

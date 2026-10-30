@@ -1,3 +1,4 @@
+import { displayText, fieldLabel, recordLabel } from '../display-labels';
 import { useEffect, useRef, useState } from 'react';
 import type { Asset } from './foundation-api';
 
@@ -72,13 +73,13 @@ export function NativeGovernance({ asset, tenant, refresh, maintainBackground }:
     {status.state === 'BACKGROUND_REQUIRED' && maintainBackground && <button className="gold" onClick={maintainBackground}>完善企业背景</button>}
     {status.canRun && ['NOT_STARTED', 'STALE'].includes(status.state) && <button className="gold" disabled={busy} onClick={() => void act('start')}>{busy ? '正在提交…' : '生成治理草稿'}</button>}
     {status.canRun && status.state === 'FAILED' && <button className="gold" disabled={busy} onClick={() => void act('retry')}>{busy ? '正在提交…' : '重试治理'}</button>}
-    {status.state === 'FAILED' && status.errorCode && <p>错误编号：{status.errorCode}</p>}
+    {status.state === 'FAILED' && status.errorCode && <p>{recordLabel(status.errorCode)}</p>}
     {draft && status.state === 'DRAFT_READY' && <>
       <h3>待发布的治理草稿</h3><p>{draft.output.summary}</p>
       {draft.output.limitations?.map((x, i) => <p key={i}>{x}</p>)}
       <details><summary>核对 {draft.output.fields.length} 个字段及依据</summary>
-        {draft.output.fields.map(f => <section key={f.column}><h4>{f.column} · {f.decision === 'UNKNOWN' ? '待核实' : '有来源依据'}</h4>
-          <p>{f.meaning}{f.unit ? ` · 单位：${f.unit}` : ''}</p><p>{f.evidence}</p></section>)}
+        {draft.output.fields.map(f => <section key={f.column}><h4>{fieldLabel(f.column)} · {f.decision === 'UNKNOWN' ? '待核实' : '有来源依据'}</h4>
+          <p>{f.meaning}{f.unit ? ` · 单位：${f.unit}` : ''}</p><p>{displayText(f.evidence)}</p></section>)}
       </details>
       <p>发布将使这份口径在原有数据权限内生效；未知项仍保留，不能据此认定账目或资金正确。</p>
       <button className="gold" disabled={busy || !draft.sourceCurrent} onClick={() => void act('publish')}>{busy ? '正在发布…' : '核对后发布治理结果'}</button>

@@ -1,3 +1,4 @@
+import { classificationLabel, versionLabel } from '../display-labels';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import type { Asset } from './foundation-api';
 import { GATES } from './world';
@@ -42,8 +43,8 @@ export function readouts(a: Asset): [string, string | number][] {
       ]
     : [
         ['质量', a.quality ?? '—'],
-        ['密级', `L${a.classification}`],
-        ['版本', `v${a.version}`],
+        ['密级', classificationLabel(a.classification)],
+        ['版本', `${versionLabel(a.version)}`],
         ['标签', a.tags.length],
       ];
 }

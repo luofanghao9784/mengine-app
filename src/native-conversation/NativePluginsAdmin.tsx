@@ -1,3 +1,4 @@
+import { settingsLabel } from '../admin/display-labels';
 import { useState } from 'react';
 import { Puzzle, RefreshCw } from 'lucide-react';
 import { Button } from '../shared/ui';
@@ -129,7 +130,7 @@ export function NativePluginsAdmin({ tenant }: { tenant: string }) {
           {error}
         </p>
       )}
-      {data.value && <p className="admin-note">设置版本 {data.value.policy.revision}，按企业独立保存。</p>}
+      {data.value && <p className="admin-note">{settingsLabel(data.value.policy.revision)}</p>}
     </section>
   );
 }

@@ -1,3 +1,4 @@
+import { versionLabel } from './display-labels';
 import { useEffect, useState } from 'react';
 import {
   ArrowUpRight,
@@ -116,7 +117,6 @@ function Workbench({
       </PageActions>
       <header className="kw-heading">
         <div>
-          <span className="kw-eyebrow">ENTERPRISE KNOWLEDGE WORKSPACE</span>
           <h2>
             让知识，在正确的权限下流动<span>.</span>
           </h2>
@@ -255,7 +255,7 @@ function Workbench({
                               <BookOpen size={16} />
                               <span>
                                 {item.name}
-                                <small>版本 {item.version}</small>
+                                <small>{versionLabel(item.version)}</small>
                               </span>
                             </button>
                           </td>

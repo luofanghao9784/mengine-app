@@ -1,3 +1,4 @@
+import { actionLabel, displayText, fieldLabel, recordLabel, versionLabel } from '../display-labels';
 import {useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {createIdentityClient,createIdentityRequest,IdentityError} from '../../identity/client';
@@ -11,9 +12,9 @@ type Field={name:string;label?:string;meaning?:string;unit?:string;rules?:string
 type Asset={source_id:string;kind:string;revision:string;updated_at:string;metadata:{title?:string;version?:number;dictionaryRevision?:number;dictionaryFingerprint?:string;dictionaryStatus?:string;tags?:string[];dictionary?:{tableMeaning?:string;usageRules?:string;fields?:Field[];relations?:{id?:string;name?:string;targetId?:string;evidence?:string;keys?:{local:string;foreign:string}[]}[];templates?:{id?:string;name?:string;question?:string;operation?:string;field?:string}[]};governance?:{sourceVersion?:number;policyVersion?:number;classification?:number;audience?:string;policyDigest?:string}}};
 type State={tenantId:string;governance:{source_revision:string;policy_current:boolean;last_synced_at:string;governance_valid_until:string;collection_state?:string};assets:Asset[];runs:{id:string;operation:string;state:string;finished_at?:string;created_at:string}[]};
 const names:Record<string,string>={SUCCEEDED:'已完成',RUNNING:'处理中',QUEUED:'等待处理',FAILED:'处理失败',INTERRUPTED:'处理已中断',SYNC_INPUTS:'同步治理成果',GENERATE_METRICS:'生成指标草稿','/scene-knowledge/sync':'整理知识',generated:'已生成',changed:'来源已变化',unconfirmed:'尚未生成',legacy:'历史口径',organization:'企业范围',department:'部门范围',private:'指定人员范围'};
-const label=(value:string|undefined)=>value?names[value]??'其他处理状态':'尚无记录';
+const label=(value:string|undefined)=>value?names[value]??'其他记录':'尚无记录';
 const time=(s?:string)=>s?new Date(s).toLocaleString('zh-CN'):'尚未同步';
-const evidence=(s?:string)=>!s||s==='UNKNOWN'?'尚缺字段依据':s.includes('DEPLOYMENT_INFERRED')?'依据现有结构推断，尚待业务事实核实':s;
+const evidence=(s?:string)=>!s||s==='UNKNOWN'?'尚缺字段依据':s.includes('DEPLOYMENT_INFERRED')?'依据现有结构推断，尚待业务事实核实':displayText(s);
 function App(){
  const platform=new URLSearchParams(location.search).get('surface')==='platform';
  const [tenants,setTenants]=useState<{id:string;name:string}[]>([]),[tenant,setTenant]=useState(''),[state,setState]=useState<State|null>(null),[selected,setSelected]=useState(''),[error,setError]=useState(''),[filter,setFilter]=useState(''),[busy,setBusy]=useState(false);
@@ -39,15 +40,15 @@ function App(){
  {!platform&&binding&&binding.bindings.length>0&&<Routing key={tenant} tenant={tenant} workspaces={binding.workspaces} onSaved={()=>setState(s=>s?{...s,governance:{...s.governance,policy_current:false}}:s)}/>}
  {state&&<><section className="summary"><div><small>权限同步</small><strong>{state.governance.policy_current?'当前有效':'已过期或尚未完成'}</strong></div><div><small>最近完成</small><strong>{time(state.governance.last_synced_at)}</strong></div><div><small>数据快照采集</small><strong>{label(state.governance.collection_state)}</strong></div><div><small>治理资产</small><strong>{state.assets.length} 项</strong></div></section>
  <p className="notice">治理元信息通常每分钟同步；快照采集完成后数据才能用于分析。权限超过五分钟未成功核对时，暂停使用同步副本。通过管理端修改来源权限会先暂停副本，再同步新权限。同步不会扩大原有空间授权。</p>
- <div className="layout"><aside><input aria-label="搜索资产" placeholder="搜索治理资产" value={filter} onChange={e=>setFilter(e.target.value)}/>{assets.map(a=><button className={a===chosen?'selected':''} key={a.kind+a.source_id} onClick={()=>setSelected(a.source_id)}>{a.metadata.title??'未命名资产'}<small>来源 v{a.metadata.version??a.metadata.governance?.sourceVersion??'—'} · 权限 v{a.metadata.governance?.policyVersion??'—'}</small></button>)}</aside><article>{m?<>
- <h2>{m.title}</h2><p>{m.tags?.join(' · ')}</p><div className="versions"><span>源数据 v{m.version??m.governance?.sourceVersion??'—'}</span><span>口径 v{m.dictionaryRevision??'—'} · {label(m.dictionaryStatus)}</span><span>权限 v{m.governance?.policyVersion??'—'}</span></div>
+ <div className="layout"><aside><input aria-label="搜索资产" placeholder="搜索治理资产" value={filter} onChange={e=>setFilter(e.target.value)}/>{assets.map(a=><button className={a===chosen?'selected':''} key={a.kind+a.source_id} onClick={()=>setSelected(a.source_id)}>{recordLabel(a.kind, a.metadata)}<small>来源{versionLabel(a.metadata.version??a.metadata.governance?.sourceVersion??'—')} · 权限{versionLabel(a.metadata.governance?.policyVersion??'—')}</small></button>)}</aside><article>{m?<>
+ <h2>{displayText(m.title)}</h2><p>{m.tags?.map(tag => fieldLabel(tag)).join(' · ')}</p><div className="versions"><span>源数据{versionLabel(m.version??m.governance?.sourceVersion??'—')}</span><span>口径{versionLabel(m.dictionaryRevision??'—')} · {label(m.dictionaryStatus)}</span><span>权限{versionLabel(m.governance?.policyVersion??'—')}</span></div>
  <h3>业务口径</h3><p>{m.dictionary?.tableMeaning??'该资产没有表级口径。'}</p><p>{m.dictionary?.usageRules}</p>
  <h3>来源权限</h3><p>{label(m.governance?.audience)} · {['公开','企业内部','机密','严格受限'][m.governance?.classification??3]}。实际读取还需满足目标空间权限；关联统计按全部来源权限的交集执行。</p>
- <h3>字段与依据</h3>{m.dictionary?.fields?.map(f=><details key={f.name}><summary>{f.label??f.name}{f.unit?`（${f.unit}）`:''}</summary><p>{f.meaning}</p><p>{f.rules}</p><p className="notice">{evidence(f.evidence)}</p></details>)}
+ <h3>字段与依据</h3>{m.dictionary?.fields?.map(f=><details key={f.name}><summary>{fieldLabel(f.name, f.label)}{f.unit?`（${f.unit}）`:''}</summary><p>{f.meaning}</p><p>{f.rules}</p><p className="notice">{evidence(f.evidence)}</p></details>)}
  <h3>数据关联 · {m.dictionary?.relations?.length??0}</h3>{m.dictionary?.relations?.map((r,i)=><p key={r.id??i}>{r.name??'关联来源'}：{r.evidence??'关联定义已随口径同步。'}</p>)}
  <h3>指标模板 · {m.dictionary?.templates?.length??0}</h3><p>保留来源定义和版本，不因同步而升级为已核实业务指标。</p>{m.dictionary?.templates?.map((t,i)=><p key={t.id??i}>{t.name??'指标模板'}：{t.question??'按来源治理口径计算'}</p>)}
- <details><summary>同步版本</summary><p>平台接收时间：{time(chosen?.updated_at)}</p><p>源口径指纹：{m.dictionaryFingerprint??'未提供'}</p><p>源权限指纹：{m.governance?.policyDigest??'未提供'}</p><p>平台治理版本：{chosen?.revision}</p></details>
- </>:<p>暂无同步资产。</p>}</article></div><Metrics key={tenant+prefix} tenant={tenant} prefix={prefix} assets={state.assets} platform={platform}/><details><summary>最近处理记录</summary>{state.runs.map(r=><p key={r.id}>{time(r.finished_at??r.created_at)} · {label(r.operation)} · {label(r.state)}</p>)}</details></>}
+ <details><summary>同步版本</summary><p>平台接收时间：{time(chosen?.updated_at)}</p><p>源口径指纹：{m.dictionaryFingerprint ? '已接收来源标记' : '未提供'}</p><p>源权限指纹：{m.governance?.policyDigest ? '已接收权限标记' : '未提供'}</p><p>平台治理版本：{versionLabel(chosen?.revision)}</p></details>
+ </>:<p>暂无同步资产。</p>}</article></div><Metrics key={tenant+prefix} tenant={tenant} prefix={prefix} assets={state.assets} platform={platform}/><details><summary>最近处理记录</summary>{state.runs.map(r=><p key={r.id}>{time(r.finished_at??r.created_at)} · {actionLabel(r.operation)} · {label(r.state)}</p>)}</details></>}
  </main>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);

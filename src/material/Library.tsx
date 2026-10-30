@@ -1,3 +1,4 @@
+import { versionLabel } from '../admin/display-labels';
 import { MaterialPipeline } from './MaterialPipeline';
 import { MaterialTextEditor } from './TextEditor';
 import { LibraryAccessBrowser, LibraryJournal } from './AccessBrowser';
@@ -651,7 +652,7 @@ function LibraryListing({
                       {q || !workspace || includeUploads
                         ? `${personal && item.workspaceId !== workspace ? '企业资料 · ' : ''}${item.path.slice(0, -1).join(' / ') || item.workspaceName}`
                         : item.kind === 'DOCUMENT'
-                          ? `v${item.version}`
+                          ? `${versionLabel(item.version)}`
                           : ''}
                     </span>
                     <span
@@ -929,7 +930,7 @@ function UploadDialog({
           </Field>
         </fieldset>
         {document && (
-          <p className="muted">将基于 v{expectedVersion} 新增版本，已有版本和下载来源继续保留。</p>
+          <p className="muted">将基于 {versionLabel(expectedVersion)} 新增版本，已有版本和下载来源继续保留。</p>
         )}
         {validation && (
           <p className="access-alert" role="alert">
@@ -1145,9 +1146,9 @@ export function DocumentDialog({
                             <dd>{data.value.document.uploadedByName || '未记录'}</dd>
                             <dt>阅读版本</dt>
                             <dd>
-                              v{selectedVersion?.number}
+                              {versionLabel(selectedVersion?.number)}
                               {selectedVersion?.number !== data.value.document.version && (
-                                <small>（最新为 v{data.value.document.version}）</small>
+                                <small>（最新为 {versionLabel(data.value.document.version)}）</small>
                               )}
                             </dd>
                             <dt>我的权限</dt>
@@ -1180,7 +1181,7 @@ export function DocumentDialog({
                               <li key={v.id} aria-current={v.id === selectedVersion?.id || undefined}>
                                 <div>
                                   <strong>
-                                    v{v.number}
+                                    {versionLabel(v.number)}
                                     {v.number === data.value!.document.version && (
                                       <i className="perm-chip">最新</i>
                                     )}
@@ -1211,7 +1212,7 @@ export function DocumentDialog({
                                       }));
                                     }}
                                   >
-                                    阅读 v{v.number}
+                                    阅读 {versionLabel(v.number)}
                                   </Button>
                                   <Button
                                     variant="ghost"
@@ -1219,7 +1220,7 @@ export function DocumentDialog({
                                     disabled={busy || data.value?.document.canDownload === false}
                                     onClick={() => void download(v)}
                                   >
-                                    下载 v{v.number}
+                                    下载 {versionLabel(v.number)}
                                   </Button>
                                 </div>
                               </li>
@@ -1252,7 +1253,7 @@ export function DocumentDialog({
             : selectedVersion && (
                 <>
                   <div className="live-reader-version-bar">
-                    <Badge>v{selectedVersion.number}</Badge>
+                    <Badge>{versionLabel(selectedVersion.number)}</Badge>
                     {!administration && (
                       <ContinueWithMaterial
                         tenant={tenant}

@@ -1,3 +1,4 @@
+import { versionLabel } from '../admin/display-labels';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, FileText, FolderOpen, RefreshCw, Recycle } from 'lucide-react';
 import type { MaterialProcessingPage } from '../../contracts/public-api/knowledge';
@@ -246,7 +247,7 @@ function ProcessingList({ tenant, context }: { tenant: string; context: TenantCo
                     <div>
                       <strong>{item.name}</strong>
                       <small>
-                        {item.workspaceName} · v{item.version}
+                        {item.workspaceName} · {versionLabel(item.version)}
                       </small>
                     </div>
                     <Badge>{processingStatusLabel[item.status]}</Badge>
@@ -353,13 +354,13 @@ function ProcessingDetail({
       ) : (
         <div className="processing-detail">
           <h3>
-            {data.value.version.filename} · v{data.value.version.number}
+            {data.value.version.filename} · {versionLabel(data.value.version.number)}
           </h3>
           <p className="muted">
             {data.value.detail.document.workspaceName} · 原件保存于 {date(data.value.version.createdAt)}
           </p>
           {data.value.version.number !== data.value.detail.document.version && (
-            <p role="status">已有更新版本，当前仍查看打开时的 v{data.value.version.number}。</p>
+            <p role="status">已有更新版本，当前仍查看打开时的 {versionLabel(data.value.version.number)}。</p>
           )}
           <div className="processing-detail-actions">
             <Button onClick={() => setOriginal(true)}>原件与历史版本</Button>

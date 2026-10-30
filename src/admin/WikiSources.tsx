@@ -1,3 +1,4 @@
+import { versionLabel } from './display-labels';
 import { WikiInsights } from './WikiInsights';
 import { WikiGraphs } from './WikiGraphs';
 import { WikiArticles } from './WikiArticles';
@@ -30,15 +31,13 @@ function Wiki({ tenant }: { tenant: string }) {
     <section className="wiki-sources">
       <header className="wiki-heading">
         <div>
-          <span>WIKI · SOURCE LIBRARY</span>
           <h2>从知识回到来源</h2>
           <p>阅读获权共享资料，按原文检索并追溯到具体文件版本。</p>
         </div>
         <BookOpen size={36} />
       </header>
       <p className="wiki-notice">
-        当前展示资料原文与解析片段；可生成本人学习草稿，经明确确认后按来源范围共享。可分析已发布知识的关系与共同阅读推荐。解析内容可能不完整，OCR
-        文字需核对原件。
+        当前展示资料原文与解析片段；可生成本人学习草稿，经明确确认后按来源范围共享。可分析已发布知识的关系与共同阅读推荐。解析内容可能不完整，识别出的文字需核对原件。
       </p>
       <div className="wiki-controls">
         <div role="tablist" aria-label="Wiki 阅读方式">
@@ -197,7 +196,7 @@ function Sources({
             <BookOpen size={20} />
             <h3>{item.name}</h3>
             <p>
-              {item.workspaceName} · v{item.version}
+              {item.workspaceName} · {versionLabel(item.version)}
             </p>
             <span>{processingStatusLabel[item.status]}</span>
             <small>阅读来源 →</small>
@@ -235,11 +234,11 @@ function Matches({
       {data.value.items.map((chunk) => (
         <button className="wiki-match" key={chunk.id} onClick={() => select(chunk.id)}>
           <strong>
-            {chunk.filename} · v{chunk.version}
+            {chunk.filename} · {versionLabel(chunk.version)}
           </strong>
           <small>
             {chunk.locator} ·{' '}
-            {chunk.method === 'OCR' ? 'OCR，需核对' : chunk.method === 'TABLE' ? '表格片段' : '文字片段'}
+            {chunk.method === 'OCR' ? '识别文字，需核对' : chunk.method === 'TABLE' ? '表格片段' : '文字片段'}
           </small>
           <p>{chunk.content.slice(0, 360)}</p>
           <span>追溯原文 →</span>

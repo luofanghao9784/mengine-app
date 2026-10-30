@@ -1,3 +1,4 @@
+import { versionLabel } from './display-labels';
 import { useEffect, useState } from 'react';
 import { useSession } from '../identity/session';
 import { Failure, Loading, Pager, SubmitError, useRemote, useSubmission } from '../shared/admin';
@@ -86,7 +87,7 @@ export function WikiInsights({ tenant, revision }: { tenant: string; revision: n
           <span>
             {s.name}
             <small>
-              v{s.version} · 解析批次 {s.generation}
+              {versionLabel(s.version)} · 解析批次 {s.generation}
             </small>
           </span>
         </label>

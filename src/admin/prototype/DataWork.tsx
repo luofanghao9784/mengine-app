@@ -1,5 +1,6 @@
+import { classificationLabel, actionLabel, actorLabel, auditDetail, displayText, fieldLabel, recordLabel, versionLabel } from '../display-labels';
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { api, ACTIONS, date, type Asset, type Detail, type Foundation } from './foundation-api';
+import { api, date, type Asset, type Detail, type Foundation } from './foundation-api';
 import { GATES } from './world';
 import { companySourceClient } from '../../profile/company-source-client';
 import { useRemote } from '../../shared/admin';
@@ -29,7 +30,7 @@ function dictionaryNotice(warning: string, fields: { name: string; label: string
     .match(/^(?:(.+?)\s*[:：]\s*)?(DEPLOYMENT_INFERRED|MODEL_DETERMINED|UNKNOWN|SOURCE_DOCUMENTED)$/);
   if (match) {
     const field = fields.find((item) => item.name === match[1]);
-    const label = field?.label || (field ? field.name : '该字段');
+    const label = field ? fieldLabel(field.name, field.label) : '该字段';
     const message = {
       DEPLOYMENT_INFERRED:
         '当前解释来自部署时的推断，尚待业务依据核实。用于分析前，请确认字段含义和使用范围。',
@@ -42,7 +43,7 @@ function dictionaryNotice(warning: string, fields: { name: string; label: string
   // Unexpected machine codes stay out of user-facing copy; retain ordinary prose notices.
   return /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/.test(warning)
     ? '部分字段口径仍需核实，请查看字段依据并联系数据维护人员确认。'
-    : warning;
+    : displayText(warning);
 }
 
 
@@ -361,7 +362,7 @@ export function DataWork({
         <article className="card live-login">
           <header>
             <h2>登录数据底座</h2>
-            <span>使用 mengine-wiki 的现有企业账号</span>
+            <span>使用现有企业账号</span>
           </header>
           <form onSubmit={login}>
             <label>
@@ -403,7 +404,7 @@ export function DataWork({
         disabled={!!pending || !detail}
         onClick={() => void act(action, a)}
       >
-        {pending === action ? '处理中…' : ACTIONS[action]}
+        {pending === action ? '处理中…' : actionLabel(action)}
       </button>
     ) : null;
   const kv = (pairs: [string, React.ReactNode][]) => (
@@ -421,11 +422,11 @@ export function DataWork({
     { id: 'all', name: '全部来源', note: '外部数据集、内部资料库、外网数据集', items: available },
     ...(data?.sources || []).map((src, i) => ({
       id: SOURCE_IDS[i] ?? 'web',
-      name: src.name,
+      name: displayText(src.name),
       note:
         i === 0
           ? [
-              ...new Set(available.filter((x) => x.sourceKind === 0).map((x) => x.source.split(' / ')[0])),
+              ...new Set(available.filter((x) => x.sourceKind === 0).map((x) => displayText(x.source.split(' / ')[0]))),
             ].join('、') || '尚未接入数据库'
           : i === 1
             ? '企业背景、制度、流程与报告'
@@ -487,7 +488,7 @@ export function DataWork({
               {leadFunnel.map((s) => (
                 <div key={s.name} className="lead-funnel-stage">
                   <b className="num">{s.count}</b>
-                  <em>{s.name}</em>
+                  <em>{displayText(s.name)}</em>
                 </div>
               ))}
             </div>
@@ -789,10 +790,10 @@ export function DataWork({
               >
                 <i className={`tone-${x.tone}`} />
                 <span className="t">
-                  <b>{x.title}</b>
-                  <span>{x.label}</span>
+                  <b>{displayText(x.title)}</b>
+                  <span>{displayText(x.label)}</span>
                   <small>
-                    {x.department} · v{x.version}
+                    {x.department} · {versionLabel(x.version)}
                   </small>
                 </span>
                 <span className="ov">
@@ -842,8 +843,8 @@ export function DataWork({
         <article className="card asset" aria-live="polite" data-spot>
           <header className="detail-head">
             <div>
-              <h2>{a?.title || '数据资产'}</h2>
-              <span>{a ? `${a.department} · v${a.version}` : '从清单中选择一项'}</span>
+              <h2>{displayText(a?.title) || '数据资产'}</h2>
+              <span>{a ? `${a.department} · ${versionLabel(a.version)}` : '从清单中选择一项'}</span>
             </div>
             {a && (
               <dl className="head-nums">
@@ -929,8 +930,8 @@ export function DataWork({
                       ['源端最近核验', a.sourceVerifiedAt ? date(a.sourceVerifiedAt) : '未提供来源核验时间'],
                       ['平台接收', date(a.receivedAt || a.updatedAt)],
                       ['业务覆盖截止', a.coverageThrough ? date(a.coverageThrough) : '来源未声明，不能以采集时间代替'],
-                      ['业务标签', a.tags.join('、') || '尚未标注'],
-                      ['密级', `L${a.classification}`],
+                      ['业务标签', a.tags.map(tag => displayText(tag)).join('、') || '尚未标注'],
+                      ['密级', classificationLabel(a.classification)],
                     ])}
                     {a.sync?.error && <p className="live-error">{a.sync.error}</p>}
                     <h4>取数批次</h4>
@@ -938,8 +939,8 @@ export function DataWork({
                       <Timeline
                         items={detail.batches.map((b) => ({
                           at: date(b.at),
-                          text: `${b.operation} · v${b.version} · ${b.actor}`,
-                          note: b.reason,
+                          text: `${actionLabel(b.operation)} · ${versionLabel(b.version)} · ${actorLabel(b.actor)}`,
+                          note: displayText(b.reason),
                         }))}
                       />
                     ) : (
@@ -970,8 +971,8 @@ export function DataWork({
                 {shownStep === 2 &&
                   (a.kind !== 'table' ? (
                     a.availabilityKind === 'PUBLISHED_KNOWLEDGE' ? <><p>{a.availableKnowledgeCount} 篇治理知识已发布，来源版本当前有效。</p>{a.limitations?.map((text,i)=><p key={i}>{text.includes('未发布') ? `生成时说明（发布前）：${text}` : text}</p>)}</> : kv([
-                      ['业务标签', a.tags.join('、') || '尚未标注'],
-                      ['密级', `L${a.classification}`],
+                      ['业务标签', a.tags.map(tag => displayText(tag)).join('、') || '尚未标注'],
+                      ['密级', classificationLabel(a.classification)],
                     ])
                   ) : dict ? (
                     <>
@@ -980,7 +981,7 @@ export function DataWork({
                         <p>{dict.usageRules}</p>
                         <small>
                           {dict.current
-                            ? `第 ${dict.revision} 版 · ${dict.provider} · ${date(dict.at)}`
+                            ? `${versionLabel(dict.revision)} · ${displayText(dict.provider)} · ${date(dict.at)}`
                             : '当前口径尚未生效，展示原始字段定义'}
                           {dict.job &&
                             ` · 生成任务${
@@ -992,7 +993,7 @@ export function DataWork({
                                   succeeded: '已完成',
                                   failed: '失败',
                                 } as Record<string, string>
-                              )[dict.job.state] || dict.job.state
+                              )[dict.job.state] || '其他记录'
                             }${dict.job.nextAt ? `，下次 ${date(dict.job.nextAt)}` : ''}`}
                         </small>
                       </div>
@@ -1002,16 +1003,16 @@ export function DataWork({
                           key={f.name}
                           title={
                             <>
-                              {f.label} <code>{f.name}</code>
+                              {fieldLabel(f.name, f.label)}
                             </>
                           }
-                          meta={[f.type, f.unit, f.required ? '必填' : '', f.sensitive ? '敏感' : '']
+                          meta={[recordLabel(f.type), displayText(f.unit), f.required ? '必填' : '', f.sensitive ? '敏感' : '']
                             .filter(Boolean)
                             .join(' · ')}
                         >
-                          <p>{f.meaning || '尚无业务解释'}</p>
-                          {f.rules && <p>规则：{f.rules}</p>}
-                          {f.evidence && <small>依据：{f.evidence}</small>}
+                          <p>{displayText(f.meaning) || '尚无业务解释'}</p>
+                          {f.rules && <p>规则：{displayText(f.rules)}</p>}
+                          {f.evidence && <small>依据：{displayText(f.evidence)}</small>}
                         </Fold>
                       ))}
                       <h4>数据关联 · {dict.relations.length}</h4>
@@ -1019,7 +1020,7 @@ export function DataWork({
                         <div className="link-row" key={r.id}>
                           <span>
                             <b>{r.target}</b>
-                            <small>{r.keys.map((k) => `${k.local} = ${k.foreign}`).join('；')}</small>
+                            <small>{r.keys.map((k) => `${fieldLabel(k.local)} = ${fieldLabel(k.foreign)}`).join('；')}</small>
                           </span>
                           <button
                             onClick={() => {
@@ -1056,7 +1057,7 @@ export function DataWork({
                         tone={f.status === 'resolved' ? 'ok' : a.tone}
                         title={
                           <>
-                            {f.title} <span className="badge num">{f.count}</span>
+                            {displayText(f.title)} <span className="badge num">{f.count}</span>
                           </>
                         }
                         meta={
@@ -1069,13 +1070,13 @@ export function DataWork({
                           )[f.status]
                         }
                       >
-                        <p>{f.detail}</p>
-                        {f.field && <small>字段：{f.field}</small>}
+                        <p>{displayText(f.detail)}</p>
+                        {f.field && <small>字段：{fieldLabel(f.field)}</small>}
                         {f.status !== 'resolved' && a.actions.includes('recheck') && (
                           <div className="fold-act">
                             {finding === f.id && (
                               <textarea
-                                aria-label={`处理说明：${f.title}`}
+                                aria-label={`处理说明：${displayText(f.title)}`}
                                 maxLength={300}
                                 placeholder="填写处理措施或人工校验依据（可选）"
                                 value={reason}
@@ -1121,8 +1122,8 @@ export function DataWork({
                           <Timeline
                             items={f.history.map((h) => ({
                               at: date(h.at),
-                              text: `${h.actor} · ${h.action}`,
-                              note: h.note,
+                              text: `${actorLabel(h.actor)} · ${actionLabel(h.action)}`,
+                              note: displayText(h.note),
                             }))}
                           />
                         )}
@@ -1132,20 +1133,20 @@ export function DataWork({
                     {!detail?.findings.length && a.issues.length > 0 && (
                       <Fold title="检查提示" meta={`${a.issues.length} 项`} tone={a.tone} open>
                         {a.issues.map((v, i) => (
-                          <p key={i}>{v}</p>
+                          <p key={i}>{displayText(v)}</p>
                         ))}
                       </Fold>
                     )}
                     {a.kind === 'document' && detail?.analysis?.report && (
                       <Fold
                         title="AI 研判"
-                        meta={`${detail.analysis.model} · ${date(detail.analysis.report.createdAt)}`}
+                        meta={`${displayText(detail.analysis.model)} · ${date(detail.analysis.report.createdAt)}`}
                       >
                         <p>{detail.analysis.report.overview}</p>
                         {detail.analysis.report.findings.map((f, i) => (
                           <p key={i}>
                             <b>
-                              {f.title} · {{ high: '高', medium: '中', low: '低' }[f.severity] || f.severity}
+                              {f.title} · {{ high: '高', medium: '中', low: '低' }[f.severity] || '其他记录'}
                               风险
                             </b>
                             <br />
@@ -1196,8 +1197,8 @@ export function DataWork({
                       <Timeline
                         items={detail.audit.map((e) => ({
                           at: date(e.at),
-                          text: `${e.actor} · ${e.action}`,
-                          note: e.detail,
+                          text: `${actorLabel(e.actor)} · ${actionLabel(e.action)}`,
+                          note: auditDetail(e.action, e.detail),
                         }))}
                       />
                     ) : (
@@ -1240,29 +1241,4 @@ const STEP_OF_EVENT: Record<string, number> = {
 function stuckAt(a: Asset) {
   return a.available && !a.needsAttention ? 4 : Math.min(a.gate, 3);
 }
-function eventName(v: string) {
-  const names: Record<string, string> = {
-    received: '接入',
-    parsing: '解析中',
-    scanning: '检查中',
-    published: '已发布',
-    quarantined: '已隔离',
-    failed: '处理失败',
-    retry: '重新解析',
-    resumed: '已恢复',
-    edited: '已更新',
-    rescanned: '已复检',
-    remediated: '治理处理完成',
-    'dictionary-queued': '口径已排队',
-    'dictionary-generating': '模型生成口径',
-    'dictionary-generated': '口径已生效',
-    'dictionary-failed': '口径生成失败',
-    'dictionary-interrupted': '口径任务中断',
-    'sync-started': '取数开始',
-    'sync-completed': '取数完成',
-    'sync-failed': '取数失败',
-    'structure-stored': '结构已保存',
-    'records-checked': '记录已检查',
-  };
-  return names[v] || v;
-}
+function eventName(v: string) { return recordLabel(v); }

@@ -1,3 +1,4 @@
+import { versionLabel } from '../display-labels';
 import { useState } from 'react';
 import { governanceApi } from '../../material/governance-client';
 import { Failure, Loading, Pager, useRemote } from '../../shared/admin';
@@ -20,7 +21,6 @@ export function DocumentCatalog({ tenant, hash }: { tenant: string; hash: string
     <div className="mengine-dashboard">
       <header className="mengine-heading">
         <div>
-          <small>KNOWLEDGE ASSETS</small>
           <h2>企业资料列表</h2>
           <p>在同一张表中查看资料、标签、质量与复核日期。</p>
         </div>
@@ -103,7 +103,7 @@ export function DocumentCatalog({ tenant, hash }: { tenant: string; hash: string
                         <small>{x.issues.length ? `${x.issues.length} 项需关注` : ''}</small>
                       </td>
                       <td>{x.reviewAt || '未设置'}</td>
-                      <td>v{x.version}</td>
+                      <td>{versionLabel(x.version)}</td>
                       <td>
                         <button onClick={() => open({ id: x.id, workspaceId: x.workspaceId })}>
                           阅读资料

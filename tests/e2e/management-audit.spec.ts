@@ -41,7 +41,7 @@ test('audit filters use server query and revocation removes previously displayed
               {
                 id: 1,
                 actorId: actor,
-                actorName: '合成管理员',
+                actorName: '合成 姓名（TENANT_ADMIN+owner）',
                 action: 'COLLECTION_NOW',
                 targetId: id(3),
                 targetName: '合成销售来源',
@@ -59,6 +59,10 @@ test('audit filters use server query and revocation removes previously displayed
   await expect(page.getByRole('link', { name: '操作审计', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: '合成销售来源' })).toBeVisible();
   await expect(page.getByText('审计链校验通过')).toHaveCount(0);
+  await expect(page.getByRole('cell', { name: '合成 姓名（企业负责人）' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: '立即更新数据', exact: true })).toBeVisible();
+  await expect(page.locator('.tenant-audit')).not.toContainText('COLLECTION_NOW');
+  await expect(page.locator('.tenant-audit')).not.toContainText('TENANT_ADMIN');
   await page.getByLabel('事件类别').selectOption('DATA');
   await page.getByRole('button', { name: '筛选', exact: true }).click();
   await expect.poll(() => queries.at(-1)?.searchParams.get('category')).toBe('DATA');

@@ -1,3 +1,4 @@
+import { displayText, fieldLabel, recordLabel, timeZoneLabel, versionLabel } from '../display-labels';
 import {Reconciliation} from './reconciliation';
 import { companySourceClient, type BackgroundEntry } from '../../profile/company-source-client';
 import { useEffect, useState, useRef } from 'react';
@@ -66,7 +67,7 @@ export function Metrics({
 }: {
   tenant: string;
   prefix: string;
-  assets: { source_id: string; kind: string; metadata: { title?: string } }[];
+  assets: { source_id: string; kind: string; metadata: { title?: string; dictionary?: { fields?: { name: string; label?: string }[] } } }[];
   platform: boolean;
 }) {
   const [background, setBackground] = useState<BackgroundEntry[]>([]),
@@ -98,6 +99,10 @@ export function Metrics({
     [page, setPage] = useState(0),
     [total, setTotal] = useState(0),
     [hasMore, setHasMore] = useState(false);
+  const sourceFields = assets.find(asset => asset.source_id === source)?.metadata.dictionary?.fields ?? [];
+  const fieldOptions = (current: string[]) => [...new Set([...sourceFields.map(field => field.name), ...current].filter(Boolean))].map(name => (
+    <option key={name} value={name}>{fieldLabel(name, sourceFields.find(field => field.name === name)?.label)}</option>
+  ));
   const path = `${prefix}/tenants/${tenant}/scene/metrics`;
   const listPath = `${path}?query=${encodeURIComponent(search.trim())}&offset=${page * 12}&limit=12`;
   const activeList = useRef(listPath);
@@ -309,12 +314,12 @@ export function Metrics({
             <summary>背景知识依据</summary>
             {(m.definition.backgroundVersionIds ?? []).map((id) => (
               <p key={id}>
-                {background.find((b) => b.versionId === id)?.label ?? '旧版本或当前不可读取'} · {id}
+                {background.find((b) => b.versionId === id)?.label ?? '旧版本或当前不可读取'}
               </p>
             ))}
           </details>
           <p>
-            最新 v{m.head_version} · {m.published_version ? `发布 v${m.published_version}` : '未发布'} ·{' '}
+            最新 {versionLabel(m.head_version)} · {m.published_version ? `发布 ${versionLabel(m.published_version)}` : '未发布'} ·{' '}
             {m.current ? '来源口径当前有效' : '来源已变化或权限待同步'}
           </p>
           <p>
@@ -343,10 +348,10 @@ export function Metrics({
           </p>
           <p>依据：{m.definition.evidence}</p>
           <p>
-            计算定义：{m.definition.aggregation === 'SUM' ? `合计 ${m.definition.valueField}` : '记录计数'}
+            计算定义：{m.definition.aggregation === 'SUM' ? `合计 ${fieldLabel(m.definition.valueField)}` : '记录计数'}
             。后端只执行已确认的固定计划；支持精确等值筛选；跨表净额仍需分别核对计算凭据。
           </p>
-          <p>筛选：{Object.entries(m.definition.execution?.equalsFilters??{}).map(([k,v])=>`${k} = ${v}`).join(' 且 ')||'无'}；换算：{m.definition.execution?.conversion==='CENTS_TO_YUAN'?'分转元（÷100）':'保持源单位'}；缺失金额：停止计算。</p>
+          <p>筛选：{Object.entries(m.definition.execution?.equalsFilters??{}).map(([k,v])=>`${fieldLabel(k)} = ${displayText(v)}`).join(' 且 ')||'无'}；换算：{m.definition.execution?.conversion==='CENTS_TO_YUAN'?'分转元（÷100）':'保持源单位'}；缺失金额：停止计算。</p>
           {!platform && (
             <div className="toolbar">
               <button
@@ -372,7 +377,7 @@ export function Metrics({
                 }
                 onClick={() => void transition(m, 'publish')}
               >
-                确认并发布 v{m.head_version}
+                确认并发布 {versionLabel(m.head_version)}
               </button>
               <button
                 disabled={busy || m.published_version === null}
@@ -386,7 +391,7 @@ export function Metrics({
             <summary>版本记录</summary>
             {m.history.map((h, i) => (
               <p key={i}>
-                v{h.version} ·{' '}
+                {versionLabel(h.version)} ·{' '}
                 {{ DRAFT: '保存草稿', PUBLISH: '确认发布', WITHDRAW: '撤回发布' }[h.action] ?? '变更'} ·{' '}
                 {new Date(h.created_at).toLocaleString('zh-CN')}
               </p>
@@ -427,7 +432,7 @@ export function Metrics({
                 .filter((a) => a.kind === 'TABLE')
                 .map((a) => (
                   <option key={a.source_id} value={a.source_id}>
-                    {a.metadata.title ?? a.source_id}
+                    {recordLabel(a.kind, a.metadata)}
                   </option>
                 ))}
             </select>
@@ -465,14 +470,11 @@ export function Metrics({
           </label>
           {definition.aggregation === 'SUM' && (
             <label>
-              数值字段（准确列名）
-              <input
-                required
-                maxLength={160}
-                disabled={busy}
-                value={definition.valueField}
-                onChange={(e) => change('valueField', e.target.value)}
-              />
+              数值字段
+              <select required disabled={busy} value={definition.valueField} onChange={(e) => change('valueField', e.target.value)}>
+                <option value="">请选择字段</option>
+                {fieldOptions([definition.valueField])}
+              </select>
             </label>
           )}
           <fieldset>
@@ -495,7 +497,7 @@ export function Metrics({
                     })
                   }
                 />
-                {b.label} · v{b.revision}
+                {b.label} · {versionLabel(b.revision)}
               </label>
             ))}
             {(definition.backgroundVersionIds ?? [])
@@ -514,7 +516,7 @@ export function Metrics({
                       })
                     }
                   />
-                  旧版本或不可读背景：{id}（需重新核对）
+                  旧版本或不可读背景（需重新核对）
                 </label>
               ))}
           </fieldset>
@@ -525,7 +527,7 @@ export function Metrics({
             </p>
             <fieldset><legend>等值筛选（所有条件同时满足）</legend>
               {Object.entries(definition.execution?.equalsFilters??{}).map(([column,value],i)=><div className="toolbar" key={i}>
-                <input aria-label={`筛选字段${i+1}`} value={column} disabled={busy} onChange={e=>{const entries=Object.entries(definition.execution?.equalsFilters??{});entries[i]=[e.target.value,value];planChange({equalsFilters:Object.fromEntries(entries)});}}/>
+                <select aria-label={`筛选字段${i+1}`} value={column} disabled={busy} onChange={e=>{const entries=Object.entries(definition.execution?.equalsFilters??{});entries[i]=[e.target.value,value];planChange({equalsFilters:Object.fromEntries(entries)});}}><option value="">请选择字段</option>{fieldOptions([column])}</select>
                 <span>等于</span><input aria-label={`筛选值${i+1}`} value={value} disabled={busy} onChange={e=>planChange({equalsFilters:{...definition.execution?.equalsFilters,[column]:e.target.value}})}/>
                 <button type="button" disabled={busy} onClick={()=>planChange({equalsFilters:Object.fromEntries(Object.entries(definition.execution?.equalsFilters??{}).filter(([k])=>k!==column))})}>删除条件</button>
               </div>)}
@@ -533,24 +535,18 @@ export function Metrics({
             </fieldset>
             <label>金额单位换算<select aria-label="金额单位换算" disabled={busy||definition.aggregation!=='SUM'} value={definition.execution?.conversion??'NONE'} onChange={e=>planChange({conversion:e.target.value})}><option value="NONE">保持来源单位</option><option value="CENTS_TO_YUAN">分 → 元（精确除以100）</option></select></label>
             <label>
-              分组字段（最多三个，用英文逗号分隔；留空计算总计）
-              <input
-                disabled={busy}
-                value={(definition.execution?.groupColumns ?? []).join(',')}
-                onChange={(e) =>
-                  planChange({
-                    groupColumns: e.target.value ? e.target.value.split(',').map((s) => s.trim()) : [],
-                  })
-                }
-              />
+              分组字段（最多三个；不选择时计算总计）
+              <select multiple disabled={busy} value={definition.execution?.groupColumns ?? []}
+                onChange={(e) => planChange({ groupColumns: Array.from(e.target.selectedOptions).map(option => option.value).slice(0, 3) })}>
+                {fieldOptions(definition.execution?.groupColumns ?? [])}
+              </select>
             </label>
             <label>
-              日期字段（不限制日期时留空）
-              <input
-                disabled={busy}
-                value={definition.execution?.dateColumn ?? ''}
-                onChange={(e) => planChange({ dateColumn: e.target.value })}
-              />
+              日期字段（不限制日期时不选择）
+              <select disabled={busy} value={definition.execution?.dateColumn ?? ''} onChange={(e) => planChange({ dateColumn: e.target.value })}>
+                <option value="">不限制日期</option>
+                {fieldOptions([definition.execution?.dateColumn ?? ''])}
+              </select>
             </label>
             <label>
               起始日期
@@ -572,11 +568,10 @@ export function Metrics({
             </label>
             <label>
               业务时区
-              <input
-                disabled={busy}
-                value={definition.execution?.timeZone ?? 'Asia/Shanghai'}
-                onChange={(e) => planChange({ timeZone: e.target.value })}
-              />
+              <select disabled={busy} value={definition.execution?.timeZone ?? 'Asia/Shanghai'} onChange={(e) => planChange({ timeZone: e.target.value })}>
+                <option value="Asia/Shanghai">{timeZoneLabel('Asia/Shanghai')}</option>
+                {definition.execution?.timeZone && definition.execution.timeZone !== 'Asia/Shanghai' && <option value={definition.execution.timeZone}>{timeZoneLabel(definition.execution.timeZone)}</option>}
+              </select>
             </label>
             <label>
               <input

@@ -1,3 +1,4 @@
+import { versionLabel } from '../admin/display-labels';
 import { GovernanceAssistant } from './GovernanceProposals';
 import { useState } from 'react';
 import { ShieldCheck, Search, ScanLine, FileText, AlertTriangle } from 'lucide-react';
@@ -57,7 +58,6 @@ function Governance({ tenant }: { tenant: string }) {
     <div className="mg-page">
       <header className="mg-heading">
         <div>
-          <span className="mg-eyebrow">DATA GOVERNANCE</span>
           <h2>让资料可信、可用、可追溯</h2>
           <p>诊断当前获权资料，依据实际检查结果处理问题。</p>
         </div>
@@ -102,8 +102,7 @@ function Governance({ tenant }: { tenant: string }) {
             <div>
               <strong>规则评分 {data.value.summary.average ?? '—'}</strong>
               <p>
-                基于 {data.value.summary.checked} 份有完整文本检查依据的资料；不代表业务正确性或专业 DLP
-                检查。
+                基于 {data.value.summary.checked} 份有完整文本检查依据的资料；不代表业务正确性或专业防泄密检查。
               </p>
             </div>
           </div>
@@ -185,7 +184,7 @@ function Governance({ tenant }: { tenant: string }) {
                         <td>
                           <strong>{item.name}</strong>
                           <small>
-                            {item.workspaceName} · v{item.version}
+                            {item.workspaceName} · {versionLabel(item.version)}
                           </small>
                           <small>上传人：{item.uploadedByName || '未记录'}</small>
                         </td>
@@ -321,7 +320,7 @@ function Editor({
       <h3>{item.name}</h3>
       <GovernanceAssistant tenant={tenant} material={item.id} />
       <p>
-        {item.workspaceName} · 文件版本 v{item.version} · 检查记录 {item.revision}
+        {item.workspaceName} · 文件版本 {versionLabel(item.version)} · 检查记录 {item.revision}
       </p>
       <div className="mg-diagnostic-grid">
         <section>
@@ -411,7 +410,7 @@ function Editor({
           {result && (
             <div className="mg-result" role="status">
               <strong>
-                {result.redacted ? '已生成脱敏新版本' : '检查已保存'} · v{result.version}
+                {result.redacted ? '已生成脱敏新版本' : '检查已保存'} · {versionLabel(result.version)}
               </strong>
               <p>{sourceLabels[result.source]}</p>
               <p>
