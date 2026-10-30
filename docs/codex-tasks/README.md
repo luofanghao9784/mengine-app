@@ -10,7 +10,8 @@
 |---|---|---|---|---|---|
 | CT-000 | [PR #7 补 build:engine 步骤](CT-000-pr7-build-engine-workflow.md) | PR #7（workflow，老板账号推，因组内令牌无 workflow 权限） | 质量性能 + 架构逻辑 | 已合入（随 #7） | 第 1 |
 | CT-004 | [PR #7 API·Postgres 作业分 4 片 + 上传 surefire 报告](CT-004-pr7-api-shards-surefire-upload.md) | PR #7 整套 90 分钟超时、无报告产物（workflow，老板账号推） | 质量性能 + 架构逻辑 | 已合入（随 #7） | 第 2 |
-| CT-005 | [Mac 本机预览脚本 + smoke workflow + 账号种子](CT-005-mac-preview.md) | Mac 预览首版（DQ 裁定 v0.2；workflow 老板推） | 安全审查 + 发布验收 + 质量性能 | 待执行 | CT-004 合入后 |
+| CT-005 | [Mac 本机预览脚本 + smoke workflow + 账号种子](CT-005-mac-preview.md) | Mac 预览首版（DQ 裁定 v0.2；附录规格） | 安全审查 + 发布验收 + 质量性能（规格） | 已文档（附录规格）；落地改走 CT-006 | CT-004 合入后 |
+| CT-006 | [Mac 预览落地（脚本/种子/smoke 入库）](CT-006-mac-preview-land.md) | CT-005 附录真正入库（DQ 裁定 A–D；#23） | 质量性能 + 发布验收 | 待执行（PR #23） | CT-005 文档合入后；依赖 CT-007 口径 |
 | CT-001 | [简报生成：全部来源未就绪时写回具体等待原因（#230 回归，:340）](CT-001-pr7-native-continuity-340-fix.md) | #230（3a29ed3）回归 | 架构逻辑 + 质量性能 | 已合入（#22） | 第 3（与 CT-002 可并行） |
 | CT-002 | [生命周期时间戳对齐 Postgres 微秒精度](CT-002-api-lifecycle-micros-truncation.md) | ProfileMethodLifecycle 3 例 + FeedbackAdjustment 1 例 | 架构逻辑 + 质量性能 | 已合入（#21） | 第 3（与 CT-001 可并行） |
 | CT-007 | [审批流程整改（合入硬闸门/两人审/体验验收/周偏离检查/暂停令优先）](CT-007-review-process-hardening.md) | 老板经 DQ 批准（2026-10-30） | 质量性能 + 发布验收 | 已合入（#25） | 纯文档 |
@@ -43,7 +44,8 @@
 ### 1.3 部署预览
 | 编号 | 说明 |
 |---|---|
-| CT-005 | 老板 Mac（Apple Silicon /opt/homebrew）本机预览脚本、`trial.py --parser`、账号种子；`macos-preview-smoke.yml` **由老板账号推**（Codex 不推 workflow）。依赖：CT-004 已合入。审查：安全审查 + 发布验收 + 质量性能。 |
+| CT-005 | 附录规格（已文档）；落地改走 CT-006。 |
+| CT-006 | 老板 Mac 本机预览脚本 / 种子 / `macos-preview-smoke.yml` **入库**（无 brew 写死；workflow 进落地 PR；审查=质量性能 + 发布验收）。依赖：CT-005 文档已合入。 |
 
 ## 2. 状态取值
 `待执行`（已交老板）→ `执行中`（老板在跑 Codex）→ `PR 已开`（写上 PR 号）→ `已合入` ；异常：`卡住`（已把输出发 DQ）、`待定`（有外部阻塞，写明原因）、`作废`。
