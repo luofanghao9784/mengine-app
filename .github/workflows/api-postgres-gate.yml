@@ -21,9 +21,16 @@ concurrency:
 
 jobs:
   api:
-    name: with-test-postgres · test:api
+    # CT-004：按耗时分 4 片并行；每片超时仍为 90 分钟（不调大）。
+    # 慢类耗时据 run 40937260088：PlatformExperienceAdjustment 1589s、GeneralExperienceTaskContext 701s、
+    # PublicationFeedback 648s、FeedbackAdjustment 340s；GeneralExperiencePipeline 当次未跑完，耗时未知。
+    name: with-test-postgres · test:api (${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [adjust, context, general, rest]
     env:
       CI: "true"
       POSTGRES_BIN: /usr/lib/postgresql/18/bin
@@ -382,5 +389,44 @@ jobs:
           npm run build:engine
           test -f engine/dist/runtime/agent-task.js || { echo "::error::engine/dist/runtime/agent-task.js missing after build:engine"; exit 1; }
 
+      # 分片清单只在这里定义一次；rest 片用排除法跑其余全部，保证每个测试类恰好落在一片。
+      - name: Resolve test shard
+        id: shard
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          adjust="PlatformExperienceAdjustmentIntegrationTest"
+          context="GeneralExperienceTaskContextIntegrationTest,PublicationFeedbackIntegrationTest"
+          general="GeneralExperiencePipelineIntegrationTest,GeneralExperienceLibraryIntegrationTest,GeneralExperienceSuggestionIntegrationTest,FeedbackAdjustmentIntegrationTest"
+          explicit="${adjust},${context},${general}"
+          # 校验：显式类不重复，且每个类在 apps/api/src/test 下恰有一个源文件。
+          dup=$(tr ',' '\n' <<<"${explicit}" | sort | uniq -d)
+          [ -z "${dup}" ] || { echo "::error::duplicate shard class: ${dup}"; exit 1; }
+          for c in $(tr ',' ' ' <<<"${explicit}"); do
+            n=$(find apps/api/src/test -name "${c}.java" | wc -l)
+            [ "${n}" -eq 1 ] || { echo "::error::${c}.java found ${n} times"; exit 1; }
+          done
+          case "${SHARD}" in
+            adjust)  filter="${adjust}" ;;
+            context) filter="${context}" ;;
+            general) filter="${general}" ;;
+            rest)    filter=$(tr ',' '\n' <<<"${explicit}" | sed 's/^/!/' | paste -sd, -) ;;
+            *) echo "::error::unknown shard ${SHARD}"; exit 1 ;;
+          esac
+          echo "shard ${SHARD}: -Dtest=${filter}"
+          echo "filter=${filter}" >> "$GITHUB_OUTPUT"
+
       - name: test:api
-        run: python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml test package
+        env:
+          TEST_FILTER: ${{ steps.shard.outputs.filter }}
+        run: python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml "-Dtest=${TEST_FILTER}" package
+
+      - name: Upload surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-${{ matrix.shard }}
+          path: apps/api/target/surefire-reports/
+          if-no-files-found: warn
+          retention-days: 14
