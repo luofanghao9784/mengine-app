@@ -20,6 +20,10 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Tests the old public business services against actual persisted departure facts. */
 @SpringBootTest(properties={"dreamcore.tasks.enabled=true","dreamcore.tasks.agent-mode=verification","dreamcore.tasks.initial-delay-ms=3600000","dreamcore.knowledge.enabled=true","dreamcore.knowledge.initial-delay-ms=3600000"})
 class DepartureBoundaryIntegrationTest {
+ @org.springframework.test.context.DynamicPropertySource
+ static void isolateQueue(org.springframework.test.context.DynamicPropertyRegistry registry) {
+  IsolatedTestDatabase.register(registry);
+ }
  @Autowired JdbcTemplate db; @Autowired MaterialService materials; @Autowired KnowledgeService knowledge;
  @Autowired IdentityService identities; @Autowired ConversationService conversations; @Autowired AgentTaskService agents;
  @Autowired ActivityService activity; @Autowired DocumentService documents; @Autowired PlanService plans;
@@ -37,7 +41,7 @@ class DepartureBoundaryIntegrationTest {
  }
  @AfterEach void stop(){db.update("UPDATE conversation_tasks SET status='CANCELLED' WHERE tenant_id=? AND status IN('QUEUED','RUNNING')",tenant);db.update("UPDATE knowledge_runs SET status='CANCELLED' WHERE tenant_id=? AND status IN('QUEUED','RUNNING')",tenant);}
  void denied(int status,Runnable action){assertEquals(status,assertThrows(IdentityException.class,action::run).status);}
- MaterialService.Entry file(UUID w){var f=materials.upload(actor,tenant,w,null,null,null,UUID.randomUUID(),new MockMultipartFile("file","synthetic.txt","text/plain","departure-evidence".getBytes(java.nio.charset.StandardCharsets.UTF_8)));var j=knowledge.claim();knowledge.finish(j,new DocumentParser.Result("synthetic","READY",List.of(),List.of(new DocumentParser.Fragment("L1","departure-evidence","TEXT"))));return f;}
+ MaterialService.Entry file(UUID w){var f=materials.upload(actor,tenant,w,null,null,null,UUID.randomUUID(),new MockMultipartFile("file","synthetic.txt","text/plain","departure-evidence".getBytes(java.nio.charset.StandardCharsets.UTF_8)));var j=knowledge.claim();assertNotNull(j);assertEquals(tenant,j.tenant());assertEquals(f.id(),j.material());knowledge.finish(j,new DocumentParser.Result("synthetic","READY",List.of(),List.of(new DocumentParser.Fragment("L1","departure-evidence","TEXT"))));return f;}
  UUID exit(){UUID id=UUID.randomUUID();db.update("INSERT INTO departure_executions(id,tenant_id,kind,state,requested_by,reason,policy_key,policy_revision,effective_at,deadline,prior_tenant_status) VALUES (?,?,'TENANT_EXIT','EXPORT_WINDOW',?,'合成退出','TENANT_EXIT_WINDOW',0,now(),now()+interval '2 hours','ACTIVE')",id,tenant,actor);db.update("INSERT INTO departure_export_grants(execution_id,tenant_id,account_id,workspace_id) VALUES (?,?,?,?)",id,tenant,actor,shared);return id;}
  @Test void allSpaceListsFilterBeforePaginationAndCoverageEvenBeforeExitWorkerRuns(){
   file(shared);file(excluded);file(personal);exit();
