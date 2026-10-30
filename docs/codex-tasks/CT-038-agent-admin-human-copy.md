@@ -1,6 +1,8 @@
-# CT-020-F4 agent-admin 人话替换（总负责人补丁词）
+# CT-038 agent-admin 人话替换（总负责人补丁词）
 
-状态：架构已裁可跑 · 待 docs 入库后交老板 Mac Codex　｜　**正式岗** id=`ec838a2d-d838-48cd-a789-e1af1424a7f3`　｜　分支：`codex/ct-020-f4-agent-admin-human-copy`　｜　**审查人（PR 后两人审）：发布验收 + 质量性能**（触及 ADR-B8 边界加 **架构逻辑**）　｜　基准：切单时最新 `origin/main`（须含 F1 `8428d1b` + F2 `#5`/`fd99aba`；F3 若已合则叠其上）
+状态：架构已裁可跑 · 待 docs 入库后交老板 Mac Codex　｜　**正式岗** id=`ec838a2d-d838-48cd-a789-e1af1424a7f3`　｜　分支：`codex/ct-038-agent-admin-human-copy`　｜　**审查人（PR 后两人审）：发布验收 + 质量性能**（触及 ADR-B8 边界加 **架构逻辑**）　｜　基准：切单时最新 `origin/main`（须含 F1 `8428d1b` + F2 `#5`/`fd99aba`；F3 若已合则叠其上）
+
+> **编号说明（DQ/质量 2026-10-30）**：人话替换原误用 CT-020-F4；**CT-020-F4 保留=只读 API 对接←CT-015**。本单正式号 **CT-038**。
 
 > **日切片：2026-10-31 / 可演示点**：Mac 本机打开 `/agent-admin/`：导航、分区、按钮均为总负责人**人话补丁词**（覆盖旧「店员花名册 / 本事」稿）；口径「**AI 功能**」。后三按钮灰。  
 > **口径（QUEUE 硬性第 6 条）**：四端 UI 可见文案一律易懂中文白话；禁止裸用 `seed` / `capability` / `Capability` / `Grant` / `admission` 等术语。  
@@ -93,7 +95,7 @@ git status   # 应 clean；否则 stash 见 README 固定步骤
 git switch main && git pull
 git merge-base --is-ancestor 8428d1b HEAD || { echo 'ERROR: 缺 F1 8428d1b'; exit 1; }
 git merge-base --is-ancestor fd99aba HEAD || { echo 'ERROR: 缺 F2 #5 fd99aba'; exit 1; }
-git switch -c codex/ct-020-f4-agent-admin-human-copy
+git switch -c codex/ct-038-agent-admin-human-copy
 ```
 
 ## ③ 完整 Codex 提示词
@@ -101,7 +103,7 @@ git switch -c codex/ct-020-f4-agent-admin-human-copy
 把下面整段交给 Codex（推荐 `$CODEX` + 模型 `gpt-6.1-sol`（若本机已有 `gpt-5.3-codex` 亦可），思考强度 **high**；sandbox/审批与组内既有 CT 一致）：
 
 ```
-你在梦擎仓库分支 codex/ct-020-f4-agent-admin-human-copy 上工作。基准 origin/main（须已含 F1 8428d1b 与 F2 #5 fd99aba）。只做本单范围。执行单全文：docs/codex-tasks/CT-020-F4-agent-admin-human-copy.md。
+你在梦擎仓库分支 codex/ct-038-agent-admin-human-copy 上工作。基准 origin/main（须已含 F1 8428d1b 与 F2 #5 fd99aba）。只做本单范围。执行单全文：docs/codex-tasks/CT-038-agent-admin-human-copy.md。
 
 【规格必须打开对照】
 - Notion《全端文案规范》https://www.notion.so/40966c386fbf8120aaefc0290f9dedb8
@@ -177,15 +179,15 @@ git add src/features/agent-admin
 # git add agent-admin/index.html
 git diff --cached --stat | grep -E 'apps/api|engine/src|workers/parser|com/dreamcore' && echo 'ERROR: 禁区' && exit 1
 git commit -m "$(cat <<'EOM'
-feat(agent-admin): CT-020-F4 人话替换（总负责人补丁词）
+feat(agent-admin): CT-038 人话替换（总负责人补丁词）
 
 导航/分区/按钮改为企业功能·功能上架·版本·企业开通与说明样例｜已上架；
 保存/上架/开通灰置；口径 AI 功能。不改路由 hash 与写 API。
 EOM
 )"
-git push -u origin codex/ct-020-f4-agent-admin-human-copy
-gh pr create -R luofanghao9784/mengine-app --base main --head codex/ct-020-f4-agent-admin-human-copy \
-  --title "feat(agent-admin): CT-020-F4 人话替换（补丁词）" \
+git push -u origin codex/ct-038-agent-admin-human-copy
+gh pr create -R luofanghao9784/mengine-app --base main --head codex/ct-038-agent-admin-human-copy \
+  --title "feat(agent-admin): CT-038 人话替换（补丁词）" \
   --body "## 摘要
 agent-admin 可见文案按总负责人补丁词人话化；后三按钮灰；口径「AI 功能」。
 
@@ -204,7 +206,7 @@ agent-admin 可见文案按总负责人补丁词人话化；后三按钮灰；�
 改路由 hash、样式体系、探针、写 API、登录、假 Live"
 ```
 
-网页备用：https://github.com/luofanghao9784/mengine-app/compare/main...codex/ct-020-f4-agent-admin-human-copy
+网页备用：https://github.com/luofanghao9784/mengine-app/compare/main...codex/ct-038-agent-admin-human-copy
 
 ## ⑥ 验收标准
 
@@ -246,8 +248,8 @@ agent-admin 可见文案按总负责人补丁词人话化；后三按钮灰；�
 - `gh issue create/comment`；回报或提交含口令
 - 有暂停令仍开 Codex
 
-回滚（未合入）：`git switch main && git branch -D codex/ct-020-f4-agent-admin-human-copy`。
+回滚（未合入）：`git switch main && git branch -D codex/ct-038-agent-admin-human-copy`。
 
 ---
 
-**DQ 审路径**：本文件 + QUEUE F4/人话行 + 两周日切片 D1。通过后交老板/前端岗 Mac 粘贴③开跑。
+**DQ 审路径**：本文件 + QUEUE CT-038/人话行（F4 保留只读 API） + 两周日切片 D1。通过后交老板/前端岗 Mac 粘贴③开跑。

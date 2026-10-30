@@ -24,7 +24,7 @@
    - **B**：已挂路由 + 鉴权门闸；未登录 `401` 人话体；登录后若仍未落库则 `501` 人话体（勿假 201）
    - **C（底线）**：控制器/路由存在，无会话也稳定返回 `401` 或 `501` 人话 JSON；`curl -i` 可证路径非 404
 3. **不做登录签发**（CT-035）；可复用现有会话/鉴权钩子做 401。
-4. **不做前端大改**（人话属 CT-020-F4；接真名单属后续日）。
+4. **不做前端大改**（人话属 CT-038；接真名单属后续日）。
 
 ## ① 目标与范围
 
@@ -42,7 +42,7 @@
   - 必要时最小迁移（仅本资源表）；须在 PR 写明
   - 可选：`contracts/public-api/capability-registry.openapi.json` 实现状态注释式 description
 - **不做什么（非范围）**：
-  - 不改前端大段 / 不接 toast 假成功（前端人话 CT-020-F4；接真数据后续日）
+  - 不改前端大段 / 不接 toast 假成功（前端人话 CT-038；接真数据后续日）
   - 不实现四端正式登录完整流（**CT-035**）
   - 不做上架/开通写完整态机、四眼 RETIRE、admission-tests 跑通（后移）
   - 不改 `/mengine-api`、`MENGINE_*` 标识；远程 **mengine-app**
@@ -110,7 +110,7 @@ git switch -c codex/ct-034-register-save-write-api-thin
 - 可在 capability-registry.openapi.json 的 info.description 追加「CT-034：stub|thin-persist」字样；勿删骨架、勿宣称全量 Live。
 
 【不许碰】
-src/features/** 大改、agent-admin UI 人话（CT-020-F4）、完整登录流（CT-035）、engine/** 业务大改、workers/parser、dist/** 手改、.local/**、口令、force push、reset --hard、直推 main、gh issue。
+src/features/** 大改、agent-admin UI 人话（CT-038）、完整登录流（CT-035）、engine/** 业务大改、workers/parser、dist/** 手改、.local/**、口令、force push、reset --hard、直推 main、gh issue。
 禁止改 Java 包名 dreamcore、/mengine-api、MENGINE_*。
 
 【本地验收 curl（按实际 API 口改端口；预览约定 api=50831）】
@@ -207,7 +207,7 @@ CT-035 登录、前端大改、上架/开通完整态机、假成功 toast"
 
 - `git push --force` / `-f` / `--force-with-lease`、`git reset --hard`、直推 `main`
 - **假成功**（无落库 201/200 + 前端成功暗示）
-- 完整登录实现（CT-035）、前端人话大改（CT-020-F4）、假 Live 列表
+- 完整登录实现（CT-035）、前端人话大改（CT-038）、假 Live 列表
 - 改 `com.dreamcore.*` 包名、`/mengine-api`、`MENGINE_*`
 - `gh issue create/comment`；含口令提交
 - 有暂停令仍开 Codex
