@@ -156,6 +156,6 @@
 | CT-020-F3 | versions/grants 只读子视图 | **执行单本 PR**；#5 已合后可派实现 |
 | CT-031 | CT-013 五分片 OpenAPI 骨架落盘（并行轨②） | **执行单本 PR** |
 | CT-032 | CI spending 限额/告警（并行轨③） | **落地文档本 PR** → [`ci-spending-limits-20261030.md`](ci-spending-limits-20261030.md)；Billing 待老板点按；自托管→CT-033 |
-| CT-035 | 正式登录 + 租户隔离（ADR-B8 D8-2/D8-3；L1–L4） | **执行单本 PR** → [`CT-035-agent-admin-login-tenant-isolation.md`](CT-035-agent-admin-login-tenant-isolation.md) |
+| CT-035 | 正式登录 + 租户隔离（L1–L4；realm/cookie【待补】；与 agent-admin 写口无关） | **执行单本 PR** → [`CT-035-agent-admin-login-tenant-isolation.md`](CT-035-agent-admin-login-tenant-isolation.md) |
 | CT-036 | 企业侧/工作台消费已开通（两周 D6～D8 · 验收句 E1–E4） | **骨架已出** → [`CT-036-enterprise-consume-opened-capability.md`](CT-036-enterprise-consume-opened-capability.md)；实现细节随 CT-035 / CT-034-P1 合入后补裁 |
 
