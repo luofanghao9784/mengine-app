@@ -111,7 +111,6 @@ export function AgentAdminApp() {
           >
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
-          <p className="agent-session">预览页面 · 无需登录</p>
         </div>
       </aside>
       <div className="admin-main">
