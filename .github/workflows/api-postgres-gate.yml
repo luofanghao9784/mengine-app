@@ -78,6 +78,7 @@ jobs:
           # poppler-utils 提供 /usr/bin/{pdfinfo,pdftotext,pdftoppm}；tesseract-ocr 提供 /usr/bin/tesseract。
           # 解析器实际读取的 chi_sim/eng 在下一步 setup.py 写入的 TESSDATA_PREFIX，不读发行版 tessdata。
           sudo apt-get install -y \
+            build-essential \
             postgresql-18 \
             bubblewrap \
             poppler-utils \
@@ -397,6 +398,21 @@ jobs:
           test -d engine/node_modules/@deepseek-ai/dsh-schedule
 
       # 供 NativeSchedules / Presentation / BriefingFaceAlignment 等测试使用本地引擎产物（engine/dist）；只构建，不连 live 模型。
+      - name: Setup pnpm for wiki
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+
+      - name: Install wiki bridge dependencies
+        working-directory: integrations/mengine-wiki
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          test -f node_modules/tsx/dist/cli.mjs
+          node node_modules/tsx/dist/cli.mjs --version
+          node --input-type=module -e 'import Database from "better-sqlite3"; const db = new Database(":memory:"); if (db.prepare("SELECT 1 AS n").get().n !== 1) process.exit(1); db.close();'
+
       - name: Build engine
         run: |
           set -euo pipefail
