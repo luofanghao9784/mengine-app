@@ -20,10 +20,24 @@ const SessionContext = createContext<{
 } | null>(null);
 const platformRequest = createIdentityRequest();
 const platformIdentityClient = {
-  me: (signal?: AbortSignal) => platformRequest('/api/platform-admin/v1/auth/me', 'GET', isIdentity, undefined, signal),
+  me: (signal?: AbortSignal) =>
+    platformRequest('/api/platform-admin/v1/auth/me', 'GET', isIdentity, undefined, signal),
   login: (username: string, password: string) =>
     platformRequest('/api/platform-admin/v1/auth/login', 'POST', isIdentity, { username, password }),
   logout: () => platformRequest('/api/platform-admin/v1/auth/logout', 'POST', (v): v is null => v === null),
+};
+
+// F1 only probes the isolated agent realm. Login/writes arrive with CT-018.
+const agentRequest = createIdentityRequest();
+const agentIdentityClient = {
+  me: (signal?: AbortSignal) =>
+    agentRequest('/api/agent-admin/v1/auth/me', 'GET', isIdentity, undefined, signal),
+  login: async (_phone: string, _password: string): Promise<Identity> => {
+    throw new Error('后端未就绪：写入 API 待 CT-018 / PR 5b');
+  },
+  logout: async (): Promise<null> => {
+    throw new Error('后端未就绪：写入 API 待 CT-018 / PR 5b');
+  },
 };
 
 export function SessionProvider({
@@ -31,13 +45,19 @@ export function SessionProvider({
   realm = 'customer',
 }: {
   children: ReactNode;
-  realm?: 'customer' | 'platform';
+  realm?: 'customer' | 'platform' | 'agent';
 }) {
-  const client = realm === 'platform' ? platformIdentityClient : identityClient;
-  const CHANGE_KEY = realm === 'platform' ? 'dreamcore-platform-session-change' : 'dreamcore-session-change';
+  const client =
+    realm === 'agent' ? agentIdentityClient : realm === 'platform' ? platformIdentityClient : identityClient;
+  const CHANGE_KEY =
+    realm === 'agent'
+      ? 'dreamcore-agent-session-change'
+      : realm === 'platform'
+        ? 'dreamcore-platform-session-change'
+        : 'dreamcore-session-change';
   const reconcile = useCallback(
     (identity: Identity | null) => {
-      if (realm === 'platform') return;
+      if (realm !== 'customer') return;
       reconcileDocumentDrafts(identity);
       reconcileViewStates(
         identity?.account.id ?? null,

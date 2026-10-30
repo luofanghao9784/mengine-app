@@ -4,7 +4,7 @@
  * 界面主体保持中性暖白；语义色只在少量位置出现，不做大面积铺色。
  * 只在管理端入口生效；客户端与深色仪表盘舞台不受影响。
  */
-:root:is([data-surface='tenant-admin'], [data-surface='platform-admin'], [data-surface='headquarters-support']) {
+:root:is([data-surface='tenant-admin'], [data-surface='platform-admin'], [data-surface='headquarters-support'], [data-surface='agent-admin']) {
   --canvas: #f5f3ee;
   background:
     radial-gradient(900px 600px at 6% -6%, rgb(241 214 160 / 30%), transparent 60%),
@@ -13,7 +13,7 @@
     var(--canvas);
   background-attachment: fixed;
 }
-:root:is([data-surface='tenant-admin'], [data-surface='platform-admin'], [data-surface='headquarters-support']) .admin-control:not(.admin-engine-fullscreen) {
+:root:is([data-surface='tenant-admin'], [data-surface='platform-admin'], [data-surface='headquarters-support'], [data-surface='agent-admin']) .admin-control:not(.admin-engine-fullscreen) {
   --canvas: transparent;
   --surface: #fffdf9;
   --surface-muted: rgb(29 27 23 / 4%);

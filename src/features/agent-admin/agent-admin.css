@@ -1,0 +1,135 @@
+.agent-admin .admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.agent-admin .admin-header > span,
+.agent-intro,
+.agent-connection,
+.agent-session {
+  color: var(--muted);
+  font-size: 13px;
+}
+.agent-admin .admin-header h1 {
+  font-size: 24px;
+}
+.agent-functions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+.agent-function {
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+}
+.agent-function h2 {
+  font-size: 20px;
+  font-weight: 500;
+}
+.agent-function > svg {
+  color: var(--champagne);
+}
+.agent-function code {
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.agent-function p {
+  color: var(--muted);
+  line-height: 1.7;
+  min-height: 48px;
+}
+.agent-badge {
+  float: right;
+  background: var(--accent-soft);
+  color: var(--blue-ink);
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+}
+.agent-tabs {
+  display: flex;
+  gap: 24px;
+  margin: 24px 0;
+  border-bottom: 1px solid var(--border);
+}
+.agent-tabs a {
+  color: var(--muted);
+  padding: 12px 0;
+  text-decoration: none;
+}
+.agent-tabs a[aria-current] {
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+}
+.agent-empty {
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 70px 24px;
+  text-align: center;
+}
+.agent-empty > svg {
+  color: var(--champagne);
+}
+.agent-empty p {
+  color: var(--muted);
+  line-height: 1.8;
+}
+.agent-admin a:focus-visible,
+.agent-admin button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.agent-admin .admin-content {
+  animation: agent-enter 0.25s ease-out;
+}
+@keyframes agent-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-admin .admin-content {
+    animation: none;
+  }
+}
+@media (max-width: 760px) {
+  .agent-admin.admin-shell {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+  .agent-admin .admin-sidebar {
+    position: static;
+    width: auto;
+    transform: none;
+    visibility: visible;
+    padding: 18px 6px;
+    margin: 6px 0 6px 6px;
+  }
+  .agent-admin .admin-brand-label,
+  .agent-admin .admin-scope,
+  .agent-admin .admin-nav-link span,
+  .agent-admin .admin-nav-group-title,
+  .agent-admin .agent-session {
+    display: none;
+  }
+  .agent-admin .admin-brand {
+    padding: 4px 8px 24px;
+  }
+  .agent-admin .admin-header {
+    padding: 16px;
+    flex-wrap: wrap;
+  }
+  .agent-admin .admin-content {
+    padding: 16px;
+  }
+  .agent-functions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

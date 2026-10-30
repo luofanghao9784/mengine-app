@@ -13,6 +13,7 @@ export default defineConfig({
         'tenant-admin/governance/index.html',
         'tenant-admin/support/index.html',
         'platform-admin/index.html',
+        'agent-admin/index.html',
       ],
     },
   },
