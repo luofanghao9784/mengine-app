@@ -10,6 +10,20 @@ import argparse, http.cookiejar, json, os, pathlib, secrets, sys, urllib.error, 
 
 P = '/api/platform-admin/v1'
 TA = '/api/tenant-admin/v1/tenants/'
+DISPLAY_NAMES = {
+    '#2': '陈明',
+    '#3': '王芳',
+    '#5': '林浩',
+    '#6': '李欣',
+    '#7': '张伟',
+    '#8': '刘洋',
+    '#9': '赵敏',
+    '#10': '周宁',
+    '#11': '吴桐',
+    '#12': '徐佳',
+    '#13': '孙悦',
+    '#15': '郑宇',
+}
 # 号码用 +1 555-555-01xx（北美保留的虚构号段）；本地投递，不会发真实短信
 def phone(n): return f'+1555555{n:04d}'
 
@@ -96,7 +110,7 @@ class Seeder:
             _, ch = r.platform('POST', P + '/auth/invitation/challenge', {'token': token})
             _, code = r.send('GET', f"/api/v1/auth/phone/local-code/{ch['id']}")
             _, me = r.platform('POST', P + '/auth/invitation/accept', {'token': token, 'username': a['login'], 'password': a['password'],
-                                                                      'displayName': label, 'challengeId': ch['id'], 'code': code['code']})
+                                                                      'displayName': DISPLAY_NAMES[key], 'challengeId': ch['id'], 'code': code['code']})
             self.state['ids'][key] = me['account']['id']
             if revoke:
                 _, staff = pa.platform('GET', P + '/staff')
@@ -116,7 +130,7 @@ class Seeder:
         c.customer('POST', '/api/v1/auth/phone/invitation', {'token': token})
         _, ch = c.customer('POST', '/api/v1/auth/phone/challenges', {'purpose': 'JOIN', 'token': token})
         _, code = c.send('GET', f"/api/v1/auth/phone/local-code/{ch['id']}")
-        _, joined = c.customer('POST', '/api/v1/auth/phone/accept', {'requestId': rid(), 'token': token, 'displayName': a['role'][:80],
+        _, joined = c.customer('POST', '/api/v1/auth/phone/accept', {'requestId': rid(), 'token': token, 'displayName': DISPLAY_NAMES[key],
                                'password': a['password'], 'challengeId': ch['id'], 'code': code['code'], 'acceptResponsibility': owner})
         self.state['ids'][key] = joined['identity']['account']['id']
     def invite(self, admin_key, tkey, contact, spaces=()):
