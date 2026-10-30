@@ -187,10 +187,30 @@ export function AgentAdminApp() {
                   <RegisterDialog open={registerOpen} onClose={() => setRegisterOpen(false)} />
                 </>
               ) : (
-                <section className="admin-panel agent-empty">
+                <section className="admin-panel agent-empty" aria-labelledby="agent-readonly-title">
                   <Boxes size={40} aria-hidden="true" />
-                  <h2>即将提供</h2>
-                  <p>版本与授权管理将在后续切片开放。</p>
+                  <h2 id="agent-readonly-title">
+                    {route.tab === 'versions' ? '版本管理 · 只读' : '授权管理 · 只读'}
+                  </h2>
+                  <h3>{route.tab === 'versions' ? '尚无可展示的版本' : '尚无可展示的租户授权'}</h3>
+                  <p>
+                    {connected === null
+                      ? '正在探测后端连接，当前未加载列表。'
+                      : connected
+                        ? '只读接口已连接；列表契约待对接，当前无可安全展示的数据。'
+                        : '尚未连接后端或未登录，当前未加载列表。'}
+                  </p>
+                  <p>写 API 未就绪（CT-018）</p>
+                  <div className="agent-readonly-actions" aria-label="暂未开放的写操作">
+                    {(route.tab === 'versions'
+                      ? ['登记版本', '退役版本', '变更准入状态']
+                      : ['新增授权', '变更授权', '设为默认']
+                    ).map((label) => (
+                      <button key={label} className="button" disabled title="写 API 未就绪（CT-018）">
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </section>
               )}
             </>
