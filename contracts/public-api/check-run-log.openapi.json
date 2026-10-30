@@ -1,0 +1,496 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "检查运行记录（check-run-log）",
+    "version": "0.0.0-skeleton",
+    "description": "【骨架 · 后端未实现 · 勿当 Live】CT-031 OpenAPI 提纲占位（表面 tenant-admin）。字段/枚举对齐 docs/architecture/契约分片-检查与能力.md 与 ADR-B8 D8-5；响应以 501 占位；禁止当作已实现 API 或假 Live 业务数据。"
+  },
+  "paths": {
+    "/api/tenant-admin/v1/quality-ops/check-tasks": {
+      "get": {
+        "operationId": "listCheckTasks",
+        "summary": "列出真检查任务（骨架）",
+        "tags": [
+          "quality-ops"
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CheckTask"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCheckTask",
+        "summary": "创建检查任务（骨架）",
+        "tags": [
+          "quality-ops"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckTaskCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckTask"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenant-admin/v1/quality-ops/check-tasks/{taskId}": {
+      "get": {
+        "operationId": "getCheckTask",
+        "summary": "获取检查任务（骨架）",
+        "tags": [
+          "quality-ops"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckTask"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenant-admin/v1/quality-ops/check-tasks/{taskId}/attempts": {
+      "get": {
+        "operationId": "listCheckAttempts",
+        "summary": "列出任务 attempt（骨架）",
+        "tags": [
+          "quality-ops"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CheckAttempt"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "RunStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "awaiting_human",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ]
+      },
+      "QualityVerdict": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "fail",
+          "pending"
+        ],
+        "description": "定稿含 pending；≠ admissionTestVerdict"
+      },
+      "PublishStatus": {
+        "type": "string",
+        "enum": [
+          "unpublished",
+          "published",
+          "superseded"
+        ]
+      },
+      "ExecutionMode": {
+        "type": "string",
+        "enum": [
+          "simulated",
+          "real"
+        ]
+      },
+      "IssueKind": {
+        "type": "string",
+        "enum": [
+          "unit_mix",
+          "date_ambiguous",
+          "missing_business_key",
+          "conflict_duplicate",
+          "other"
+        ]
+      },
+      "CheckStage": {
+        "type": "string",
+        "enum": [
+          "ingest",
+          "parse",
+          "quality-check",
+          "review",
+          "publish"
+        ]
+      },
+      "QualityIssueEvidence": {
+        "type": "object",
+        "required": [
+          "inputVersionId"
+        ],
+        "properties": {
+          "inputVersionId": {
+            "type": "string"
+          },
+          "row": {
+            "type": "integer"
+          },
+          "column": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "QualityIssue": {
+        "type": "object",
+        "required": [
+          "issueId",
+          "kind",
+          "qualityVerdict",
+          "summary"
+        ],
+        "properties": {
+          "issueId": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/IssueKind"
+          },
+          "qualityVerdict": {
+            "$ref": "#/components/schemas/QualityVerdict"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/QualityIssueEvidence"
+          },
+          "rawValue": {
+            "type": "string"
+          },
+          "proposedValue": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CheckTask": {
+        "type": "object",
+        "required": [
+          "taskId",
+          "tenantId",
+          "inputVersionId",
+          "configVersionId",
+          "lockedConfigVersionId",
+          "runStatus",
+          "qualityVerdict",
+          "publishStatus",
+          "executionMode",
+          "stage"
+        ],
+        "properties": {
+          "taskId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "inputVersionId": {
+            "type": "string"
+          },
+          "configVersionId": {
+            "type": "string"
+          },
+          "lockedConfigVersionId": {
+            "type": "string"
+          },
+          "moduleVersionId": {
+            "type": "string"
+          },
+          "runStatus": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "qualityVerdict": {
+            "$ref": "#/components/schemas/QualityVerdict"
+          },
+          "publishStatus": {
+            "$ref": "#/components/schemas/PublishStatus"
+          },
+          "executionMode": {
+            "$ref": "#/components/schemas/ExecutionMode"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/CheckStage"
+          },
+          "openIssueCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failedStep": {
+            "type": "string"
+          },
+          "usage": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "isStale": {
+            "type": "boolean",
+            "description": "任务级过期提示；独立布尔，不进三态枚举"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "三态分列：runStatus / qualityVerdict / publishStatus；succeeded+fail → unpublished"
+      },
+      "CheckTaskCreate": {
+        "type": "object",
+        "required": [
+          "inputVersionId",
+          "configVersionId",
+          "executionMode"
+        ],
+        "properties": {
+          "spaceId": {
+            "type": "string"
+          },
+          "inputVersionId": {
+            "type": "string"
+          },
+          "configVersionId": {
+            "type": "string"
+          },
+          "moduleVersionId": {
+            "type": "string"
+          },
+          "executionMode": {
+            "$ref": "#/components/schemas/ExecutionMode"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CheckAttempt": {
+        "type": "object",
+        "required": [
+          "attemptId",
+          "taskId",
+          "lockedConfigVersionId"
+        ],
+        "properties": {
+          "attemptId": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "lockedConfigVersionId": {
+            "type": "string"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "retryOf": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

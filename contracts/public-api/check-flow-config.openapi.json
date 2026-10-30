@@ -1,0 +1,441 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "检查流程配置（check-flow-config）",
+    "version": "0.0.0-skeleton",
+    "description": "【骨架 · 后端未实现 · 勿当 Live】CT-031 OpenAPI 提纲占位（表面 tenant-admin）。字段/枚举对齐 docs/architecture/契约分片-检查与能力.md 与 ADR-B8 D8-5；响应以 501 占位；禁止当作已实现 API 或假 Live 业务数据。"
+  },
+  "paths": {
+    "/api/tenant-admin/v1/quality-ops/config-versions": {
+      "get": {
+        "operationId": "listCheckFlowConfigVersions",
+        "summary": "列出流程配置版本（骨架）",
+        "tags": [
+          "quality-ops"
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CheckFlowConfigVersion"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCheckFlowConfigVersion",
+        "summary": "新建 draft 配置版本（骨架）",
+        "tags": [
+          "quality-ops"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckFlowConfigVersionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckFlowConfigVersion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenant-admin/v1/quality-ops/config-versions/{configVersionId}/publish": {
+      "post": {
+        "operationId": "publishCheckFlowConfigVersion",
+        "summary": "发布配置版本（骨架）",
+        "tags": [
+          "quality-ops"
+        ],
+        "parameters": [
+          {
+            "name": "configVersionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckFlowConfigVersion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenant-admin/v1/quality-ops/config-versions/{configVersionId}/rollback": {
+      "post": {
+        "operationId": "rollbackCheckFlowConfigVersion",
+        "summary": "回退：新 published + supersedes；旧版 retired（骨架）",
+        "tags": [
+          "quality-ops"
+        ],
+        "parameters": [
+          {
+            "name": "configVersionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckFlowConfigVersion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenant-admin/v1/quality-ops/bindable-modules": {
+      "get": {
+        "operationId": "listBindableModulesForTenant",
+        "summary": "本租户可绑定版本列表（骨架；含 admissionStatus 只读）",
+        "tags": [
+          "quality-ops"
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BindableModuleSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdmissionStatus": {
+        "type": "string",
+        "enum": [
+          "candidate",
+          "admitted",
+          "deprecated"
+        ],
+        "description": "模块版本准入状态（≠ admissionTestVerdict）"
+      },
+      "ConfigStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "published",
+          "retired"
+        ]
+      },
+      "StepBinding": {
+        "type": "object",
+        "required": [
+          "stepId"
+        ],
+        "properties": {
+          "stepId": {
+            "type": "string",
+            "enum": [
+              "ingest",
+              "parse",
+              "quality-check",
+              "review",
+              "publish"
+            ],
+            "description": "首版步骤；quality-check 定稿名"
+          },
+          "moduleVersionId": {
+            "type": "string"
+          },
+          "toolPolicy": {
+            "type": "string"
+          },
+          "budget": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CheckFlowConfigVersion": {
+        "type": "object",
+        "required": [
+          "configVersionId",
+          "tenantId",
+          "status",
+          "stepBindings"
+        ],
+        "properties": {
+          "configVersionId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ConfigStatus"
+          },
+          "supersedes": {
+            "type": "string",
+            "description": "定稿血缘字段；≠ basedOn"
+          },
+          "stepBindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StepBinding"
+            }
+          },
+          "requiredChecks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CheckFlowConfigVersionCreate": {
+        "type": "object",
+        "required": [
+          "stepBindings"
+        ],
+        "properties": {
+          "spaceId": {
+            "type": "string"
+          },
+          "supersedes": {
+            "type": "string"
+          },
+          "stepBindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StepBinding"
+            }
+          },
+          "requiredChecks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "BindableModuleSummary": {
+        "type": "object",
+        "required": [
+          "moduleVersionId",
+          "admissionStatus"
+        ],
+        "properties": {
+          "moduleVersionId": {
+            "type": "string"
+          },
+          "capabilityId": {
+            "type": "string"
+          },
+          "admissionStatus": {
+            "$ref": "#/components/schemas/AdmissionStatus"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

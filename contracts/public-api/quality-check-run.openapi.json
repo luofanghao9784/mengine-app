@@ -1,0 +1,439 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "检查调试执行（quality-check-run / CheckDebugRun）",
+    "version": "0.0.0-skeleton",
+    "description": "【骨架 · 后端未实现 · 勿当 Live】CT-031 OpenAPI 提纲占位（表面 tenant-admin）。字段/枚举对齐 docs/architecture/契约分片-检查与能力.md 与 ADR-B8 D8-5；响应以 501 占位；禁止当作已实现 API 或假 Live 业务数据。"
+  },
+  "paths": {
+    "/api/tenant-admin/v1/quality-ops/check-debug-runs": {
+      "get": {
+        "operationId": "listCheckDebugRuns",
+        "summary": "列出调试试跑（骨架；与 CheckTask 分 id 空间）",
+        "tags": [
+          "quality-ops"
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CheckDebugRun"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCheckDebugRun",
+        "summary": "发起单模块试跑（禁自动发布；骨架）",
+        "tags": [
+          "quality-ops"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckDebugRunCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "骨架占位 · 未实现；无 publishStatus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckDebugRun"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenant-admin/v1/quality-ops/check-debug-runs/{debugRunId}": {
+      "get": {
+        "operationId": "getCheckDebugRun",
+        "summary": "获取调试试跑（骨架）",
+        "tags": [
+          "quality-ops"
+        ],
+        "parameters": [
+          {
+            "name": "debugRunId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckDebugRun"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenant-admin/v1/quality-ops/check-debug-runs/{debugRunId}/cancel": {
+      "post": {
+        "operationId": "cancelCheckDebugRun",
+        "summary": "取消调试试跑（骨架）",
+        "tags": [
+          "quality-ops"
+        ],
+        "parameters": [
+          {
+            "name": "debugRunId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "骨架占位 · 未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckDebugRun"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话无效（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "资格或 CSRF 不符合（骨架占位）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "骨架未实现（Not Implemented）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "RunStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "awaiting_human",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ]
+      },
+      "QualityVerdict": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "fail",
+          "pending"
+        ],
+        "description": "定稿含 pending；≠ admissionTestVerdict"
+      },
+      "ExecutionMode": {
+        "type": "string",
+        "enum": [
+          "simulated",
+          "real"
+        ]
+      },
+      "IssueKind": {
+        "type": "string",
+        "enum": [
+          "unit_mix",
+          "date_ambiguous",
+          "missing_business_key",
+          "conflict_duplicate",
+          "other"
+        ]
+      },
+      "QualityIssueEvidence": {
+        "type": "object",
+        "required": [
+          "inputVersionId"
+        ],
+        "properties": {
+          "inputVersionId": {
+            "type": "string"
+          },
+          "row": {
+            "type": "integer"
+          },
+          "column": {
+            "type": "string",
+            "description": "定稿 column（非 field）"
+          }
+        },
+        "additionalProperties": false
+      },
+      "QualityIssue": {
+        "type": "object",
+        "required": [
+          "issueId",
+          "kind",
+          "qualityVerdict",
+          "summary"
+        ],
+        "properties": {
+          "issueId": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/IssueKind"
+          },
+          "qualityVerdict": {
+            "$ref": "#/components/schemas/QualityVerdict"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/QualityIssueEvidence"
+          },
+          "rawValue": {
+            "type": "string"
+          },
+          "proposedValue": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CheckDebugRun": {
+        "type": "object",
+        "required": [
+          "debugRunId",
+          "tenantId",
+          "inputVersionId",
+          "moduleVersionId",
+          "executionMode",
+          "runStatus"
+        ],
+        "properties": {
+          "debugRunId": {
+            "type": "string",
+            "description": "定稿主键；≠ runId"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "inputVersionId": {
+            "type": "string"
+          },
+          "capabilityId": {
+            "type": "string"
+          },
+          "moduleVersionId": {
+            "type": "string"
+          },
+          "configVersionId": {
+            "type": "string"
+          },
+          "executionMode": {
+            "$ref": "#/components/schemas/ExecutionMode"
+          },
+          "runStatus": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "qualityVerdict": {
+            "$ref": "#/components/schemas/QualityVerdict"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityIssue"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "usage": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "error": {
+            "type": "string"
+          },
+          "evidenceComplete": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "description": "无 publishStatus；不可发布"
+      },
+      "CheckDebugRunCreate": {
+        "type": "object",
+        "required": [
+          "inputVersionId",
+          "moduleVersionId",
+          "executionMode"
+        ],
+        "properties": {
+          "spaceId": {
+            "type": "string"
+          },
+          "inputVersionId": {
+            "type": "string"
+          },
+          "capabilityId": {
+            "type": "string"
+          },
+          "moduleVersionId": {
+            "type": "string"
+          },
+          "configVersionId": {
+            "type": "string"
+          },
+          "executionMode": {
+            "$ref": "#/components/schemas/ExecutionMode"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
