@@ -1,15 +1,49 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ClipboardCheck } from 'lucide-react';
 import { Loading } from '../shared/admin';
-import { openedCapabilitiesFailureTitle, type OpenedCapabilitiesState } from '../admin/openedCapabilities';
-import { Empty } from '../shared/ui';
-import { Button } from '../shared/ui';
+import { openedCapabilitiesFailureTitle, type OpenedCapabilitiesState } from '../admin/openedCapabilities.ts';
+import { Button, Empty, Field } from '../shared/ui';
+import {
+  qualityCheckFailureMessage,
+  qualityCheckNotOpened,
+  submitQualityCheck,
+  type QualityCheckResult,
+} from './quality-check-client.ts';
 import './quality-check.css';
 
 export const qualityCheckHref = (tenant: string) =>
   `#tenant=${encodeURIComponent(tenant)}&view=quality-check`;
 
-/** Enablement is read-only; submission and execution are outside this slice. */
+type Submission =
+  | { state: 'idle' | 'submitting' }
+  | { state: 'success'; value: QualityCheckResult }
+  | { state: 'failure'; message: string };
+
 export function QualityCheck({ opened }: { opened: OpenedCapabilitiesState }) {
+  const [materialText, setMaterialText] = useState('');
+  const [title, setTitle] = useState('');
+  const [submission, setSubmission] = useState<Submission>({ state: 'idle' });
+  const pending = useRef<AbortController | null>(null);
+  useEffect(() => () => pending.current?.abort(), []);
+  const enabled = !opened.error && opened.items?.some((item) => item.enterpriseFunction === 'quality-check');
+  const valid = materialText.trim().length > 0 && materialText.length <= 20_000 && title.length <= 200;
+  const submitting = submission.state === 'submitting';
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!enabled || !valid || pending.current) return;
+    const controller = new AbortController();
+    pending.current = controller;
+    setSubmission({ state: 'submitting' });
+    try {
+      const value = await submitQualityCheck(materialText, title, controller.signal);
+      if (!controller.signal.aborted) setSubmission({ state: 'success', value });
+    } catch (error) {
+      if (!controller.signal.aborted)
+        setSubmission({ state: 'failure', message: qualityCheckFailureMessage(error) });
+    } finally {
+      if (pending.current === controller) pending.current = null;
+    }
+  }
   if (opened.error)
     return (
       <Empty
@@ -20,29 +54,62 @@ export function QualityCheck({ opened }: { opened: OpenedCapabilitiesState }) {
     );
   if (!opened.items) return <Loading />;
   if (!opened.items.some((item) => item.enterpriseFunction === 'quality-check'))
-    return (
-      <Empty
-        icon={ClipboardCheck}
-        title="本企业尚未开通此 AI 功能"
-        text="请联系企业管理员确认，开通后再进入。"
-      />
-    );
+    return <Empty icon={ClipboardCheck} title={qualityCheckNotOpened} text="开通后可在这里提交检查材料。" />;
   return (
     <div className="quality-check">
       <section className="access-panel" aria-labelledby="quality-check-intro">
         <h2 id="quality-check-intro">① 进入说明</h2>
-        <p>质量检查用于提交检查材料并查看处理结果。材料提交与结果读取尚未接通。</p>
+        <p>输入需要检查的文字，提交后在下方查看本次结果。刷新页面后，本次结果不会保留。</p>
       </section>
       <section className="access-panel" aria-labelledby="quality-check-submit">
         <h2 id="quality-check-submit">② 提交检查材料</h2>
-        <Button disabled aria-describedby="quality-check-submit-reason">
-          提交检查材料
-        </Button>
-        <p id="quality-check-submit-reason">暂时不能提交检查材料（执行服务尚未接通）</p>
+        <form onSubmit={submit} aria-busy={submitting}>
+          <Field label="标题（选填）" hint={`${title.length} / 200 字符`}>
+            <input value={title} onChange={(event) => setTitle(event.target.value)} disabled={submitting} />
+          </Field>
+          <Field label="检查材料">
+            <textarea
+              value={materialText}
+              onChange={(event) => setMaterialText(event.target.value)}
+              rows={8}
+              disabled={submitting}
+              aria-describedby="quality-check-count"
+              aria-invalid={materialText.length > 20_000}
+            />
+          </Field>
+          <p id="quality-check-count">{materialText.length} / 20000 字符</p>
+          {materialText.length > 20_000 && <p role="alert">检查材料不能超过 20000 字符</p>}
+          {title.length > 200 && <p role="alert">标题不能超过 200 字符</p>}
+          <Button type="submit" disabled={!valid || submitting}>
+            {submitting ? '提交中…' : '提交检查材料'}
+          </Button>
+        </form>
       </section>
       <section className="access-panel" aria-labelledby="quality-check-results">
         <h2 id="quality-check-results">③ 处理结果</h2>
-        <p>暂时不能查看处理结果（执行服务尚未接通）</p>
+        <div aria-live="polite" aria-atomic="true">
+          {submission.state === 'idle' && <p>提交材料后，这里会显示本次处理结果。</p>}
+          {submitting && <p role="status">提交中，请稍候…</p>}
+          {submission.state === 'failure' && <p role="alert">{submission.message}</p>}
+          {submission.state === 'success' && (
+            <>
+              <p>
+                {submission.value.result.verdict === 'NO_ISSUES'
+                  ? '没有发现需要注意的地方'
+                  : `发现 ${submission.value.result.issues.length} 处需要注意`}
+              </p>
+              {submission.value.result.issues.length > 0 && (
+                <ol>
+                  {submission.value.result.issues.map((issue, index) => (
+                    <li key={index} style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                      {issue.message}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </>
+          )}
+        </div>
       </section>
     </div>
   );
