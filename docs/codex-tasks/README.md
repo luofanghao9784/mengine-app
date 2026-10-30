@@ -64,6 +64,8 @@
 4. **审查账号**：非作者留痕/Approve 使用 **`luofanghao1203`**（与开 PR 的 `luofanghao9784` 分离）。作者不得 Approve 自己的 PR。
 5. **同账号方案 A 已废（2026-10-30，CT-029）**：禁止用开 PR 同账号 Comment 代闸门。闸门目标为 1203 Approve；发闸门接通前暂用 **1203** Comment「放行/可合」。纯文档 PR 两人审仍为**质量性能 + 发布验收**；拦 P0+P1。
 
+CT-030：门禁单一 paths，已取代 CT-008 同事件 ignore。
+
 ### 3.2 Codex 机审（第一道，即日）
 - 每个**业务/流程 PR** 合入前，在老板 Mac 用 Codex 机审（见 [`CODEX-REVIEW-PROMPT.md`](CODEX-REVIEW-PROMPT.md)）。
 - **流程/执行单类 docs PR 仍须机审**（含 CT-007 自身）；仅错别字/标点超短 docs 可免，且 PR 须注明「免机审：仅错别字/标点」。

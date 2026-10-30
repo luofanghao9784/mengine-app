@@ -1,14 +1,23 @@
 # 指向 main 的 pull request 只跑契约与引擎门禁。
 # 不含 model:smoke、test:model-smoke、test:ppt:live，也不跑需要真实模型密钥的步骤。
+# CT-030：on.pull_request 只有 paths。未命中正向路径则 skipped。
 name: Contracts · Engine gate
 
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
-      - '**/*.md'
+    paths:
+      - 'contracts/**'
+      - 'tests/contracts/**'
+      - 'engine/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'engine/package.json'
+      - 'engine/package-lock.json'
+      - '.github/workflows/contracts-engine-gate.yml'
+      - '!docs/**'
+      - '!*.md'
+      - '!**/*.md'
 
 # contents:read 供 checkout；actions:write 供 setup-node 的 npm 缓存。
 # 显式 permissions 会覆盖默认令牌权限，少了 actions:write 时缓存步骤会 403 并挡住门禁。

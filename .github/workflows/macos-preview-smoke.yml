@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, macos-15]  # 均为 Apple Silicon（/opt/homebrew）；DQ 裁定不为 Intel 另开一套
+        os: [macos-15]  # 单一 Apple Silicon（macos-15，/opt/homebrew）；CT-030 缩矩阵。DQ 裁定不为 Intel 另开一套
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:

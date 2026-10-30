@@ -1,15 +1,29 @@
 # 指向 main 的 pull request 只跑前端硬门禁 A/B/C。
 # 全量 npm run test:e2e 与选跑脚本不在本 workflow。
 # 选跑触发条件：docs/验收/_模板-前端合入验收清单.md
+# CT-030：on.pull_request 只有 paths。未命中正向路径则 skipped。
 name: Frontend gate
 
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
-      - '**/*.md'
+    paths:
+      - 'src/**'
+      - 'workspace/**'
+      - 'tenant-admin/**'
+      - 'platform-admin/**'
+      - 'agent-admin/**'
+      - 'vite.config.ts'
+      - 'playwright.config.ts'
+      - 'tests/**'
+      - 'scripts/verify-built-entries.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.node-version'
+      - '.github/workflows/frontend-gate.yml'
+      - '!docs/**'
+      - '!*.md'
+      - '!**/*.md'
 
 # contents:read 供 checkout；actions:write 供 setup-node 的 npm 缓存。
 # 显式 permissions 会覆盖默认令牌权限，少了 actions:write 时缓存步骤会 403 并挡住门禁。
