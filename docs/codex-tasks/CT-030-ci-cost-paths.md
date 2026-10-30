@@ -87,9 +87,9 @@ on:
 ```bash
 # ⓪ 暂停令自查
 CODEX="/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"
-REPO="$HOME/Desktop/dreamcore-luofanghao9784"
+REPO="$HOME/Desktop/mengine-luofanghao9784"
 cd "$REPO"
-git remote get-url origin | grep -q 'luofanghao9784/dreamcore-workspace' || exit 1
+git remote get-url origin | grep -q 'luofanghao9784/mengine' || exit 1
 git switch main && git pull
 git switch -c codex/ct-030-ci-cost-paths
 ```
@@ -135,7 +135,7 @@ ci(ct-030): 单一 paths 分流三门禁 + macos 单 OS（取代 paths-ignore）
 EOM
 )"
 git push -u origin codex/ct-030-ci-cost-paths
-gh pr create -R luofanghao9784/dreamcore-workspace --base main --head codex/ct-030-ci-cost-paths \
+gh pr create -R luofanghao9784/mengine --base main --head codex/ct-030-ci-cost-paths \
   --title "ci(ct-030): 单一 paths 分流门禁省 Actions" \
   --body "## 摘要
 删除 paths-ignore；仅 paths（含 !docs 排除）。macos 单 OS。

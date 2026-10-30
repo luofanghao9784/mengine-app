@@ -34,7 +34,7 @@
 - **workflow 推送权限**：组内令牌无 `workflow` scope，GitHub 拒绝改 `.github/workflows` 的推送。**必须由老板本人账号推**（必要时 `gh auth refresh -s workflow`）。Codex 只改本地文件，**不得**用组内账号 push 本分支（若 push 被拒属预期）。
 ```bash
 # ⓪ 暂停令自查通过后再继续
-cd ~/dreamcore-workspace
+cd ~/mengine
 git status
 # 应显示 nothing to commit, working tree clean
 git switch main && git pull
@@ -47,7 +47,7 @@ git switch -c codex/ct-008-docs-path-filter
 
 ## ③ Codex 提示词（整段复制）
 ```text
-你在 dreamcore-workspace 仓库。任务：给三道 PR 门禁加上 docs 类 paths-ignore，使「只改文档」的 PR 跳过重门禁。本单是门禁 workflow 变更。
+你在 mengine 仓库。任务：给三道 PR 门禁加上 docs 类 paths-ignore，使「只改文档」的 PR 跳过重门禁。本单是门禁 workflow 变更。
 
 【硬约束】
 1. 只改下面 3 个文件，禁止碰其他任何路径：
@@ -89,7 +89,7 @@ Codex 或手工 10–20 分钟；推送与开 PR 10 分钟；CI（本单仍会�
 ## ⑥ 跑完如何提交
 **推送与开 PR 必须用老板账号**（含 workflow scope）。组内账号 push 若报 `refusing to allow ... workflow` 为预期，改老板账号执行下方命令。
 ```bash
-cd ~/dreamcore-workspace
+cd ~/mengine
 git diff --stat
 # 只应出现三个 .github/workflows/*.yml
 git diff -- .github/workflows/

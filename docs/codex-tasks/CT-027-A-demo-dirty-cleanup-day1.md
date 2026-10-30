@@ -33,9 +33,9 @@
 ```bash
 # ⓪ 暂停令自查
 CODEX="/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"
-REPO="$HOME/Desktop/dreamcore-luofanghao9784"
+REPO="$HOME/Desktop/mengine-luofanghao9784"
 cd "$REPO"
-git remote get-url origin | grep -q 'luofanghao9784/dreamcore-workspace' || exit 1
+git remote get-url origin | grep -q 'luofanghao9784/mengine' || exit 1
 git switch main && git pull
 git switch -c codex/ct-027-a-demo-dirty-cleanup-day1
 ```
@@ -82,7 +82,7 @@ git add -A
 git diff --cached --stat | grep -E 'scripts/preview/|apps/api|\.gitignore' && echo ERROR && exit 1
 git commit -m "chore: CT-027-A day1 卸根 Demo/Konggu/private-demo（保留正式预览包）"
 git push -u origin codex/ct-027-a-demo-dirty-cleanup-day1
-gh pr create -R luofanghao9784/dreamcore-workspace --base main --head codex/ct-027-a-demo-dirty-cleanup-day1 \
+gh pr create -R luofanghao9784/mengine --base main --head codex/ct-027-a-demo-dirty-cleanup-day1 \
   --title "chore: CT-027-A Demo/脏代码清理日切片1" \
   --body "对照 demo-cleanup-inventory；须留 scripts/preview；冲突项未动。审查：安全+架构。"
 ```

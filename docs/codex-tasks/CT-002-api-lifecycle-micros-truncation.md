@@ -18,7 +18,7 @@
 ## ② 前置条件与分支名
 无依赖，可与 CT-001 任意先后。
 ```bash
-cd ~/dreamcore-workspace
+cd ~/mengine
 git status
 # 干净时显示：nothing to commit, working tree clean
 git switch main && git pull
@@ -31,7 +31,7 @@ codex -m gpt-6.1-sol
 
 ## ③ Codex 提示词（整段复制）
 ```text
-你在 dreamcore-workspace 仓库（Java 21 / Spring / Postgres 18）。修复一类时间精度问题，只做这一件事。
+你在 mengine 仓库（Java 21 / Spring / Postgres 18）。修复一类时间精度问题，只做这一件事。
 
 【根因】
 Linux 上 Instant.now() 是纳秒精度，Postgres timestamptz 只存微秒，读回后舍入。macOS 的 Instant.now() 只到微秒，所以 Mac 本地不会复现，Linux CI 必红。生产时钟 RetentionClock.now() 是 SELECT clock_timestamp()，本身是微秒；纳秒只来自测试夹具，以及将来可能传入纳秒 Instant 的调用方。
@@ -70,7 +70,7 @@ Codex 15–25 分钟；本地测试约 7 分钟（两类合计，CI 上 72s + 34
 
 ## ⑥ 跑完如何提交
 ```bash
-cd ~/dreamcore-workspace
+cd ~/mengine
 git diff --stat
 # 只应有 ObjectScopeLifecycle.java、ProfileMethodLifecycleIntegrationTest.java、FeedbackAdjustmentIntegrationTest.java
 python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml -Dtest='ProfileMethodLifecycleIntegrationTest,FeedbackAdjustmentIntegrationTest' test 2>&1 | tee /tmp/ct-002-test.log
@@ -101,13 +101,13 @@ open -e /tmp/ct-002-pr.md
 gh pr create --base main --head codex/ct-002-lifecycle-micros --title "fix(lifecycle): 生命周期时间戳对齐 Postgres 微秒精度" --body-file /tmp/ct-002-pr.md
 ```
 （`open -e` 打开文本编辑把 `__` 填上，保存后再执行最后一行。）
-网页备用：<https://github.com/luofanghao9784/dreamcore-workspace/compare/main...codex/ct-002-lifecycle-micros>　开好后把链接发 DQ。
+网页备用：<https://github.com/luofanghao9784/mengine/compare/main...codex/ct-002-lifecycle-micros>　开好后把链接发 DQ。
 
 
 ### 验收（#7 合入前，main 无 API CI）
 老板 Mac 本地测试绿 + 附 surefire 报告。打包到桌面：
 ```bash
-cd ~/dreamcore-workspace
+cd ~/mengine
 zip -j ~/Desktop/CT-002-surefire.zip apps/api/target/surefire-reports/*ProfileMethodLifecycle* apps/api/target/surefire-reports/*FeedbackAdjustment*
 ```
 把 `~/Desktop/CT-002-surefire.zip` 拖进 PR 页面底部评论框发出；或发文字摘要：
