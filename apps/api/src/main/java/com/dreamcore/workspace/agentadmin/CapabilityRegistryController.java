@@ -1,14 +1,17 @@
 package com.dreamcore.workspace.agentadmin;
 
+import jakarta.servlet.http.HttpServletRequest;
+import java.io.IOException;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 
-/** CT-034-A：通过会话与 CSRF 门禁后登记平台目录。 */
+/** CT-034-A 登记平台目录；CT-044 只读列出目录，沿用第四端会话门禁。 */
 @RestController
 public class CapabilityRegistryController {
     static final String PATH = "/api/agent-admin/v1/capabilities";
@@ -17,6 +20,14 @@ public class CapabilityRegistryController {
 
     public CapabilityRegistryController(CapabilityRegistryStore store) {
         this.store = store;
+    }
+
+    @GetMapping(PATH)
+    public ResponseEntity<?> listCapabilities(HttpServletRequest request) throws IOException {
+        if (request.getQueryString() != null || request.getInputStream().read() != -1) {
+            return invalid("有无法识别的字段，请检查后再提交");
+        }
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(store.listCapabilities());
     }
 
     @PostMapping(PATH)
