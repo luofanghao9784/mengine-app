@@ -40,7 +40,7 @@ export function replyNinepop(state: DemoState, chat: Chat, text: string) {
         .slice(0, 3)
         .map((d) => `「${d.title}」\n${latest(d).content.slice(0, 5000)}`)
         .join('\n\n')
-    : '资料包中未找到足够依据。可以从画报卡片发起会话，或选择对应资料继续核对；新问题的实时分析需在梦擎引擎接入后进行。';
+    : '资料包中未找到足够依据。可以从画报卡片发起会话，或选择对应资料继续核对；新问题的实时分析需在梦核引擎接入后进行。';
   addMessage(
     chat,
     'assistant',

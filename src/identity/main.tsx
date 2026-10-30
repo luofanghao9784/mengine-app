@@ -1,4 +1,4 @@
-import { AgentAdminApp } from '../features/agent-admin/AgentAdminApp';
+import { AgentAdminAccess } from './AgentAdminAccess';
 import { SurfaceEntry } from './SurfaceAccess';
 import '../shared/gesture-boundaries.css';
 import { createRoot } from 'react-dom/client';
@@ -38,7 +38,7 @@ createRoot(root).render(
     }
   >
     {surface === 'agent-admin' ? (
-      <AgentAdminApp />
+      <AgentAdminAccess />
     ) : surface === 'headquarters-support' ? (
       <SupportApp />
     ) : surface === 'platform-admin' ? (

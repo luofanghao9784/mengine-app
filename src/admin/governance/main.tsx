@@ -29,9 +29,9 @@ function App(){
  async function sync(){if(!tenant)return;setBusy(true);setError('');try{setState(await request<State>(`${prefix}/tenants/${tenant}/scene/synchronize`,'POST',object,{}));}catch{setError('本次同步未完成，请核对数据服务连接后重试。过期的权限副本不会继续用于分析。');}finally{setBusy(false);}}
  const assets=state?.assets.filter(a=>(a.metadata.title??a.source_id).toLowerCase().includes(filter.toLowerCase()))??[];
  const chosen=assets.find(a=>a.source_id===selected)??assets[0];const m=chosen?.metadata;
- return <main><header><div><p className="eyebrow">梦擎工作空间 · {platform?'总台':'企业管理端'}</p><h1>治理成果同步</h1></div><a href={platform?'/platform-admin/#admin=engine':'/tenant-admin/'}>返回管理端</a></header>
+ return <main><header><div><p className="eyebrow">梦擎工作空间 · {platform?'总台':'企业管理端'}</p><h1>数据口径同步</h1></div><a href={platform?'/platform-admin/#admin=engine':'/tenant-admin/'}>返回管理端</a></header>
  <p>在两端查看同一份治理成果：数据口径、字段依据、关联、指标模板与权限版本。</p>
- <div className="toolbar"><select aria-label="企业" value={tenant} disabled={busy} onChange={e=>setTenant(e.target.value)}>{tenants.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><button onClick={()=>void sync()} disabled={!tenant||busy||!state}>{busy?'同步中…':'立即同步治理成果'}</button></div>
+ <div className="toolbar"><select aria-label="企业" value={tenant} disabled={busy} onChange={e=>setTenant(e.target.value)}>{tenants.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><button onClick={()=>void sync()} disabled={!tenant||busy||!state}>{busy?'同步中…':'立即同步'}</button></div>
  {error&&<p role="alert">{error}</p>}
  {!platform&&binding&&binding.bindings.length===0&&<section className="summary"><div><h2>设置治理成果的目标空间</h2><p>选择接收数据快照和知识的共享空间。保持原有来源权限与空间权限；不会自动给员工授权。设置后再执行同步。</p><label>目标共享空间 <select aria-label="治理目标空间" value={workspace} disabled={busy} onChange={e=>setWorkspace(e.target.value)}><option value="">请选择空间</option>{binding.workspaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><button disabled={busy||!workspace} onClick={()=>void bind()}>建立来源映射</button>{binding.workspaces.length===0&&<p>没有可维护的共享空间，请先由负责人配置空间与维护权限。</p>}</div></section>}
  {binding&&binding.bindings.length>0&&<p className="notice">治理目标空间：{binding.workspaces.find(w=>w.id===binding.bindings[0].workspace_id)?.name??'已配置的共享空间'}。启用按来源配置后，以完整同步清单为准；数据是否可用以同步和采集结果为准。</p>}

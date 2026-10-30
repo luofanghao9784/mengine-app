@@ -200,7 +200,7 @@ export function AdminShell({
     return (
       <PageTitleContext.Provider value={titleTarget}>
         <PageActionsContext.Provider value={actions}>
-          <div className="scene-business-body admin-control">
+          <div className="scene-business-body legacy-skin">
             <header className="scene-business-heading">
               <div ref={setTitleTarget}>{title}</div>
               <div ref={setActions} />
@@ -237,7 +237,7 @@ export function AdminShell({
               <div className="admin-brand">
                 <DreamcoreLogo />
                 <div className="admin-brand-label">
-                  <strong>梦擎引擎</strong>
+                  <strong>梦核引擎</strong>
                   <span className="admin-brand-english">Mengine</span>
                 </div>
                 <Button
@@ -256,7 +256,7 @@ export function AdminShell({
               {(realm === 'platform'
                 ? [
                     {
-                      label: '梦擎引擎',
+                      label: '梦核引擎',
                       items: nav.filter((item) =>
                         ['engine', 'database', 'materials', 'experience', 'capabilities'].includes(item.id),
                       ),
@@ -268,7 +268,7 @@ export function AdminShell({
                   ]
                 : [
                     {
-                      label: '梦擎引擎',
+                      label: '梦核引擎',
                       items: nav.filter((item) =>
                         ['engine', 'database', 'catalog', 'materials', 'experience', 'wiki', 'abilities'].includes(
                           item.id,

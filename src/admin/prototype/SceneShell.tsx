@@ -1,4 +1,5 @@
 import { GovernanceProgress } from './GovernanceProgress';
+import { TenantConsole } from '../TenantConsole';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { EngineStage3D } from '../../operations/engine-stage/EngineStage3D';
 import { busyDemo } from '../../operations/engine-demo';
@@ -40,7 +41,7 @@ const MemoCompanyWork = memo(CompanyWork);
 const MemoExperienceWork = memo(ExperienceWork);
 const MemoWork = memo(Work);
 const SCENE: Place[] = ['home', 'data', 'knowledge', 'experience'];
-const SETTINGS: Place[] = ['members', 'usage', 'company'];
+const SETTINGS: Place[] = ['opened', 'members', 'usage', 'company'];
 const SHORTCUT: Partial<Record<Place, string>> = { data: '1', knowledge: '2', experience: '4' };
 type Sheet = 'peek' | 'half' | 'full';
 const ORDER: Sheet[] = ['peek', 'half', 'full'];
@@ -154,8 +155,8 @@ export function SceneShell({ tenant = null, name }: { tenant?: string | null; na
   const sceneSheet = useRef<Sheet>('half');
   const allowed: Sheet[] = hasScene(place) ? ORDER : ['peek'];
   const stops: Record<Sheet, number> = {
-    // 窄窗口时导航退到第二行，卡片升到顶也要让开它。
-    peek: width < 1180 ? 58 : 4,
+    // 加上已开通入口后，导航较长；沿用第二行布局，避免与板块标题重叠。
+    peek: width < 1560 ? 58 : 4,
     // 手机竖屏本来就矮：半屏档少给 3D 一些，下面的卡片多留空间。
     half: Math.round(height * (width <= 600 && height > width ? 0.42 : 0.6)),
     full: height - 66,
@@ -712,7 +713,17 @@ export function SceneShell({ tenant = null, name }: { tenant?: string | null; na
             <Icon name="search" />
           </button>
         </nav>
-        {tenant && place === 'members' ? (
+        {place === 'opened' ? (
+          <section className="cards glass business-work" aria-label="已开通的 AI 功能">
+            <article className="card">
+              {tenant ? (
+                <TenantConsole key={tenant} tenant={tenant} name={enterpriseName || ''} embedded />
+              ) : (
+                <p className="none">登录企业后查看已开通的 AI 功能。</p>
+              )}
+            </article>
+          </section>
+        ) : tenant && place === 'members' ? (
           <MemoMembersWork key={tenant} tenant={tenant} />
         ) : tenant && place === 'usage' ? (
           <MemoUsageWork key={tenant} tenant={tenant} />
@@ -788,13 +799,17 @@ function Bars({ label }: { label: string }) {
 const StatCard = ({ c, go }: { c: (typeof homeCards)[number]; go: (p: Place) => void }) => (
   <button type="button" className="card stat" onClick={() => go(c.place)}>
     <span className="label">{c.label}</span>
-    <span className="value">
-      {c.value}
-      <small>{c.unit}</small>
-    </span>
-    <span className="bar">
-      <i style={{ width: `${c.ratio * 100}%` }} />
-    </span>
+    {c.place !== 'opened' && (
+      <span className="value">
+        {c.value}
+        <small>{c.unit}</small>
+      </span>
+    )}
+    {c.place !== 'opened' && (
+      <span className="bar">
+        <i style={{ width: `${c.ratio * 100}%` }} />
+      </span>
+    )}
     <span className="note">{c.note}</span>
   </button>
 );
@@ -862,7 +877,7 @@ function Home({
           ))}
         </ol>
       </article>
-      {cards.slice(0, 4).map((c) => (
+      {cards.slice(0, 5).map((c) => (
         <StatCard key={c.label} c={c} go={go} />
       ))}
       <article className="card chart">
@@ -1372,6 +1387,12 @@ function Palette({
 
 /** 导航图标：同一套 1.5 线宽的细线图形。 */
 const ICONS: Record<Place | 'search', React.ReactNode> = {
+  opened: (
+    <>
+      <rect x="4" y="4" width="16" height="16" rx="4" />
+      <path d="m8 12 3 3 5-6" />
+    </>
+  ),
   home: (
     <>
       <circle cx="12" cy="12" r="3" />

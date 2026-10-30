@@ -46,6 +46,7 @@ export function adminPage(realm: AdminRealm, hash: string): AdminPage {
   const params = new URLSearchParams(hash.replace(/^#/, ''));
   const pages: readonly string[] = realm === 'tenant' ? tenantPages : [...platformPages, 'settings'];
   const selected = params.get('admin');
+  if (realm === 'tenant' && params.get('place') === 'opened') return 'abilities';
   if (
     realm === 'platform' &&
     (selected === 'data' || (selected === 'engine' && params.get('detail') === 'data'))

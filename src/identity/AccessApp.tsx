@@ -1,4 +1,5 @@
 import { useOpenedCapabilities } from '../admin/openedCapabilities';
+import { GovernanceLink } from './GovernanceLink';
 import { TenantConsole } from '../admin/TenantConsole';
 import { SkillCenter, skillsHref } from '../skills/SkillCenter';
 import { SuspendedEnterprise } from './SuspendedEnterprise';
@@ -67,7 +68,7 @@ import { useAutoHideScrollbars } from '../useAutoHideScrollbars';
 
 export type Surface = 'workspace' | 'tenant-admin' | 'platform-admin';
 const labels: Record<Surface, string> = {
-  workspace: '工作空间',
+  workspace: '工作台',
   'tenant-admin': '企业管理',
   'platform-admin': '系统管理',
 };
@@ -188,7 +189,6 @@ export default function AccessApp({
           identity={session.identity}
           legacyAllowed={legacyAllowed}
           legacyEntry={surface === 'platform-admin'}
-          welcome={surface === 'workspace' ? '欢迎回来，今天的画报已经在等你了。' : undefined}
           onJoined={(membership) => {
             cancelInvitation(membership.tenantId);
           }}
@@ -422,6 +422,7 @@ function GuardedAccessShell({
   if (surface === 'tenant-admin' && selected)
     return (
       <UploadProvider>
+        <GovernanceLink />
         {new URLSearchParams(location.search).get('view') === 'business' ||
         // 地址里有 place 时是场景外壳（它的板块里会嵌旧版管理台、带上 admin/tab 等参数）；否则按旧链接打开旧版管理台。
         (!new URLSearchParams(location.hash.slice(1)).has('place') &&
@@ -589,7 +590,7 @@ function GuardedAccessShell({
                                     : skills
                                       ? '技能中心'
                                       : qualityCheck
-                                        ? (openedQualityCheck?.displayName ?? 'AI 功能')
+                                        ? (openedQualityCheck?.displayName ?? '质量检查')
                                         : labels[surface]}
                   </h1>
                   {surface === 'workspace' && briefing && (

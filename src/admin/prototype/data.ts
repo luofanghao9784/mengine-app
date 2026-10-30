@@ -2,7 +2,7 @@
 import type { Focus } from '../../operations/engine-stage/scene';
 import { knowledgeItems } from './knowledge';
 
-export type Place = 'home' | 'data' | 'knowledge' | 'experience' | 'output' | 'members' | 'usage' | 'company';
+export type Place = 'home' | 'data' | 'knowledge' | 'experience' | 'output' | 'opened' | 'members' | 'usage' | 'company';
 export type Tone = 'bad' | 'warn' | 'run' | 'ok' | 'plain';
 export interface Item {
   id: string;
@@ -41,6 +41,7 @@ const FIELD: [string, string, string] = ['字段', '含义', '依据'];
 const FACT: [string, string, string] = ['项', '内容', '状态'];
 
 export const places: Record<Place, PlaceInfo> = {
+  opened: { name: '已开通的 AI 功能', focus: null, status: '', filters: [], items: [] },
   home: { name: '引擎概览', focus: null, status: '', filters: [], items: [] },
   data: {
     name: '数据底座',
@@ -490,6 +491,7 @@ export const briefing = {
 
 /** 每个板块右侧“常用数据”卡片里的读数；数据底座的五项可以点，用来按工序筛选。 */
 export const stats: Record<Place, { title: string; rows: [string, string, string?][] }> = {
+  opened: { title: '', rows: [] },
   home: { title: '', rows: [] },
   data: {
     title: '治理进度',
@@ -567,6 +569,7 @@ export const homeCards: {
   note: string;
   ratio: number;
 }[] = [
+  { place: 'opened', label: '已开通的 AI 功能', value: '', unit: '', note: '查看总部已开通的功能与服务设置', ratio: 0 },
   {
     place: 'data',
     label: '数据底座',

@@ -1,76 +1,6 @@
-import { test, expect, type Page } from '@playwright/test';
-
-// Synthetic identities and explicitly mocked read responses only; no real execution or results.
-const tenant = '00000000-0000-4000-8000-000000000036';
-const other = '00000000-0000-4000-8000-000000000037';
-const account = '00000000-0000-4000-8000-000000000038';
+import { test, expect } from '@playwright/test';
+import { fixture, tenant, other, account, openedItem } from './fixtures/ct036';
 const href = (id = tenant) => `/workspace/#tenant=${id}&view=quality-check`;
-type OpenedReply = {
-  status?: number;
-  items?: { enterpriseFunction: string; displayName: string }[];
-  networkError?: boolean;
-};
-const openedItem = { enterpriseFunction: 'quality-check', displayName: '质量检查' };
-async function fixture(
-  page: Page,
-  mode: 'member' | 'anonymous' | 'no-member' = 'member',
-  reply: OpenedReply = { items: [openedItem] },
-) {
-  const requests: { path: string; method: string }[] = [];
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  await page.route('**/api/**', async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    requests.push({ path, method: route.request().method() });
-    const t = path.includes(other) ? other : tenant;
-    if (path === '/api/tenant-admin/v1/opened-capabilities') {
-      expect(new URL(route.request().url()).search).toBe('');
-      if (reply.networkError) return route.abort('failed');
-      return route.fulfill({ status: reply.status ?? 200, json: { items: reply.items ?? [] } });
-    }
-    if (path === '/api/v1/me') {
-      if (mode === 'anonymous') return route.fulfill({ status: 401, json: { code: 'UNAUTHENTICATED' } });
-      return route.fulfill({
-        json: {
-          account: { id: account, phone: '+8619900000036', email: null, displayName: '合成成员' },
-          platformAdmin: false,
-          memberships:
-            mode === 'no-member'
-              ? []
-              : [
-                  { tenantId: tenant, tenantName: '合成企业甲', role: 'TENANT_ADMIN' },
-                  { tenantId: other, tenantName: '合成企业乙', role: 'TENANT_ADMIN' },
-                ],
-        },
-      });
-    }
-    if (path.endsWith('/phone/configuration'))
-      return route.fulfill({ json: { delivery: 'DISABLED', localPreview: false } });
-    if (path.endsWith('/governance'))
-      return route.fulfill({
-        json: {
-          tenantId: t,
-          ownerId: account,
-          revision: 1,
-          owner: true,
-          canConfigure: true,
-          canEnterManagement: true,
-          canAcceptInitialResponsibility: false,
-          pendingHandover: null,
-          capabilities: [],
-        },
-      });
-    if (path.endsWith('/business-status'))
-      return route.fulfill({
-        json: { tenantId: t, businessEnabled: true, canExport: false, exitState: null, exportDeadline: null },
-      });
-    if (path.endsWith('/workspace/notifications'))
-      return route.fulfill({ json: { tenantId: t, conversations: false, briefing: false } });
-    // Existing native plugin requests may fail; the new opened section must still be visible.
-    return route.fulfill({ status: 503, json: { code: 'SERVICE_UNAVAILABLE' } });
-  });
-  return { requests, errors };
-}
 
 for (const width of [1440, 390]) {
   test(`质量检查三步空态、刷新和导航（${width}px）`, async ({ page }) => {
@@ -129,7 +59,7 @@ test('智能服务在原生服务不可用时仍显示已开通读失败空态',
   await expect(
     page.getByRole('heading', { name: '暂时不能查看已开通功能（后台开通中）', exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole('heading', { name: '智能服务', exact: true, level: 2 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '服务设置', exact: true, level: 2 })).toBeVisible();
   expect(requests.every((r) => r.method === 'GET' && !r.path.includes('/agent-admin/'))).toBe(true);
   expect(errors).toEqual([]);
   await page.screenshot({ path: '/tmp/ct036-tenant-opened.png', fullPage: true });
