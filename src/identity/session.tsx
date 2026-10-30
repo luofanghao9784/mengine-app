@@ -4,6 +4,7 @@ import { reconcileDocumentDrafts } from '../documents/drafts';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Identity } from '../../contracts/public-api/identity';
 import { createIdentityClient, createIdentityRequest, isIdentity, IdentityError } from './client';
+import { createAgentIdentityClient } from './agent-client';
 
 export const identityClient = createIdentityClient();
 type Session = {
@@ -27,18 +28,7 @@ const platformIdentityClient = {
   logout: () => platformRequest('/api/platform-admin/v1/auth/logout', 'POST', (v): v is null => v === null),
 };
 
-// F1 only probes the isolated agent realm. Login/writes arrive with CT-018.
-const agentRequest = createIdentityRequest();
-const agentIdentityClient = {
-  me: (signal?: AbortSignal) =>
-    agentRequest('/api/agent-admin/v1/auth/me', 'GET', isIdentity, undefined, signal),
-  login: async (_phone: string, _password: string): Promise<Identity> => {
-    throw new Error('后端未就绪：写入 API 待 CT-018 / PR 5b');
-  },
-  logout: async (): Promise<null> => {
-    throw new Error('后端未就绪：写入 API 待 CT-018 / PR 5b');
-  },
-};
+const agentIdentityClient = createAgentIdentityClient();
 
 export function SessionProvider({
   children,

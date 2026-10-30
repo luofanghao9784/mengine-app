@@ -3,6 +3,7 @@ import { SupportPageRedirect } from '../platform/SupportApp';
 import { PlatformDataOperations } from '../operations/PlatformDataOperations';
 import { PlatformEngineDashboard } from '../operations/PlatformEngineDashboard';
 import { useSession } from '../identity/session';
+import { roleLabel } from '../identity/role-labels';
 import { GeneralExperienceLibrary } from '../experience/GeneralExperienceLibrary';
 import { AdminShell, useAdminRoute } from './AdminShell';
 import { AdminOverview } from './AdminOverview';
@@ -24,7 +25,9 @@ export function PlatformConsole({ logout }: { logout: () => void }) {
       customerLinks={<SurfaceLinks surface="platform-admin" />}
       realm="platform"
       name="平台管理"
-      account={session.identity?.account.displayName || ''}
+      account={[session.identity?.account.displayName, roleLabel({ realm: 'platform' })]
+        .filter(Boolean)
+        .join(' · ')}
       page={page}
       hash={hash}
       logout={logout}

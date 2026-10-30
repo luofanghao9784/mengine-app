@@ -176,11 +176,11 @@ try {
   await page.getByLabel('手机号', { exact: true }).fill(fixturePhones.platform);
   await page.getByLabel('密码', { exact: true }).fill(password);
   await page.getByRole('button', { name: '登录', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '选择进入哪一端' })).toBeVisible();
-  for (const name of ['总台端', '企业管理端', '客户端'])
+  await expect(page.getByRole('region', { name: '选择进入哪一端', exact: true })).toBeVisible();
+  for (const name of ['总台端', '企业管理端', '工作台'])
     await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
   await screenshot(page, 'surface-choice');
-  await page.getByRole('button', { name: '客户端', exact: true }).click();
+  await page.getByRole('button', { name: '工作台', exact: true }).click();
   await expect(page.getByRole('heading', { name: '选择企业', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '合成企业甲', exact: true }).click();
   await expect(page.getByRole('link', { name: '梦擎工作空间', exact: true })).toHaveAttribute(

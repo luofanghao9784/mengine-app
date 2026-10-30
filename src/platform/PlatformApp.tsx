@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { useSession } from '../identity/session';
+import { GovernanceLink } from '../identity/GovernanceLink';
 import { IdentityError } from '../identity/client';
 import { RequestGuard } from '../shared/request-guard';
 import { Button, Field } from '../shared/ui';
@@ -109,6 +110,7 @@ export function PlatformApp() {
     );
   return (
     <RequestGuard>
+      <GovernanceLink />
       {error && <p role="alert">{error}</p>}
       <PlatformConsole logout={() => void signOut()} />
     </RequestGuard>

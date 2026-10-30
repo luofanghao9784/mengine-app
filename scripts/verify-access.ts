@@ -179,7 +179,7 @@ try {
   assert.ok(await admin.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await screenshot(admin, 'tenant-admin-mobile.png');
   await admin.setViewportSize({ width: 1440, height: 1000 });
-  await admin.getByRole('link', { name: '工作空间', exact: true }).click();
+  await admin.getByRole('link', { name: '工作台', exact: true }).click();
   await expect(admin.locator('.access-spaces li')).toHaveCount(1);
   await expect(admin.locator('.access-spaces')).toContainText('个人空间');
   await admin.goBack();

@@ -108,8 +108,8 @@ test('unified login asks for authorized surface before entering an enterprise', 
   await page.getByLabel('用户名或手机号', { exact: true }).fill('19900000001');
   await page.getByLabel('密码', { exact: true }).fill('synthetic-password');
   await page.getByRole('button', { name: '登录', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '选择进入哪一端' })).toBeVisible();
-  for (const name of ['总台端', '企业管理端', '客户端'])
+  await expect(page.getByRole('region', { name: '选择进入哪一端', exact: true })).toBeVisible();
+  for (const name of ['总台端', '企业管理端', '工作台'])
     await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
   await page.screenshot({ path: 'test-results/unified-surface-choice.png' });
   await page.getByRole('button', { name: '总台端', exact: true }).click();

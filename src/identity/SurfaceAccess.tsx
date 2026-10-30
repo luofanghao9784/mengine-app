@@ -1,6 +1,8 @@
 import { pendingSurfaceChoice, clearSurfaceChoice } from './surface-choice';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useSession } from './session';
+import { entryTenant, rememberedTenant } from './entry';
+import { roleLabel } from './role-labels';
 import { governanceClient } from '../governance/client';
 import { useRemote, Loading, Failure } from '../shared/admin';
 import { EntryChoice, EntryFrame } from './EntryFrame';
@@ -15,7 +17,7 @@ const labels: Record<Surface, string> = {
   'platform-admin': '总台端',
 };
 const details: Record<Surface, string> = {
-  workspace: '阅读画报、会话、资料库与技能',
+  workspace: '和 AI 对话、查资料、看每日要点',
   'tenant-admin': '管理成员、资料权限与企业配置',
   'platform-admin': '平台运营、企业开通与系统设置',
 };
@@ -41,6 +43,7 @@ function useManagement(identity: Identity | null) {
       );
       return {
         account: identity?.account.id,
+        snapshots: results,
         members: results.filter((r) => r.access.canEnterManagement).map((r) => r.membership),
       };
     },
@@ -78,11 +81,38 @@ function ChooseSurface({
   const data = useManagement(identity);
   const { logout } = useSession();
   const [chosen, setChosen] = useState(false);
+  const [tenant, setTenant] = useState(() =>
+    entryTenant(
+      new URLSearchParams(location.hash.slice(1)).get('tenant'),
+      identity.memberships,
+      rememberedTenant(identity.account.id, surface),
+    ),
+  );
+  const membership = identity.memberships.find((m) => m.tenantId === tenant);
+  const snapshot =
+    data.value?.account === identity.account.id
+      ? data.value.snapshots.find((r) => r.membership.tenantId === tenant)?.access
+      : undefined;
+  const name = identity.account.displayName.trim();
+  const label = roleLabel({
+    role: membership?.role,
+    platformAdmin: identity.platformAdmin,
+    owner: snapshot?.owner,
+    canConfigure: snapshot?.canConfigure,
+    canMaintain: snapshot?.capabilities.some((c) => c.capability === 'CONTENT_MAINTAIN'),
+  });
   const options = data.value?.account === identity.account.id ? surfaces(identity, data.value.members) : [];
   const choose = (target: Surface) => {
     clearSurfaceChoice();
-    if (target === surface) setChosen(true);
-    else window.location.assign(`/${target}/`);
+    const hash = target !== 'platform-admin' && tenant ? `#tenant=${encodeURIComponent(tenant)}` : '';
+    if (target === surface) {
+      if (hash) {
+        const params = new URLSearchParams(location.hash.slice(1));
+        params.set('tenant', tenant);
+        location.hash = params.toString();
+      }
+      setChosen(true);
+    } else window.location.assign(`/${target}/${hash}`);
   };
   useEffect(() => {
     if (data.value?.account === identity.account.id && options.length <= 1) {
@@ -96,8 +126,21 @@ function ChooseSurface({
   if (chosen) return children;
   return (
     <EntryFrame label="选择进入哪一端">
-      <h1>选择进入哪一端</h1>
-      <p>{identity.account.displayName}，欢迎回来。这次要进入哪里？</p>
+      <h1>{name ? `你好，${name}` : '你好'}</h1>
+      <p>{[membership?.tenantName, label].filter(Boolean).join(' · ')}</p>
+      {identity.memberships.length > 1 && (
+        <label className="field">
+          <span>当前企业</span>
+          <select aria-label="当前企业" value={tenant} onChange={(e) => setTenant(e.target.value)}>
+            <option value="">请选择企业</option>
+            {identity.memberships.map((m) => (
+              <option key={m.tenantId} value={m.tenantId}>
+                {m.tenantName}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {data.error ? (
         <Failure error={data.error} retry={() => window.location.reload()} />
       ) : !data.value ? (

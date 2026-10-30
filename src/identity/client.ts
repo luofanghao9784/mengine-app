@@ -305,7 +305,9 @@ export function createIdentityRequest(fetcher: typeof fetch = fetch, timeoutMs =
       const headers: Record<string, string> = { Accept: 'application/json' };
       if (method !== 'GET') {
         const token = await request(
-          path.startsWith('/api/platform-admin/') ? '/api/platform-admin/v1/auth/csrf' : '/api/v1/auth/csrf',
+          path.startsWith('/api/agent-admin/')
+            ? '/api/agent-admin/v1/auth/csrf'
+            : path.startsWith('/api/platform-admin/') ? '/api/platform-admin/v1/auth/csrf' : '/api/v1/auth/csrf',
           'GET',
           isCsrf,
           undefined,

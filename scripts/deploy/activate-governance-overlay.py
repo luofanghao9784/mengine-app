@@ -104,7 +104,7 @@ def activate():
  atomic(S/'web/tenant-admin/governance/index.html',WEB/'tenant-admin/governance/index.html')
  for surface in ['tenant-admin','platform-admin']:
   dest=WEB/surface/'index.html';body=dest.read_text();assert 'data-governance-link' not in body
-  link='<a data-governance-link href="/tenant-admin/governance/?surface='+('platform' if surface=='platform-admin' else 'tenant')+'" style="position:fixed;right:20px;bottom:18px;z-index:10000;padding:9px 16px;border:1px solid #bda77e;border-radius:20px;background:#fffaf0;color:#554426;font:14px system-ui;text-decoration:none">治理成果同步</a>'
+  link='<a data-governance-link hidden href="/tenant-admin/governance/?surface='+('platform' if surface=='platform-admin' else 'tenant')+'" style="position:fixed;right:20px;bottom:18px;z-index:10000;padding:9px 16px;border:1px solid #bda77e;border-radius:20px;background:#fffaf0;color:#554426;font:14px system-ui;text-decoration:none">同步数据口径</a>'
   tmp=E/(surface+'-linked.html');tmp.write_text(body.replace('</body>',link+'</body>'));atomic(tmp,dest)
  run('systemctl','start','dreamcore-wiki.service');health(WIKI_HEALTH)
  run('systemctl','start','dreamcore-app-rehearsal.service');health('http://127.0.0.1:18481/actuator/health')

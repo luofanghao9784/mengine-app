@@ -6,8 +6,7 @@
 }
 .agent-admin .admin-header > span,
 .agent-intro,
-.agent-connection,
-.agent-session {
+.agent-connection {
   color: var(--muted);
   font-size: 13px;
 }
@@ -123,8 +122,7 @@
   .agent-admin .admin-brand-label,
   .agent-admin .admin-scope,
   .agent-admin .admin-nav-link span,
-  .agent-admin .admin-nav-group-title,
-  .agent-admin .agent-session {
+  .agent-admin .admin-nav-group-title {
     display: none;
   }
   .agent-admin .admin-brand {

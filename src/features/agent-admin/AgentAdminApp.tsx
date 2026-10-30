@@ -73,7 +73,7 @@ export function AgentAdminApp() {
         <div className="admin-brand">
           <DreamcoreLogo />
           <div className="admin-brand-label">
-            <strong>梦擎引擎</strong>
+            <strong>梦核引擎</strong>
             <span className="admin-brand-english">Mengine</span>
           </div>
         </div>
@@ -131,7 +131,7 @@ export function AgentAdminApp() {
                     <Puzzle size={22} aria-hidden="true" />
                     <span className="agent-badge">{status}</span>
                     <h2>{title}</h2>
-                    <code>{id}</code>
+                    <code>编号：{id}</code>
                     <p>{description}</p>
                     {id === 'quality-check' ? (
                       <a className="button primary" href="#view=capability-registry&tab=catalog">
@@ -180,7 +180,7 @@ export function AgentAdminApp() {
                             {id === 'quality-check' ? '可登记说明' : '仅供查看'}
                           </span>
                           <h3>{title}</h3>
-                          <code>{id}</code>
+                          <code>编号：{id}</code>
                           <p>{description}</p>
                           {id === 'quality-check' ? (
                             <button className="button primary" onClick={() => setRegisterOpen(true)}>
@@ -204,7 +204,11 @@ export function AgentAdminApp() {
                         <div className="agent-functions">
                           {capabilities.items.map((item) => (
                             <section className="admin-panel agent-function" key={item.capabilityId}>
-                              <h3>{item.name}</h3>
+                              <h3>
+                                {item.name === item.capabilityId || functions.some(([id]) => item.name.includes(id))
+                                  ? functions.find(([id]) => id === item.enterpriseFunction)?.[1] ?? '其他功能'
+                                  : item.name}
+                              </h3>
                               <code>编号：{item.capabilityId}</code>
                               <p>
                                 企业功能：

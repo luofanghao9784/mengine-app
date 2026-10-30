@@ -198,7 +198,7 @@ function Control() {
 /* —— 落地服务：一条路线，四站，每站写清我们做什么、你们准备什么（与手册的五步对应，后两步并成“复盘扩展”） —— */
 const journey: { icon: LucideIcon; title: string; we: string; you: string }[] = [
   { icon: Target, title: '选定场景', we: '一起梳理高频工作，挑出最值得先交给 AI 的一件。', you: '一位能拍板的负责人。' },
-  { icon: FolderKey, title: '搭建数据基座', we: '盘点来源、整理资料、确认口径，接上数据，把空间和权限配清楚。', you: '相关资料、成员名单，和一位能确认口径的业务负责人。' },
+  { icon: FolderKey, title: '搭建数据底座', we: '盘点来源、整理资料、确认口径，接上数据，把空间和权限配清楚。', you: '相关资料、成员名单，和一位能确认口径的业务负责人。' },
   { icon: Rocket, title: '跑通真实任务', we: '培训到每个岗位，陪着团队把一项真实任务从头做完。', you: '让团队每天用起来。' },
   { icon: RefreshCcw, title: '复盘扩展', we: '固定回访，看来源是否按时更新、哪里好用、哪里要调。', you: '决定下一个场景。' },
 ];

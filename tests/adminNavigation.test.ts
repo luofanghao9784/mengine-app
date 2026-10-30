@@ -46,3 +46,11 @@ test('customer admin keeps return context, platform does not carry tenant or cli
   assert.equal(platform.get('back'), null);
   assert.equal(platform.get('admin'), 'accounts');
 });
+
+test('已开通场景使用既有智能服务页，经典链接和总台路由不受影响', () => {
+  assert.equal(adminPage('tenant', '#place=opened'), 'abilities');
+  assert.equal(adminPage('tenant', '#place=opened&admin=abilities'), 'abilities');
+  assert.equal(adminPage('tenant', '#place=opened&admin=members'), 'abilities');
+  assert.equal(adminPage('tenant', '#admin=members'), 'members');
+  assert.equal(adminPage('platform', '#place=opened'), 'overview');
+});
