@@ -76,7 +76,7 @@
 .shell .eng3d-top {
   visibility: hidden;
 }
-/* 数据基座、知识库视角，以及卡片升到顶时：还是同一个模型和同一块画布，只是引擎自己的读数标签让位。 */
+/* 数据底座、知识库视角，以及卡片升到顶时：还是同一个模型和同一块画布，只是引擎自己的读数标签让位。 */
 .shell[data-own] .eng3d > :not(canvas),
 .shell[data-mode='work'][data-sheet='peek'] .eng3d > :not(canvas) {
   opacity: 0 !important;
@@ -1097,7 +1097,7 @@
   font-size: 30px;
 }
 
-/* ---- 数据基座：清单行上直接操作，详情第一行是结论和操作 ---- */
+/* ---- 数据底座：清单行上直接操作，详情第一行是结论和操作 ---- */
 .cards.work.data {
   grid-template-columns: minmax(320px, 1fr) minmax(0, 1.5fr) 260px;
 }
