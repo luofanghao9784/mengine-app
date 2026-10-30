@@ -478,7 +478,16 @@ public class BriefingGenerationService {
             Timestamp coverage=db.queryForObject("SELECT coverage_through FROM dataset_snapshots WHERE id=?",Timestamp.class,source.versionId());
             if(coverage==null||coverage.toInstant().isBefore(now.minusSeconds(7200))){hold(batch,manualBatch,"WAITING_DATA","SOURCE_COVERAGE_TOO_OLD");return;}
         }
-        if(selected.isEmpty()&&!info){hold(batch,manualBatch,"WAITING_DATA","RESULT_NOT_READY");return;}
+        if(selected.isEmpty()&&!info){
+            // 多来源未就绪时取排序第一个（order→materialId）的原因，保证稳定
+            String reason=sources.stream().filter(Source::dataset)
+                .filter(source->readiness.get(source.materialId())!=null&&!readiness.get(source.materialId()).ready())
+                .sorted(order.thenComparing(Source::materialId))
+                .map(source->readiness.get(source.materialId()).reason()).findFirst().orElse("RESULT_NOT_READY");
+            hold(batch,manualBatch,"WAITING_DATA",reason);
+            db.update("UPDATE briefing_generation_policies SET reason=? WHERE id=?",reason,id);
+            return;
+        }
         if(!info)for(var source:selected)if(source.dataset()) {
             var ready=readiness.get(source.materialId());
             if(ready!=null&&!ready.ready()) {
