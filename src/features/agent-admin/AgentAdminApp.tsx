@@ -60,9 +60,11 @@ export function AgentAdminApp() {
   useEffect(() => {
     const controller = new AbortController();
     setCapabilities({ status: 'loading' });
-    void listCapabilities(controller.signal).then((value) => {
-      if (!controller.signal.aborted) setCapabilities(value);
-    });
+    void listCapabilities(controller.signal)
+      .catch((): CapabilityListResult => ({ status: 'failed' }))
+      .then((value) => {
+        if (!controller.signal.aborted) setCapabilities(value);
+      });
     return () => controller.abort();
   }, [listAttempt]);
   return (
