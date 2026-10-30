@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Boxes, LayoutGrid, PanelLeftClose, PanelLeftOpen, Puzzle } from 'lucide-react';
 import { DreamcoreLogo } from '../../components/DreamcoreLogo';
 import '../../admin/admin.css';
 import './agent-admin.css';
 import { agentRoute } from './routes';
-import { probeCapabilities } from './client';
+import { createCapabilityTenantGrant, probeCapabilities } from './client';
 import { RegisterDialog } from './RegisterDialog';
 
 const functions = [
@@ -21,6 +21,28 @@ export function AgentAdminApp() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const route = agentRoute(hash);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [enterprise, setEnterprise] = useState('');
+  const [grantStatus, setGrantStatus] = useState('');
+  const [grantPending, setGrantPending] = useState(false);
+  const grantInFlight = useRef(false);
+
+  async function submitGrant() {
+    if (grantInFlight.current) return;
+    if (!enterprise.trim()) {
+      setGrantStatus('请按要求填写开通内容');
+      return;
+    }
+    grantInFlight.current = true;
+    setGrantPending(true);
+    setGrantStatus('正在开通…');
+    try {
+      setGrantStatus(await createCapabilityTenantGrant(enterprise));
+    } finally {
+      grantInFlight.current = false;
+      setGrantPending(false);
+    }
+  }
+
   useEffect(() => {
     const changed = () => setHash(location.hash);
     window.addEventListener('hashchange', changed);
@@ -187,9 +209,7 @@ export function AgentAdminApp() {
               ) : (
                 <section className="admin-panel agent-empty" aria-labelledby="agent-readonly-title">
                   <Boxes size={40} aria-hidden="true" />
-                  <h2 id="agent-readonly-title">
-                    {route.tab === 'versions' ? '版本 · 只读' : '企业开通 · 只读'}
-                  </h2>
+                  <h2 id="agent-readonly-title">{route.tab === 'versions' ? '版本 · 只读' : '企业开通'}</h2>
                   <h3>{route.tab === 'versions' ? '尚无可展示的版本' : '尚无可展示的企业开通记录'}</h3>
                   <p>
                     {connected === null
@@ -198,23 +218,42 @@ export function AgentAdminApp() {
                         ? '已连接后台；AI 功能列表暂未接入，当前无法展示。'
                         : '尚未连接后台或未登录，当前未加载列表。'}
                   </p>
-                  <p>AI 功能暂不能上架或开通给企业（后台开通中）</p>
-                  <div className="agent-readonly-actions" aria-label="暂未开放的 AI 功能操作">
-                    {(route.tab === 'versions' ? ['上架功能'] : ['开通给企业']).map((label) => (
-                      <button
-                        key={label}
-                        className="button"
-                        disabled
-                        title={
-                          route.tab === 'versions'
-                            ? '暂时不能上架（后台开通中）'
-                            : '暂时不能开通（后台开通中）'
-                        }
-                      >
-                        {label}
+                  {route.tab === 'versions' ? (
+                    <>
+                      <p>AI 功能暂不能上架或开通给企业（后台开通中）</p>
+                      <div className="agent-readonly-actions" aria-label="暂未开放的 AI 功能操作">
+                        <button className="button" disabled title="暂时不能上架（后台开通中）">
+                          上架功能
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <form
+                      className="agent-grant-form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void submitGrant();
+                      }}
+                    >
+                      <label className="field">
+                        <span>企业</span>
+                        <input
+                          placeholder="填写企业编号"
+                          value={enterprise}
+                          onChange={(event) => setEnterprise(event.target.value)}
+                          disabled={grantPending}
+                        />
+                      </label>
+                      <label className="field">
+                        <span>企业功能</span>
+                        <input value="质量检查" readOnly />
+                      </label>
+                      <button type="submit" className="button" disabled={grantPending}>
+                        开通给企业
                       </button>
-                    ))}
-                  </div>
+                      <p role="status">{grantStatus}</p>
+                    </form>
+                  )}
                 </section>
               )}
             </>
