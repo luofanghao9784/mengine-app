@@ -43,7 +43,7 @@ const FACT: [string, string, string] = ['项', '内容', '状态'];
 export const places: Record<Place, PlaceInfo> = {
   home: { name: '引擎概览', focus: null, status: '', filters: [], items: [] },
   data: {
-    name: '数据基座',
+    name: '数据底座',
     focus: null,
     status: '61 项里 47 项已是 AI 可用状态，11 项卡住，3 项正在处理',
     filters: ['全部 61', '卡住的 11', '业务数据 38', '资料 23'],
@@ -488,7 +488,7 @@ export const briefing = {
   ],
 };
 
-/** 每个板块右侧“常用数据”卡片里的读数；数据基座的五项可以点，用来按工序筛选。 */
+/** 每个板块右侧“常用数据”卡片里的读数；数据底座的五项可以点，用来按工序筛选。 */
 export const stats: Record<Place, { title: string; rows: [string, string, string?][] }> = {
   home: { title: '', rows: [] },
   data: {
@@ -569,7 +569,7 @@ export const homeCards: {
 }[] = [
   {
     place: 'data',
-    label: '数据基座',
+    label: '数据底座',
     value: '47',
     unit: '/ 61 可用',
     note: '11 项卡住，3 项处理中',

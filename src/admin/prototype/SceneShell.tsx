@@ -29,7 +29,7 @@ import './glass-theme.css';
 /**
  * 原型：企业管理端的“场景外壳”。没有侧边栏和页面，整个管理端是一个铺满窗口的 3D 引擎模型，
  * 内容是浮在模型上的一组深色玻璃卡片。
- * - 数据基座、知识星链和引擎是同一个模型：切换板块 = 同一台相机移到模型的另一处。
+ * - 数据底座、知识星链和引擎是同一个模型：切换板块 = 同一台相机移到模型的另一处。
  * - 卡片组有三档：升到顶（专心处理）、半屏、降到底（3D 全屏）。上下滚动自然地在三档之间过渡（没有拖动拉手）。
  * - 导航是一条独立的深色栏，挂在卡片组上方，跟着卡片一起上下滑动；卡片升到顶时它正好在最顶部。
  */
@@ -110,7 +110,7 @@ export function SceneShell({ tenant = null, name }: { tenant?: string | null; na
     [tenant, runtime.value, runtime.samples, runtime.log, now],
   );
 
-  // 当前板块以地址里的 place 为准：刷新回原处；没写时接入企业默认进数据基座。
+  // 当前板块以地址里的 place 为准：刷新回原处；没写时接入企业默认进数据底座。
   const [place, setPlace] = useState<Place>(() => scenePlace() ?? (tenant ? 'data' : 'home'));
   const [sheet, setSheet] = useState<Sheet>(() => (SCENE.includes(place) ? 'half' : 'peek'));
   const [picked, setPicked] = useState<Partial<Record<Place, string>>>({});
@@ -276,7 +276,7 @@ export function SceneShell({ tenant = null, name }: { tenant?: string | null; na
   const toCompany = useCallback(() => goRef.current('company'), []);
   const pickHere = useMemo(() => pick(place), [place]);
   const setFilterHere = useCallback((i: number) => setFilter((old) => ({ ...old, [place]: i })), [place]);
-  // 在引擎舞台里直接点某一段也算一次切换：点输入车道 = 去数据基座；点自进化轨道 = 去经验库；输出板块暂不展示。
+  // 在引擎舞台里直接点某一段也算一次切换：点输入车道 = 去数据底座；点自进化轨道 = 去经验库；输出板块暂不展示。
   useEffect(() => {
     const el = stage.current?.querySelector('.eng3d');
     if (!el) return;
@@ -291,7 +291,7 @@ export function SceneShell({ tenant = null, name }: { tenant?: string | null; na
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
-    // 抢在舞台自己的快捷键之前：1、2 去数据基座和知识星链（舞台原本会把它们当作“输入”“处理”）。
+    // 抢在舞台自己的快捷键之前：1、2 去数据底座和知识星链（舞台原本会把它们当作“输入”“处理”）。
     const key = (e: KeyboardEvent) => {
       if (!e.isTrusted) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -658,13 +658,13 @@ export function SceneShell({ tenant = null, name }: { tenant?: string | null; na
           {place === 'data'
             ? foundation.data
               ? `资产 ${foundation.data.items.length} · 待处理 ${foundation.data.governance.attention} · 隔离 ${foundation.data.governance.isolated} 项 · 平均质量 ${foundation.data.governance.averageQuality ?? '—'}`
-              : '数据基座 · 等待连接'
+              : '数据底座 · 等待连接'
             : place === 'knowledge'
               ? '知识星链 · ' +
                 (knowledge.error || (knowledge.busy ? '正在同步' : knowledge.data?.status || '等待连接'))
               : tenant
                 ? ''
-                : '引擎与其他板块为演示 · 数据基座与知识星链已接入'}
+                : '引擎与其他板块为演示 · 数据底座与知识星链已接入'}
         </span>
       </header>
 
@@ -822,7 +822,7 @@ function Home({
           ...c,
           value: foundation.data ? String(assets.filter((x) => x.available).length) : '—',
           unit: foundation.data ? `/ ${assets.filter((x) => x.status !== 'archived').length} 可用` : '',
-          note: foundation.data ? '当前企业数据基座' : '登录数据基座后查看',
+          note: foundation.data ? '当前企业数据底座' : '登录数据底座后查看',
           ratio: assets.length ? assets.filter((x) => x.available).length / assets.length : 0,
         }
       : c.place === 'knowledge'

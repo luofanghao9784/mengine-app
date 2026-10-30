@@ -104,7 +104,7 @@ export function DataWork({
           }
         }
       } catch {
-        /* 主视觉可暂缺，不阻断数据基座 */
+        /* 主视觉可暂缺，不阻断数据底座 */
       }
     })();
     return () => {
@@ -360,7 +360,7 @@ export function DataWork({
       <section className="cards work data live-foundation">
         <article className="card live-login">
           <header>
-            <h2>登录数据基座</h2>
+            <h2>登录数据底座</h2>
             <span>使用 mengine-wiki 的现有企业账号</span>
           </header>
           <form onSubmit={login}>
@@ -463,7 +463,7 @@ export function DataWork({
     ][i];
   };
   const STEP_INTRO = [
-    '数据从来源系统进入数据基座：取数频率、最近一次取数和每次取数留下的批次。',
+    '数据从来源系统进入数据底座：取数频率、最近一次取数和每次取数留下的批次。',
     '把来源内容拆成结构化记录与字段，并记录每个处理阶段。',
     a?.kind === 'table'
       ? '采集端在交付前核对字段业务含义、单位和规则；梦擎按本批携带的来源定义独立复核，无需预先认可版本。缺少依据时在采集端继续补证。'
@@ -472,7 +472,7 @@ export function DataWork({
     a?.nativeGovernance ? '当前快照检查通过后，按已发布口径提供给 AI；记录规则检查不代表银行到账、利润或真实逾期本金已核实。' : '通过检查的记录提供给 AI 查询；隔离记录不参与。',
   ];
   return (
-    <section ref={section} className="cards work data live-foundation glass" aria-label="数据基座">
+    <section ref={section} className="cards work data live-foundation glass" aria-label="数据底座">
       <article className="card sources" data-spot>
         <header className="list-head">
           <h2>数据来源</h2>

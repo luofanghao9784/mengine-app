@@ -21,7 +21,7 @@ import { Facts, ListBody, ListHead, SectionTabs, errorText, useDebounced, useHas
 import type { Tone } from './data';
 
 /**
- * 成员与权限：一排栏目页签 + 清单卡 / 详情卡 / 概况卡，与数据基座、知识星链同一套。
+ * 成员与权限：一排栏目页签 + 清单卡 / 详情卡 / 概况卡，与数据底座、知识星链同一套。
  * 动作全部沿用原有流程（停用与恢复、紧急停用、离职、交接、邀请与撤销、共享空间管理、数据访问、岗位与关注）。
  * 栏目记在 hash 的 tab，选中项记在 member / item，刷新回原处。
  */

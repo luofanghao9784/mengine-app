@@ -3,8 +3,8 @@ import { FORCED, LINKED } from './label-layout';
 import type { Item } from './data';
 
 /**
- * 原型：数据基座和知识库在引擎模型里的实体。
- * - 数据基座 = 引擎输入的上游，画的是治理过程：三个数据来源（外部数据集、内部资料库、外网数据集）是三片庞大而暗淡的
+ * 原型：数据底座和知识库在引擎模型里的实体。
+ * - 数据底座 = 引擎输入的上游，画的是治理过程：三个数据来源（外部数据集、内部资料库、外网数据集）是三片庞大而暗淡的
  *   光尘，汇成一股向右流，连续穿过三道由大到小的处理星门（解析、口径标注、检查）。进入第一道门即“接入”，
  *   进入梦核即“AI 可用”，这两步不单独设门。每过一道门，粒子更少、更亮、更收拢；最后一道门就立在引擎三条输入光流
  *   的起点上，引擎首页也能看到它。这个视角下相机拉得很远，梦核只占画面右端很小一块，用来对比数据来源的庞大。
@@ -55,7 +55,7 @@ const rotX = (p: V3, a: number): V3 => [
 const smooth = (u: number) => u * u * (3 - 2 * u);
 const clamp01 = (u: number) => Math.max(0, Math.min(1, u));
 
-/* ---------- 数据基座：三个来源 → 三道处理星门 → 引擎的三条输入光流 ---------- */
+/* ---------- 数据底座：三个来源 → 三道处理星门 → 引擎的三条输入光流 ---------- */
 /** 治理的五步。接入和 AI 可用不设门：第 1–3 步各有一道星门。 */
 export const GATES = ['接入', '解析', '口径标注', '检查', 'AI 可用'];
 /** 每条记录停在哪道门前（5 = 已可用）。 */
@@ -378,7 +378,7 @@ export class World implements SceneExtension {
     this.scene = scene;
     scene?.setExtension(this);
   }
-  /** 看知识库时引擎自己的一切都隐去；看数据基座时引擎保持原样，只是远远地缩在右端。 */
+  /** 看知识库时引擎自己的一切都隐去；看数据底座时引擎保持原样，只是远远地缩在右端。 */
   engineAlpha() {
     return 1 - this.kKnow;
   }
@@ -418,7 +418,7 @@ export class World implements SceneExtension {
     this.kData = ease(this.kData, this.view === 'data' ? 1 : 0);
     this.kKnow = ease(this.kKnow, this.view === 'knowledge' ? 1 : 0);
     // 不在本视角时只留很淡的一层，提示它们一直在模型里，又不改动引擎首页原本的样子；
-    // 看知识星链时数据基座的星尘、星门整片隐去，不和星链抢画面。
+    // 看知识星链时数据底座的星尘、星门整片隐去，不和星链抢画面。
     const A = 0.14 * (1 - this.kKnow) + 0.86 * this.kData,
       B = 0.1 + 0.9 * this.kKnow;
     const ring = (at: V3, rad: number, alpha: number) => {
@@ -624,7 +624,7 @@ export class World implements SceneExtension {
     return !!best || gate >= 1;
   }
 
-  /** 数据基座里选中项在模型中的位置：正在处理的光珠、已可用记录所在的输入光流，或卡住它的那道星门底部。 */
+  /** 数据底座里选中项在模型中的位置：正在处理的光珠、已可用记录所在的输入光流，或卡住它的那道星门底部。 */
   focus(): V3 | null {
     if (this.view !== 'data' || !this.selected) return null;
     const run = this.runners.find((q) => q.id === this.selected);
