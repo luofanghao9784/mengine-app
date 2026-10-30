@@ -26,10 +26,16 @@ public class PlatformIdentity {
     private final String dummy;
     public record Session(String tokenHash, String csrfHash, UUID actor) {}
     public PlatformIdentity(JdbcTemplate db, PasswordEncoder passwords, IdentityService identities,
+                            IdentityAudit audit, LoginThrottle throttle, String cookieName, String customerCookieName) {
+        this(db,passwords,identities,audit,throttle,cookieName,customerCookieName,"DREAMCORE_AGENT");
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public PlatformIdentity(JdbcTemplate db, PasswordEncoder passwords, IdentityService identities,
                             IdentityAudit audit, LoginThrottle throttle,
                             @org.springframework.beans.factory.annotation.Value("${dreamcore.platform.cookie-name:DREAMCORE_PLATFORM}") String cookieName,
-                            @org.springframework.beans.factory.annotation.Value("${server.servlet.session.cookie.name:DREAMCORE_SESSION}") String customerCookieName) {
-        if (!cookieName.matches("[A-Za-z0-9_]{1,100}") || cookieName.equals(customerCookieName)) throw new IllegalArgumentException("Invalid or shared platform cookie name");
+                            @org.springframework.beans.factory.annotation.Value("${server.servlet.session.cookie.name:DREAMCORE_SESSION}") String customerCookieName,
+                            @org.springframework.beans.factory.annotation.Value("${dreamcore.agent.cookie-name:DREAMCORE_AGENT}") String agentCookieName) {
+        AgentAdminIdentity.validateCookieNames(agentCookieName,cookieName,customerCookieName);
         this.cookieName=cookieName;
         this.db=db; this.passwords=passwords; this.identities=identities; this.audit=audit; this.throttle=throttle;
         dummy=passwords.encode(UUID.randomUUID().toString());
