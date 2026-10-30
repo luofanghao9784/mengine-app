@@ -1,3 +1,4 @@
+import { displayText, fieldLabel, recordLabel, versionLabel } from '../admin/display-labels';
 import { useContext, useEffect, useState } from 'react';
 import { ArrowLeft, Database, Plug, RefreshCw, Search } from 'lucide-react';
 import { Button, Badge, Empty, Field, Modal, PageActions } from '../shared/ui';
@@ -252,14 +253,14 @@ function DataList({ tenant, hash }: { tenant: string; hash: string }) {
                       {data.value.list.items.map((d) => (
                         <tr key={d.id}>
                           <td>
-                            <strong>{d.name}</strong>
+                            <strong>{displayText(d.name)}</strong>
                             <small>{d.description || '尚无业务说明'}</small>
                           </td>
                           <td>{d.workspaceName}</td>
                           <td>{d.columns.length}</td>
                           <td>{d.rowCount ?? '—'}</td>
                           <td>
-                            {d.version === null ? '暂无可用版本' : `v${d.version}`}
+                            {d.version === null ? '暂无可用版本' : `${versionLabel(d.version)}`}
                             <small>{runStatus(d.latestRun)}</small>
                           </td>
                           <td>{date(d.coverageThrough)}</td>
@@ -301,8 +302,8 @@ function DataList({ tenant, hash }: { tenant: string; hash: string }) {
                       })}
                     >
                       <span>
-                        <strong>{d.name}</strong>
-                        <small>{d.version === null ? '暂无可用数据' : `版本 ${d.version}`}</small>
+                        <strong>{displayText(d.name)}</strong>
+                        <small>{d.version === null ? '暂无可用数据' : `${versionLabel(d.version)}`}</small>
                       </span>
                       <span>{d.workspaceName}</span>
                       <span>{d.version === null ? '—' : d.rowCount?.toLocaleString('zh-CN')}</span>
@@ -358,7 +359,7 @@ function DatasetDetail({ tenant, id, hash }: { tenant: string; id: string; hash:
       ) : (
         <section className="admin-section">
           <div className="admin-section-heading">
-            <h2>{data.name}</h2>
+            <h2>{displayText(data.name)}</h2>
             <Badge>{runStatus(data.latestRun)}</Badge>
           </div>
           <DatasetLifecyclePanel tenant={tenant} id={id} />
@@ -369,7 +370,7 @@ function DatasetDetail({ tenant, id, hash }: { tenant: string; id: string; hash:
           <dl className="database-facts">
             <div>
               <dt>数据可用性</dt>
-              <dd>{data.version === null ? '暂无可用数据' : `可用 · 版本 ${data.version}`}</dd>
+              <dd>{data.version === null ? '暂无可用数据' : `可用 · ${versionLabel(data.version)}`}</dd>
             </div>
             <div>
               <dt>最近成功</dt>
@@ -400,16 +401,16 @@ function DatasetDetail({ tenant, id, hash }: { tenant: string; id: string; hash:
                   </thead>
                   <tbody>
                     {data.fieldDefinitions.map((f) => (
-                      <tr key={f.column}>
+                      <tr key={fieldLabel(f.column)}>
                         <td>
-                          <strong>{f.column}</strong>
-                          <div>{f.type}</div>
+                          <strong>{fieldLabel(f.column)}</strong>
+                          <div>{recordLabel(f.type)}</div>
                         </td>
                         <td>
                           {f.meaning}
                           <div>单位：{f.unit || '未确定或不适用'}</div>
                         </td>
-                        <td>{f.evidence}</td>
+                        <td>{displayText(f.evidence)}</td>
                         <td>
                           {
                             {
@@ -447,7 +448,7 @@ function DatasetDetail({ tenant, id, hash }: { tenant: string; id: string; hash:
                     <thead>
                       <tr>
                         {data.columns.map((c) => (
-                          <th key={c}>{c}</th>
+                          <th key={c}>{fieldLabel(c)}</th>
                         ))}
                       </tr>
                     </thead>
@@ -516,7 +517,7 @@ function Connections({ tenant, hash }: { tenant: string; hash: string }) {
                 href={adminHref('tenant', 'database', hash, { section: 'access', connection: c.id })}
               >
                 <span>
-                  <strong>{c.name}</strong>
+                  <strong>{displayText(c.name)}</strong>
                   <small>{c.routeLabel}</small>
                 </span>
                 <span>
@@ -577,7 +578,7 @@ function ConnectionDetail({ tenant, id, hash }: { tenant: string; id: string; ha
         <>
           <section className="admin-section">
             <div className="admin-section-heading">
-              <h2>{data.name}</h2>
+              <h2>{displayText(data.name)}</h2>
               <Badge>{status(data.status)}</Badge>
             </div>
             <dl className="database-facts">

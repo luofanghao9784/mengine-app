@@ -134,9 +134,9 @@ test('governance diagnosis checks then confirms a new redacted version', async (
   await page.getByRole('button', { name: '脱敏为新版本' }).click();
   await expect(page.getByText(/旧版本仍保留敏感信息/)).toBeVisible();
   await page.getByRole('button', { name: '确认生成脱敏版本' }).click();
-  await expect(page.locator('.mg-result')).toContainText('已生成脱敏新版本 · v2');
+  await expect(page.locator('.mg-result')).toContainText('已生成脱敏新版本 · 第 2 版');
   await page.getByRole('button', { name: '查看最新诊断' }).click();
-  await expect(page.getByText(/文件版本 v2/)).toBeVisible();
+  await expect(page.getByText(/文件版本 第 2 版/)).toBeVisible();
   await page.screenshot({ path: '.local/material-governance/diagnosis.png', fullPage: true });
   await page.getByRole('button', { name: '关闭弹窗' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);

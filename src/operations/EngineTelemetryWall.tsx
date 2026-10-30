@@ -1,3 +1,4 @@
+import { recordLabel } from '../admin/display-labels';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Activity, ArrowDownToLine, ArrowUpFromLine, Cpu, Dna, RefreshCw } from 'lucide-react';
 import type {
@@ -231,7 +232,7 @@ function Snapshot({
         }
       >
         <div>
-          <small>ENGINE</small>
+          <small>{recordLabel('ENGINE')}</small>
           <strong>{n(running)}</strong>
           <span>{compact ? '全链路执行中' : '执行中'}</span>
         </div>
@@ -347,7 +348,7 @@ function Snapshot({
             <section key={g.id} className={`engine-bank engine-${g.id}`} aria-label={`${g.title}运行状态`}>
               <div className="engine-bank-heading">
                 <div>
-                  <small>{g.english}</small>
+                  <small>{recordLabel(g.english)}</small>
                   <h3>
                     <g.icon size={19} />
                     {g.title}
@@ -394,7 +395,7 @@ function Snapshot({
         <section className="engine-bank engine-evolution" aria-label="自进化运行状态">
           <div className="engine-bank-heading">
             <div>
-              <small>EVOLUTION</small>
+              <small>{recordLabel('EVOLUTION')}</small>
               <h3>
                 <Dna size={19} />
                 自进化
@@ -451,7 +452,7 @@ function Snapshot({
                     strokeWidth="2"
                   />
                   <text textAnchor="middle" y="-19" fill="#baa0d5" fontSize="10" letterSpacing="2">
-                    EVOLVE
+                    {recordLabel('EVOLVE')}
                   </text>
                   <Dna x="-14" y="-8" size={28} color="#d4b8f4" strokeWidth={1.3} aria-hidden="true" />
                   <text textAnchor="middle" y="35" fill="#d4b8f4" fontSize="11">

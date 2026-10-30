@@ -1,3 +1,4 @@
+import { versionLabel } from './display-labels';
 import { useState } from 'react';
 import type { WikiDraft } from '../../contracts/public-api/wiki-learning';
 import type { WikiArticle, WikiArticleBody } from '../../contracts/public-api/wiki-articles';
@@ -107,7 +108,7 @@ function PublishForm({
   const submit = useSubmission<ArticleText & { expectedRevision: number; acknowledged: boolean }>();
   return published ? (
     <p role="status">
-      已发布为 Wiki 知识 v{published.revision}。<Button onClick={done}>完成发布</Button>
+      已发布为 Wiki 知识{versionLabel(published.revision)}。<Button onClick={done}>完成发布</Button>
     </p>
   ) : (
     <form
@@ -122,7 +123,7 @@ function PublishForm({
     >
       <p className="wiki-notice">
         {expected
-          ? `将更新这份资料的现有 Wiki 知识 v${expected}，旧版保留在维护记录。`
+          ? `将更新这份资料的现有 Wiki 知识 ${versionLabel(expected)}，旧版保留在维护记录。`
           : '发布后，当前及以后获准读取来源资料的成员可阅读此知识。'}{' '}
         不会开放你的私人会话。原文引用保持不变，正文请依据来源校订。
       </p>
@@ -178,7 +179,7 @@ export function WikiArticles({ tenant, revision }: { tenant: string; revision: n
               <button className="wiki-card" key={item.id} onClick={() => select(item.id)}>
                 <h3>{item.article?.title || item.sourceName}</h3>
                 <p>
-                  {item.sourceName} · 来源 v{item.sourceVersion} · 知识 v{item.revision}
+                  {item.sourceName} · 来源{versionLabel(item.sourceVersion)} · 知识{versionLabel(item.revision)}
                 </p>
                 {item.sourceChanged ? (
                   <span>来源已变化，正文已隐藏</span>
@@ -252,7 +253,7 @@ export function ArticleReader({ tenant, id, close }: { tenant: string; id: strin
       ) : (
         <>
           <p>
-            {data.value.sourceName} · 来源 v{data.value.sourceVersion} · 知识 v{data.value.revision}
+            {data.value.sourceName} · 来源{versionLabel(data.value.sourceVersion)} · 知识{versionLabel(data.value.revision)}
             {data.value.archived ? ' · 已下架' : ''}
           </p>
           <Button onClick={() => retry((n) => n + 1)}>刷新知识</Button>
@@ -368,7 +369,7 @@ function History({ tenant, id }: { tenant: string; id: string }) {
       {data.value.items.map((h) => (
         <details key={h.revision}>
           <summary>
-            v{h.revision} · {{ PUBLISH: '发布', EDIT: '校订', ARCHIVE: '下架', RESTORE: '恢复' }[h.action]} ·{' '}
+            {versionLabel(h.revision)} · {{ PUBLISH: '发布', EDIT: '校订', ARCHIVE: '下架', RESTORE: '恢复' }[h.action]} ·{' '}
             {h.createdAt}
           </summary>
           <p>操作者：{h.actorId}</p>

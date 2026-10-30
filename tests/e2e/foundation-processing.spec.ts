@@ -151,7 +151,7 @@ async function fixture(page: Page, items: unknown[] = [asset], auditValid: boole
             state: 'SUCCEEDED',
             createdAt: '2026-10-18T23:59:00Z',
             finishedAt: '2026-10-19T00:00:00Z',
-            detail: '快照 v1 · 41 条记录',
+            detail: '快照 第 1 版 · 41 条记录',
           },
         ],
         notes: ['字段来自来源表头。'],
@@ -177,7 +177,7 @@ test('显示字段、真实分页、阶段产物和批次，版本变化不拼�
   const result = page.getByRole('region', { name: '结构化处理结果' });
   await expect(result.getByText('来源预约编号', { exact: true })).toBeVisible();
   await expect(result.getByText('S001', { exact: true })).toBeVisible();
-  await expect(result.getByText('快照 v1 · 41 条记录', { exact: true })).toBeVisible();
+  await expect(result.getByText('快照 第 1 版 · 41 条记录', { exact: true })).toBeVisible();
   await result.getByRole('button', { name: '下一页记录' }).click();
   await expect(result.getByText('S021', { exact: true })).toBeVisible();
   expect(state.seen).toEqual(['first', 'source-r1']);
@@ -428,4 +428,67 @@ test('原生治理生成草稿后必须核对再显式发布', async ({ page }) 
   await page.getByRole('button', { name: '核对后发布治理结果' }).click();
   await expect(page.getByRole('region', { name: '本表治理处理' })).toContainText('治理结果已发布');
   expect(publishes).toBe(1);
+});
+
+test('数据底座字段、来源、版本与部署审计只显示人话', async ({ page }) => {
+  await fixture(page);
+  const copyAsset = { ...asset, title: 'synth_demo.sqlite 字段说明 v1', tags: ['internal_material', 'FUTURE_CATEGORY'] };
+  await page.route('**/scene/dispatch?**', route => {
+    const path = new URL(route.request().url()).searchParams.get('path');
+    if (path === '/scene-foundation') return route.fulfill({ json: {
+      at: '2026-10-31T00:00:00Z', user: { name: '张三', role: 'admin' }, tenant: { name: '合成企业' },
+      model: { configured: false, enabled: false, model: '' }, items: [copyAsset], passed: [1, 1, 1, 1, 1],
+      sources: [{ name: '外部数据集', count: 1 }], auditValid: true,
+      governance: { attention: 0, isolated: 0, overdue: 0, failed: 0, averageQuality: null, departments: [] }, canScan: false,
+    } });
+    if (path === '/scene-foundation/' + asset.id) return route.fulfill({ json: {
+      asset: copyAsset, analysis: null, findings: [], events: [], batches: [],
+      dictionary: { current: true, revision: 2, at: '2026-10-31T00:00:00Z', provider: 'Codex-CT027-B', tableMeaning: '线索口径', usageRules: '合成演示', warnings: [], job: null,
+        fields: [{ name: 'funnel_stage', label: '业务阶段标题', type: 'text', meaning: '线索所在阶段', unit: '', required: false, sensitive: false, rules: '', evidence: 'synth_demo.sqlite 字段说明 v1' },
+          { name: 'future_column', label: '', type: 'future_type', meaning: '待核实', unit: '', required: false, sensitive: false, rules: '', evidence: '' }], relations: [] },
+      audit: [{ at: '2026-10-31T00:00:00Z', actor: '张三（TENANT_ADMIN+owner）', action: 'deployment.governance.applied', detail: '部署 ct027-b-synth-demo-v1；全量检查 26 条；保留异常隔离' },
+        { at: '2026-10-31T00:00:00Z', actor: 'SYSTEM', action: 'future.action', detail: '内部记录' }],
+    } });
+    return route.fallback();
+  });
+  await page.reload();
+  await page.mouse.move(1400, 300);
+  await page.mouse.wheel(0, 900);
+  await expect(page.getByRole('heading', { name: '演示数据字段说明 · 第 1 版' })).toBeVisible();
+  await page.getByRole('tab', { name: /^口径标注/ }).click();
+  await expect(page.locator('.card.asset')).toContainText('总部整理');
+  await expect(page.locator('.card.asset')).toContainText('业务阶段标题');
+  await expect(page.locator('.card.asset')).toContainText('其他记录');
+  await expect(page.locator('.card.asset')).not.toContainText('funnel_stage');
+  await page.getByRole('tablist', { name: '治理流程' }).getByRole('tab', { name: /^AI 可用/ }).click();
+  await expect(page.locator('.card.asset')).toContainText('张三（企业负责人） · 更新数据口径');
+  await expect(page.locator('.card.asset')).toContainText('检查 26 条，异常记录已隔离');
+  await expect(page.locator('.card.asset')).toContainText('系统 · 其他操作');
+  await expect(page.locator('body')).not.toContainText(/ct027-b-synth-demo-v1|deployment\.governance\.applied|Codex-CT027-B|synth_demo\.sqlite|TENANT_ADMIN|future\.action/);
+  await expect(page.locator('.step-body')).toHaveCSS('opacity', '1');
+  await page.screenshot({ path: 'test-results/data-copy-audit.png', fullPage: true, animations: 'disabled' });
+});
+
+
+test('知识来源中文化，部署编号整行隐藏，动态版次统一', async ({ page }) => {
+  await fixture(page);
+  const item = {
+    id: 'copy-knowledge', name: '合成经营知识', group: '内部资料', why: '总部整理', side: '内部资料', tone: 'ok', verdict: '合成验证结论',
+    kvHead: ['项目', '内容', '状态'], kv: [
+      ['来源', 'Codex-CT027-B（部署治理）', '来源 v2 · 知识 v1', 'plain'],
+      ['部署 ct027-b-synth-demo-v1', '不应显示的整段', '', 'plain'],
+      ['部署', 'future-package-v2', '同样不应显示', 'plain'],
+    ], actions: [],
+  };
+  await page.route('**/scene/dispatch?path=%2Fscene-knowledge', route => route.fulfill({ json: {
+    items: [item], relations: [], sourceKind: { [item.id]: 1 }, tabs: [{ label: '全部 1', items: [item] }],
+    stats: { title: '知识构成', rows: [] }, aside: { title: '最近入库', rows: [] }, pending: 0, failed: 0, busy: false,
+    available: false, needsGraph: false, scopeRevision: 'synthetic-scope', status: '已读取合成知识',
+  } }));
+  await page.locator('.shell-switch').getByRole('button', { name: '知识星链', exact: true }).click();
+  const detail = page.locator('.card.detail');
+  await expect(detail.getByRole('cell', { name: '总部整理', exact: true })).toBeVisible();
+  await expect(detail).toContainText('来源第 2 版 · 知识第 1 版');
+  await expect(detail).not.toContainText(/Codex|ct027|future-package|不应显示|同样不应显示/);
+  await page.screenshot({ path: 'test-results/data-copy-knowledge.png', fullPage: true });
 });

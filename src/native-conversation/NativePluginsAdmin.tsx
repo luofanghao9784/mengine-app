@@ -1,3 +1,4 @@
+import { settingsLabel } from '../admin/display-labels';
 import { useState } from 'react';
 import { Puzzle, RefreshCw } from 'lucide-react';
 import { Button } from '../shared/ui';
@@ -50,7 +51,7 @@ export function NativePluginsAdmin({ tenant }: { tenant: string }) {
     <section className="admin-section native-plugins">
       <div className="admin-section-heading">
         <div>
-          <h2>智能服务</h2>
+          <h2>服务设置</h2>
           <p className="admin-note">
             这些模块由部署方审核后随运行环境预装，这里只能开关，不能安装新的。切换后，正在运行的 AI
             会按新设置重启，进行中的那一轮会被中断，会话记录保留。
@@ -129,7 +130,7 @@ export function NativePluginsAdmin({ tenant }: { tenant: string }) {
           {error}
         </p>
       )}
-      {data.value && <p className="admin-note">设置版本 {data.value.policy.revision}，按企业独立保存。</p>}
+      {data.value && <p className="admin-note">{settingsLabel(data.value.policy.revision)}</p>}
     </section>
   );
 }

@@ -1,4 +1,6 @@
+import { displayText, isDeploymentIdentifier } from '../display-labels';
 import { GovernanceProgress } from './GovernanceProgress';
+import { TenantConsole } from '../TenantConsole';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { EngineStage3D } from '../../operations/engine-stage/EngineStage3D';
 import { busyDemo } from '../../operations/engine-demo';
@@ -40,7 +42,7 @@ const MemoCompanyWork = memo(CompanyWork);
 const MemoExperienceWork = memo(ExperienceWork);
 const MemoWork = memo(Work);
 const SCENE: Place[] = ['home', 'data', 'knowledge', 'experience'];
-const SETTINGS: Place[] = ['members', 'usage', 'company'];
+const SETTINGS: Place[] = ['opened', 'members', 'usage', 'company'];
 const SHORTCUT: Partial<Record<Place, string>> = { data: '1', knowledge: '2', experience: '4' };
 type Sheet = 'peek' | 'half' | 'full';
 const ORDER: Sheet[] = ['peek', 'half', 'full'];
@@ -154,8 +156,8 @@ export function SceneShell({ tenant = null, name }: { tenant?: string | null; na
   const sceneSheet = useRef<Sheet>('half');
   const allowed: Sheet[] = hasScene(place) ? ORDER : ['peek'];
   const stops: Record<Sheet, number> = {
-    // 窄窗口时导航退到第二行，卡片升到顶也要让开它。
-    peek: width < 1180 ? 58 : 4,
+    // 加上已开通入口后，导航较长；沿用第二行布局，避免与板块标题重叠。
+    peek: width < 1560 ? 58 : 4,
     // 手机竖屏本来就矮：半屏档少给 3D 一些，下面的卡片多留空间。
     half: Math.round(height * (width <= 600 && height > width ? 0.42 : 0.6)),
     full: height - 66,
@@ -465,11 +467,11 @@ export function SceneShell({ tenant = null, name }: { tenant?: string | null; na
         if (el.dataset.html !== html) {
           el.dataset.html = html;
           const title = document.createElement('b');
-          title.textContent = l.text;
+          title.textContent = displayText(l.text);
           el.replaceChildren(title);
           if (l.sub) {
             const sub = document.createElement('span');
-            sub.textContent = l.sub;
+            sub.textContent = displayText(l.sub);
             el.appendChild(sub);
           }
         }
@@ -712,7 +714,17 @@ export function SceneShell({ tenant = null, name }: { tenant?: string | null; na
             <Icon name="search" />
           </button>
         </nav>
-        {tenant && place === 'members' ? (
+        {place === 'opened' ? (
+          <section className="cards glass business-work" aria-label="已开通的 AI 功能">
+            <article className="card">
+              {tenant ? (
+                <TenantConsole key={tenant} tenant={tenant} name={enterpriseName || ''} embedded />
+              ) : (
+                <p className="none">登录企业后查看已开通的 AI 功能。</p>
+              )}
+            </article>
+          </section>
+        ) : tenant && place === 'members' ? (
           <MemoMembersWork key={tenant} tenant={tenant} />
         ) : tenant && place === 'usage' ? (
           <MemoUsageWork key={tenant} tenant={tenant} />
@@ -788,13 +800,17 @@ function Bars({ label }: { label: string }) {
 const StatCard = ({ c, go }: { c: (typeof homeCards)[number]; go: (p: Place) => void }) => (
   <button type="button" className="card stat" onClick={() => go(c.place)}>
     <span className="label">{c.label}</span>
-    <span className="value">
-      {c.value}
-      <small>{c.unit}</small>
-    </span>
-    <span className="bar">
-      <i style={{ width: `${c.ratio * 100}%` }} />
-    </span>
+    {c.place !== 'opened' && (
+      <span className="value">
+        {c.value}
+        <small>{c.unit}</small>
+      </span>
+    )}
+    {c.place !== 'opened' && (
+      <span className="bar">
+        <i style={{ width: `${c.ratio * 100}%` }} />
+      </span>
+    )}
     <span className="note">{c.note}</span>
   </button>
 );
@@ -852,8 +868,8 @@ function Home({
               <button type="button" onClick={() => go(t.place, t.id)}>
                 <span className="n">{i + 1}</span>
                 <span className="t">
-                  <b>{t.title}</b>
-                  <span>{t.sub}</span>
+                  <b>{displayText(t.title)}</b>
+                  <span>{displayText(t.sub)}</span>
                 </span>
                 <span className="tag">{places[t.place].name}</span>
                 <span className="go">{t.act} →</span>
@@ -862,7 +878,7 @@ function Home({
           ))}
         </ol>
       </article>
-      {cards.slice(0, 4).map((c) => (
+      {cards.slice(0, 5).map((c) => (
         <StatCard key={c.label} c={c} go={go} />
       ))}
       <article className="card chart">
@@ -940,7 +956,7 @@ function Usage() {
     <section className="cards usage glass" aria-label="用量与运行">
       {usage.readings.map(([label, value, note]) => (
         <article key={label} className="card stat">
-          <span className="label">{label}</span>
+          <span className="label">{displayText(label)}</span>
           <span className="value">{value}</span>
           <span className="note">{note}</span>
         </article>
@@ -958,8 +974,8 @@ function Usage() {
         </header>
         {usage.parts.map(([label, value, share]) => (
           <div key={label} className="fact share">
-            <span>{label}</span>
-            <b>{value}</b>
+            <span>{displayText(label)}</span>
+            <b>{displayText(value)}</b>
             <i>
               <i style={{ width: `${share}%` }} />
             </i>
@@ -972,8 +988,8 @@ function Usage() {
         </header>
         {usage.quality.map(([label, value, tone]) => (
           <div key={label} className="fact">
-            <span>{label}</span>
-            <b className={`tone-${tone}-text`}>{value}</b>
+            <span>{displayText(label)}</span>
+            <b className={`tone-${tone}-text`}>{displayText(value)}</b>
           </div>
         ))}
         <header>
@@ -1158,10 +1174,10 @@ function Work({
 
       <article className="card detail" aria-live="polite">
         <header>
-          <h2>{current.name}</h2>
+          <h2>{displayText(current.name)}</h2>
           <span>
-            {current.group}
-            {current.side && ` · ${current.side}`}
+            {displayText(current.group)}
+            {current.side && ` · ${displayText(current.side)}`}
           </span>
         </header>
         <div className="card-scroll">
@@ -1169,7 +1185,7 @@ function Work({
             {actionError ||
               (place === 'knowledge' &&
                 (knowledge.error || (knowledge.busy ? '正在同步知识与关联…' : ''))) ||
-              current.verdict}
+              displayText(current.verdict)}
           </p>
           {flow && (
             <ol className="flow">
@@ -1191,11 +1207,11 @@ function Work({
                 </tr>
               </thead>
               <tbody>
-                {current.kv.map(([a, b, c, tone], i) => (
+                {current.kv.filter(([a, b, c]) => !isDeploymentIdentifier([a, b, c])).map(([a, b, c, tone], i) => (
                   <tr key={`${a}-${i}`}>
-                    <th>{a}</th>
-                    <td>{b}</td>
-                    <td className={`${toneClass(tone)}-text`}>{c}</td>
+                    <th>{displayText(a)}</th>
+                    <td>{displayText(b)}</td>
+                    <td className={`${toneClass(tone)}-text`}>{displayText(c)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1213,8 +1229,8 @@ function Work({
                     pick(r.id);
                   }}
                 >
-                  <b>{r.name}</b>
-                  <span>{r.why}</span>
+                  <b>{displayText(r.name)}</b>
+                  <span>{displayText(r.why)}</span>
                 </button>
               ))}
               {links.length === 0 && (
@@ -1247,7 +1263,7 @@ function Work({
       <div className="side">
         <article className="card facts">
           <header>
-            <h2>{side.title}</h2>
+            <h2>{displayText(side.title)}</h2>
           </header>
           {side.rows.map(([label, value, note], i) =>
             place === 'data' && note ? (
@@ -1258,27 +1274,27 @@ function Work({
                 aria-pressed={gate === i}
                 onClick={() => setGate(gate === i ? null : i)}
               >
-                <span>{label}</span>
-                <b>{value}</b>
-                <small>{note}</small>
+                <span>{displayText(label)}</span>
+                <b>{displayText(value)}</b>
+                <small>{displayText(note)}</small>
               </button>
             ) : (
               <div key={`${label}-${i}`} className="fact">
-                <span>{label}</span>
-                <b>{value}</b>
-                {note && <small>{note}</small>}
+                <span>{displayText(label)}</span>
+                <b>{displayText(value)}</b>
+                {note && <small>{displayText(note)}</small>}
               </div>
             ),
           )}
         </article>
         <article className="card facts more">
           <header>
-            <h2>{more.title}</h2>
+            <h2>{displayText(more.title)}</h2>
           </header>
           {more.rows.map(([label, value, tone], i) => (
             <div key={`${label}-${i}`} className="fact line">
-              <span>{label}</span>
-              <small className={tone ? `tone-${tone}-text` : undefined}>{value}</small>
+              <span>{displayText(label)}</span>
+              <small className={tone ? `tone-${tone}-text` : undefined}>{displayText(value)}</small>
             </div>
           ))}
         </article>
@@ -1319,8 +1335,8 @@ function Palette({
         ).map((x) => ({
           place: p,
           id: x.id as string | undefined,
-          label: x.name,
-          sub: `${places[p].name} · ${x.why}`,
+          label: displayText(x.name),
+          sub: `${places[p].name} · ${displayText(x.why)}`,
         })),
       ),
     ],
@@ -1372,6 +1388,12 @@ function Palette({
 
 /** 导航图标：同一套 1.5 线宽的细线图形。 */
 const ICONS: Record<Place | 'search', React.ReactNode> = {
+  opened: (
+    <>
+      <rect x="4" y="4" width="16" height="16" rx="4" />
+      <path d="m8 12 3 3 5-6" />
+    </>
+  ),
   home: (
     <>
       <circle cx="12" cy="12" r="3" />

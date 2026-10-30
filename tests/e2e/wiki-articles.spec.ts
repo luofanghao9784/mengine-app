@@ -227,7 +227,7 @@ test('Wiki explicit publication, revision edit, archive, restore and revoked acc
   await page.getByLabel('知识标题', { exact: true }).fill('人工核对的共享知识');
   await page.getByLabel('我已核对内容，同意按来源资料的读取范围发布').check();
   await page.getByRole('button', { name: '确认发布', exact: true }).click();
-  await expect(page.getByText('已发布为 Wiki 知识 v1。')).toBeVisible();
+  await expect(page.getByText('已发布为 Wiki 知识第 1 版。')).toBeVisible();
   expect(publishBodies).toHaveLength(1);
   await page.getByRole('button', { name: '完成发布' }).click();
   await page.getByRole('button', { name: '关闭弹窗', exact: true }).click();
@@ -238,7 +238,7 @@ test('Wiki explicit publication, revision edit, archive, restore and revoked acc
   await page.getByRole('button', { name: '保存校订并更新共享知识' }).click();
   await expect(page.getByText('第二版人工校订内容。', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '维护记录', exact: true }).click();
-  await expect(page.getByText(/v2 · 校订/)).toBeVisible();
+  await expect(page.getByText(/第 2 版 · 校订/)).toBeVisible();
   await page.screenshot({ path: 'test-results/wiki-article-maintenance.png', fullPage: true });
   await page.getByRole('button', { name: '下架知识', exact: true }).click();
   await expect(page.getByRole('button', { name: '恢复上架', exact: true })).toBeVisible();

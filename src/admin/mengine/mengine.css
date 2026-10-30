@@ -17,9 +17,6 @@
 .mengine-heading h2 span {
   color: #aa8550;
 }
-.mengine-heading small {
-  letter-spacing: 0.15em;
-}
 .mengine-heading p,
 .mengine-dashboard small {
   color: var(--muted, #687787);

@@ -1,3 +1,4 @@
+import { versionLabel } from './display-labels';
 import { PublishWikiDraft } from './WikiArticles';
 import { useEffect, useState } from 'react';
 import { useSession } from '../identity/session';
@@ -89,7 +90,7 @@ export function WikiDrafts({
         <button className="wiki-match" key={item.id} onClick={() => select(item.id)}>
           <strong>{item.article?.title || item.sourceName}</strong>
           <small>
-            {item.sourceName} · v{item.sourceVersion} · {labels[item.status]}
+            {item.sourceName} · {versionLabel(item.sourceVersion)} · {labels[item.status]}
           </small>
           {item.executionClass === 'verification' && <span>模拟验证执行</span>}
         </button>
@@ -122,7 +123,7 @@ export function WikiDraftReader({ tenant, id, close }: { tenant: string; id: str
       ) : (
         <>
           <p>
-            {data.value.sourceName} · v{data.value.sourceVersion} · {labels[data.value.status]}
+            {data.value.sourceName} · {versionLabel(data.value.sourceVersion)} · {labels[data.value.status]}
           </p>
           <Button onClick={() => retry((n) => n + 1)}>刷新学习状态</Button>
           <a

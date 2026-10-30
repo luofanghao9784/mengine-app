@@ -1,3 +1,4 @@
+import { actionLabel, actorLabel, auditDetail } from '../display-labels';
 import { useContext, useEffect, useState } from 'react';
 import { tenantClient as api } from '../../tenant/client';
 import { MutationGate, useRemote } from '../../shared/admin';
@@ -5,7 +6,6 @@ import { Modal } from '../../shared/ui';
 import { RequestPending, requestNavigationLocked } from '../../shared/request-guard';
 import { useSession } from '../../identity/session';
 import { LocalInviteLink } from '../../identity/LocalInviteLink';
-import { auditActions } from '../../tenant/audit-labels';
 import { Confirm, EmergencyStop, MemberInviteForm, SpaceDetail } from '../../tenant/TenantAdminHome';
 import { SpaceOwnerForm } from '../../tenant/SpaceOwnerForm';
 import { DeparturePanel } from '../../departure/DeparturePanel';
@@ -184,11 +184,11 @@ export function MembersWork({ tenant }: { tenant: string }) {
               {(records.value || []).slice(0, 8).map((r) => (
                 <div key={r.id} className="fact line">
                   <span>
-                    {auditActions[r.action] || r.action} · {r.targetName || '—'}
+                    {actionLabel(r.action)} · {r.targetName || '—'}
                     {r.relatedAccountName && ` → ${r.relatedAccountName}`}
                   </span>
                   <small>
-                    {r.actorName} · {when(r.createdAt)}
+                    {actorLabel(r.actorName)} · {when(r.createdAt)}
                   </small>
                 </div>
               ))}
@@ -804,8 +804,8 @@ function AccessPane(pane: PaneProps) {
               a.audits.items.map((x) => (
                 <KnowledgeListRow
                   key={x.id}
-                  name={x.action}
-                  summary={`${x.actor} · ${new Date(x.at).toLocaleString()}`}
+                  name={actionLabel(x.action)}
+                  summary={`${actorLabel(x.actor)} · ${new Date(x.at).toLocaleString()}`}
                   tone="plain"
                   selected={x.id === audit?.id}
                   onSelect={() => setPick(x.id)}
@@ -906,9 +906,9 @@ function AccessPane(pane: PaneProps) {
                 <>
                   <p>审计完整性：{a.audits?.valid ? '校验通过' : '校验未通过'}</p>
                   <p>
-                    {new Date(audit.at).toLocaleString()} · {audit.actor} · {audit.action}
+                    {new Date(audit.at).toLocaleString()} · {actorLabel(audit.actor)} · {actionLabel(audit.action)}
                   </p>
-                  <pre>{audit.detail}</pre>
+                  <p>{auditDetail(audit.action, audit.detail)}</p>
                 </>
               ) : (
                 <p>暂无审计记录。</p>

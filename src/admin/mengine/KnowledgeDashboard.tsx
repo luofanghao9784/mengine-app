@@ -1,3 +1,4 @@
+import { actorLabel, versionLabel } from '../display-labels';
 import { useState } from 'react';
 import { OrbitCanvas } from './OrbitCanvas';
 import { readWorkbench } from '../knowledge-workbench-client';
@@ -41,7 +42,6 @@ export function KnowledgeDashboard({ tenant, hash }: { tenant: string; hash: str
     <div className="mengine-dashboard">
       <header className="mengine-heading">
         <div>
-          <small>ENTERPRISE KNOWLEDGE WORKSPACE</small>
           <h2>
             让知识，在正确的权限下流动<span>.</span>
           </h2>
@@ -59,7 +59,7 @@ export function KnowledgeDashboard({ tenant, hash }: { tenant: string; hash: str
           <OrbitCanvas phase={phase} paused={paused} pending={false} />
           <div className="mengine-orbit-caption">
             <strong>知识处理流程</strong>
-            <span>{item ? `${item.name} · v${item.version}` : '等待接入资料'}</span>
+            <span>{item ? `${item.name} · ${versionLabel(item.version)}` : '等待接入资料'}</span>
             <button onClick={() => pause((x) => !x)}>{paused ? '播放视觉效果' : '暂停视觉效果'}</button>
           </div>
         </div>
@@ -74,7 +74,7 @@ export function KnowledgeDashboard({ tenant, hash }: { tenant: string; hash: str
               <select aria-label="仪表盘资料" value={item.id} onChange={(e) => setSelected(e.target.value)}>
                 {data.value.items.map((x) => (
                   <option key={x.id} value={x.id}>
-                    {x.name} · v{x.version}
+                    {x.name} · {versionLabel(x.version)}
                   </option>
                 ))}
               </select>
@@ -148,7 +148,7 @@ export function KnowledgeDashboard({ tenant, hash }: { tenant: string; hash: str
                         <button onClick={() => open(x)}>{x.name}</button>
                       </td>
                       <td>{x.workspaceName}</td>
-                      <td>v{x.version}</td>
+                      <td>{versionLabel(x.version)}</td>
                       <td>{new Date(x.updatedAt).toLocaleDateString('zh-CN')}</td>
                     </tr>
                   ))}
@@ -172,10 +172,10 @@ export function KnowledgeDashboard({ tenant, hash }: { tenant: string; hash: str
               {activity.value.items.map((x) => (
                 <li key={x.id}>
                   <strong>
-                    {x.actorName} · {x.kind.includes('UPDATED') ? '更新了资料' : '发布了资料'}
+                    {actorLabel(x.actorName)} · {x.kind.includes('UPDATED') ? '更新了资料' : '发布了资料'}
                   </strong>
                   <p>
-                    {x.filename} · v{x.version}
+                    {x.filename} · {versionLabel(x.version)}
                   </p>
                   <small>
                     {x.workspaceName} · {new Date(x.occurredAt).toLocaleString('zh-CN')}

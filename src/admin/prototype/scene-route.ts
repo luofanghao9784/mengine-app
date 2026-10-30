@@ -5,7 +5,7 @@ import type { Place } from './data';
  * - 当前板块写在地址的 hash 里（place=…），刷新回原处，浏览器后退可用，链接可以分享。
  * - 当前企业由外壳传入；数据接口 api() 从这里取，不再读地址栏的 ?tenant=。
  */
-const PLACES: Place[] = ['home', 'data', 'knowledge', 'experience', 'members', 'usage', 'company'];
+const PLACES: Place[] = ['home', 'data', 'knowledge', 'experience', 'opened', 'members', 'usage', 'company'];
 /** 板块自己在 hash 里记的栏目、选中项等参数（含旧版管理台的 admin/detail 等）；换板块时一并清掉。 */
 const SECTION_KEYS = ['admin', 'detail', 'tab', 'member', 'period', 'section', 'item', 'flow', 'space', 'view', 'version', 'experience', 'scope'];
 
@@ -17,10 +17,11 @@ export function scenePlace(hash = location.hash): Place | null {
 /** 把当前板块写进地址；replace 为真时不新增历史记录（用于首次打开时补上 place）。 */
 export function writeScenePlace(place: Place, replace = false) {
   const params = new URLSearchParams(location.hash.slice(1));
-  if (params.get('place') === place) return;
+  if (params.get('place') === place && (place !== 'opened' || params.get('admin') === 'abilities')) return;
   const leaving = params.get('place');
   params.set('place', place);
   if (leaving) for (const key of SECTION_KEYS) params.delete(key);
+  if (place === 'opened') params.set('admin', 'abilities');
   if (replace) history.replaceState(history.state, '', '#' + params);
   else location.hash = params.toString();
 }

@@ -1,3 +1,4 @@
+import { versionLabel } from '../admin/display-labels';
 import { useState } from 'react';
 import { materialClient as api } from './client';
 import { Failure, Loading, useRemote } from '../shared/admin';
@@ -33,7 +34,7 @@ export function MaterialPipeline({
       ) : (
         <>
           <p className="perm-note">
-            以下为当前最新 v{s.version} 的独立状态；资料阅读、规则检查和 Wiki 发布分别执行。
+            以下为当前最新 {versionLabel(s.version)} 的独立状态；资料阅读、规则检查和 Wiki 发布分别执行。
           </p>
           <ol className="material-pipeline">
             <li>

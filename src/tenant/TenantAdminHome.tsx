@@ -1,3 +1,4 @@
+import { actionLabel, actorLabel } from '../admin/display-labels';
 import { LibraryDepartments } from '../material/Permissions';
 import { WorkspaceArchive, readWorkspaceArchive } from './WorkspaceArchive';
 import { adminHref } from '../admin/navigation';
@@ -62,7 +63,6 @@ const tabs = [
   ['settings', '企业设置', Settings],
 ] as const;
 const inviteLabels = { PENDING: '等待接受', ACCEPTED: '已加入', REVOKED: '已撤销', EXPIRED: '已过期' };
-import { auditActions as actions } from './audit-labels';
 const time = (date: string) => new Date(date).toLocaleString('zh-CN', { hour12: false });
 const role = (value: string) => (value === 'TENANT_ADMIN' ? '企业管理员' : '成员');
 export function TenantAdminHome({
@@ -636,10 +636,10 @@ function Records({ tenant, attempt, refresh }: { tenant: string; attempt: number
               <li key={r.id}>
                 <span>
                   <strong>
-                    {actions[r.action]} · {r.targetName || r.targetId}
+                    {actionLabel(r.action)} · {r.targetName || r.targetId}
                     {r.relatedAccountName && ` → ${r.relatedAccountName}`}
                   </strong>
-                  <small>操作人：{r.actorName}</small>
+                  <small>操作人：{actorLabel(r.actorName)}</small>
                 </span>
                 <time dateTime={r.createdAt}>{time(r.createdAt)}</time>
               </li>

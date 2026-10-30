@@ -1,3 +1,4 @@
+import { displayText } from '../display-labels';
 import type { Tone } from './data';
 
 export function KnowledgeListRow({ name, summary, side, tone = 'plain', selected, onSelect, label }: {
@@ -6,7 +7,7 @@ export function KnowledgeListRow({ name, summary, side, tone = 'plain', selected
 }) {
   return <button type="button" className="row knowledge-list-row" aria-label={label} aria-pressed={selected} onClick={onSelect}>
     <i className={`tone-${tone}`} />
-    <span className="t"><b>{name}</b><span className={tone === 'bad' ? 'tone-bad-text' : undefined}>{summary}</span></span>
-    <span className="s">{side}</span>
+    <span className="t"><b>{displayText(name)}</b><span className={tone === 'bad' ? 'tone-bad-text' : undefined}>{displayText(summary)}</span></span>
+    <span className="s">{displayText(side)}</span>
   </button>;
 }

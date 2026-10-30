@@ -1,3 +1,4 @@
+import { versionLabel } from '../admin/display-labels';
 import { useState } from 'react';
 import { materialClient as api } from './client';
 import { Failure, Loading, SubmitError, useRemote, useSubmission } from '../shared/admin';
@@ -64,7 +65,7 @@ export function MaterialTextEditor({
           }}
         >
           <p>
-            {source.value.filename} · 基于 v{source.value.version}
+            {source.value.filename} · 基于 {versionLabel(source.value.version)}
           </p>
           <label>
             资料正文

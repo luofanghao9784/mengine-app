@@ -1,3 +1,4 @@
+import { actionLabel, actorLabel } from '../admin/display-labels';
 import { useEffect, useState, useRef } from 'react';
 import { createIdentityRequest, record, uuid } from '../identity/client';
 import { Button, Field, Modal } from '../shared/ui';
@@ -86,29 +87,6 @@ const isPolicy = (v: unknown): v is Policy =>
 const isDirectory = (v: unknown): v is Directory =>
   record(v) && Array.isArray(v.people) && Array.isArray(v.departments);
 const errorText = (e: unknown) => (e instanceof Error ? e.message : '操作未完成，请稍后重试');
-const actionNames: Record<string, string> = {
-  PERMISSION_CHANGE: '修改权限',
-  PERMISSION_IMPACT: '权限变更影响',
-  ROLE_GRANT_REVOKED: '调岗撤销个人授权',
-  MATERIAL_UPLOAD: '上传文件',
-  MATERIAL_VERSION: '上传新版本',
-  MATERIAL_DOWNLOAD: '下载文件',
-  MATERIAL_PREVIEW: '预览文件',
-  PERMISSION_MODEL_MIGRATION: '权限规则迁移',
-  MATERIAL_TRASH: '删除文件',
-  MATERIAL_RESTORE: '恢复文件',
-  MATERIAL_CITATION_READ: '查看引用片段',
-  TASK_ORIGINAL_READ: 'AI 读取原件',
-  MATERIAL_FOLDER_CREATE: '创建文件夹',
-  MATERIAL_MOVE: '移动资料',
-  MOVE_PERMISSION_CHANGE: '移动引起的权限变化',
-  REQUEST_DOWNLOAD: '下载请求',
-  REQUEST_READ: '阅读请求',
-  REQUEST_PERMISSIONS: '权限请求',
-  REQUEST_PREVIEW: '预览请求',
-  REQUEST_MOVE: '移动请求',
-  REQUEST_AUDIT_READ: '查看操作记录',
-};
 
 export function useLibraryPermissionsEnabled(tenant: string) {
   const [enabled, setEnabled] = useState(false);
@@ -612,13 +590,13 @@ export function LibraryEvents({
             {events.map((e) => (
               <li key={e.id}>
                 <b>
-                  {actionNames[e.action] || e.action}
+                  {actionLabel(e.action)}
                   <i className={`perm-chip ${e.outcome === 'SUCCESS' ? '' : 'edit'}`}>
-                    {outcomes[e.outcome] || e.outcome}
+                    {outcomes[e.outcome] || '其他记录'}
                   </i>
                 </b>
                 <small>
-                  {e.actorName || (e.actorId ? '历史成员' : '系统')} ·{' '}
+                  {actorLabel(e.actorName || (e.actorId ? '历史成员' : '系统'))} ·{' '}
                   {new Date(e.occurredAt).toLocaleString('zh-CN')}
                   {e.executionSource === 'AI'
                     ? ' · AI 执行'
@@ -629,27 +607,13 @@ export function LibraryEvents({
                 {audit && e.requestId && (
                   <details>
                     <summary>请求核对信息</summary>
-                    <p>
-                      请求编号：{e.requestId}
-                      {e.httpStatus ? `；HTTP 状态：${e.httpStatus}` : ''}
-                    </p>
+                    <p>该请求已留存核对记录。</p>
                   </details>
                 )}
                 {e.afterValue && (
                   <details>
                     <summary>变更详情</summary>
                     <PermissionEventSummary before={e.beforeValue} after={e.afterValue} />
-                    {audit && (
-                      <details>
-                        <summary>完整变更快照</summary>
-                        <p>变更前</p>
-                        <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-                          {e.beforeValue || '无'}
-                        </pre>
-                        <p>变更后</p>
-                        <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{e.afterValue}</pre>
-                      </details>
-                    )}
                   </details>
                 )}
               </li>

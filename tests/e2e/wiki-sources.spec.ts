@@ -119,11 +119,11 @@ test('Wiki sources, search pagination, immutable citations and revocation', asyn
   await page.getByRole('button', { name: '下一页' }).click();
   await expect.poll(() => queries.at(-1)?.searchParams.get('offset')).toBe('20');
   await page.getByRole('button', { name: /合成交付规范.txt/ }).click();
-  await expect(page.getByRole('heading', { name: '合成交付规范.txt · v2' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '合成交付规范.txt · 第 2 版' })).toBeVisible();
   await page.screenshot({ path: 'test-results/wiki-source-reader.png', fullPage: true });
   denied = true;
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-  await expect(page.getByRole('heading', { name: '合成交付规范.txt · v2' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '合成交付规范.txt · 第 2 版' })).toHaveCount(0);
   await expect(
     page.getByText('交付验收必须核对原件。<script>alert(1)</script>', { exact: true }),
   ).toHaveCount(0);

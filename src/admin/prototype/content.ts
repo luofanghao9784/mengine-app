@@ -875,6 +875,7 @@ const outputMore: Item[] = [
 
 /** 每个板块的栏目：点栏目切换清单内容。 */
 export const tabs: Record<Place, { label: string; items: Item[] }[]> = {
+  opened: [],
   home: [],
   data: [
     { label: '治理 14', items: dataItems.filter((x) => x.tone !== 'ok') },
@@ -918,6 +919,7 @@ export const tabs: Record<Place, { label: string; items: Item[] }[]> = {
 
 /** 右侧第二张辅助卡片：和当前板块最相关的一小组信息。 */
 export const aside: Record<Place, { title: string; rows: [string, string, Tone?][] }> = {
+  opened: { title: '', rows: [] },
   home: { title: '', rows: [] },
   data: {
     title: '数据来源',

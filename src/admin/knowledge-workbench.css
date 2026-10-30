@@ -29,11 +29,6 @@
   align-items: center;
   gap: 20px;
 }
-.kw-eyebrow {
-  font-size: 10px;
-  letter-spacing: 2.5px;
-  color: #8b98ac;
-}
 .kw-heading h2 {
   font-size: clamp(23px, 2.2vw, 34px);
   font-weight: 500;

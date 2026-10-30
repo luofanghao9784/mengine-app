@@ -1,3 +1,4 @@
+import { versionLabel } from '../admin/display-labels';
 import { useViewState } from '../shared/useViewState';
 import { useEffect, useState } from 'react';
 import type { KnowledgeChunk } from '../../contracts/public-api/knowledge';
@@ -17,7 +18,7 @@ export const processingStatusLabel: Record<string, string> = {
   CANCELLED: '权限变化，解析已取消',
 };
 const warnings: Record<string, string> = {
-  OCR_REVIEW_REQUIRED: '文字来自 OCR，可能存在错字或数字识别错误，请核对原件。',
+  OCR_REVIEW_REQUIRED: '文字来自识别结果，可能存在错字或数字识别错误，请核对原件。',
   DOCLING_LAYOUT_REVIEW_REQUIRED: '已提取版面与表格内容，阅读顺序、数字和表格关系仍需核对原件。',
   DOCLING_MODELS_NOT_READY: '文档解析模型尚未准备好，请联系维护者。',
   DOCLING_VERSION_MISMATCH: '文档解析器版本不匹配，请联系维护者。',
@@ -46,7 +47,7 @@ function Fragment({ chunk }: { chunk: KnowledgeChunk }) {
     <article className="knowledge-fragment">
       <header>
         <strong>{chunk.locator}</strong>
-        <Badge>{chunk.method === 'OCR' ? 'OCR' : chunk.method === 'TABLE' ? '表格' : '文字'}</Badge>
+        <Badge>{chunk.method === 'OCR' ? '识别文字' : chunk.method === 'TABLE' ? '表格' : '文字'}</Badge>
       </header>
       <pre>{chunk.content}</pre>
     </article>
@@ -246,7 +247,7 @@ export function Citation({
               <dt>文件</dt>
               <dd>{data.value.filename}</dd>
               <dt>阅读版本</dt>
-              <dd>v{data.value.version}</dd>
+              <dd>{versionLabel(data.value.version)}</dd>
               <dt>引用位置</dt>
               <dd>{data.value.locator}</dd>
               <dt>来源规则</dt>
@@ -255,7 +256,7 @@ export function Citation({
           ) : (
             !embedded && (
               <h3>
-                {data.value.filename} · v{data.value.version}
+                {data.value.filename} · {versionLabel(data.value.version)}
               </h3>
             )
           )}
@@ -399,10 +400,10 @@ function SearchResults({
       {data.value.items.map((c) => (
         <button className="knowledge-result" key={c.id} onClick={() => select(c.id)}>
           <strong>
-            {c.filename} · v{c.version}
+            {c.filename} · {versionLabel(c.version)}
           </strong>
           <small>
-            {c.locator} · {c.method === 'OCR' ? 'OCR，需核对' : '查看来源'}
+            {c.locator} · {c.method === 'OCR' ? '识别文字，需核对' : '查看来源'}
           </small>
           <span>{c.content.slice(0, 360)}</span>
         </button>

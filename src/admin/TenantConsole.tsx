@@ -19,6 +19,7 @@ import { AdminOverview } from './AdminOverview';
 import { adminHref, type AdminPage } from './navigation';
 import { returnToWorkspaceHref } from '../identity/navigation';
 import { useSession } from '../identity/session';
+import { roleLabel } from '../identity/role-labels';
 import { governanceClient } from '../governance/client';
 import { GovernancePanel, type MemberSelection } from '../governance/GovernancePanel';
 import { Failure, Loading, useRemote } from '../shared/admin';
@@ -94,7 +95,18 @@ export function TenantConsole({
       realm="tenant"
       allowedPages={limited ? limitedPages : undefined}
       name={name}
-      account={session.identity?.account.displayName || ''}
+      account={[
+        session.identity?.account.displayName,
+        roleLabel({
+          role: session.identity?.memberships.find((m) => m.tenantId === tenant)?.role,
+          platformAdmin: session.identity?.platformAdmin,
+          owner: governance.value?.owner,
+          canConfigure: governance.value?.canConfigure,
+          canMaintain: governance.value?.capabilities.some((c) => c.capability === 'CONTENT_MAINTAIN'),
+        }),
+      ]
+        .filter(Boolean)
+        .join(' · ')}
       page={page}
       hash={hash}
       logout={() => void signOut()}

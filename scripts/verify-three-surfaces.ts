@@ -237,7 +237,7 @@ try {
   await adminB.getByRole('button', { name: '更多工作与管理', exact: true }).click();
   await adminB.getByRole('link', { name: '企业管理', exact: true }).click();
   await expect(adminB.locator('.access-welcome h2')).toHaveText('合成试用企业 B');
-  await adminB.getByRole('link', { name: '工作空间', exact: true }).click();
+  await adminB.getByRole('link', { name: '工作台', exact: true }).click();
   await expect(adminB.getByLabel('当前企业')).toHaveValue(b);
   await expect(adminB.getByRole('tab', { name: '推荐', exact: true })).toBeVisible();
   await expect(adminB).toHaveURL(new RegExp(`tenant=${b}$`));

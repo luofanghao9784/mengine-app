@@ -26,7 +26,7 @@ export function RegisterDialog({ open, onClose }: { open: boolean; onClose: () =
       <form onSubmit={(event) => event.preventDefault()}>
         <label>
           企业功能
-          <input value="quality-check" readOnly />
+          <input value="质量检查" readOnly />
         </label>
         <label>
           模型厂商
