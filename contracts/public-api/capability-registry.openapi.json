@@ -3,7 +3,7 @@
   "info": {
     "title": "能力登记与准入（capability-registry）",
     "version": "0.0.0-skeleton",
-    "description": "CT-034-A：平台目录已落库。仅 POST /api/agent-admin/v1/capabilities 已实现：须第四端会话与 CSRF，合法请求落库返回 201；未登录 401，CSRF 无效 403，非法字段 400，重复登记 409。错误体沿用 error.schema.json 四字段形状，登记域扩展 code。GET list、模块、准入与 grants 仍为骨架 · 未实现。"
+    "description": "CT-034-A：平台目录已落库。POST /api/agent-admin/v1/capabilities 已实现：须第四端会话与 CSRF，合法请求落库返回 201；未登录 401，CSRF 无效 403，非法字段 400，重复登记 409。错误体沿用 error.schema.json 四字段形状，登记域扩展 code。CT-040 开通写已落库；GET list 与模块、准入仍是骨架 · 未实现；本 POST /api/agent-admin/v1/tenants/{tenantId}/grants 不是模块版本授权。"
   },
   "paths": {
     "/api/agent-admin/v1/capabilities": {
@@ -522,7 +522,7 @@
       },
       "post": {
         "operationId": "createCapabilityTenantGrant",
-        "summary": "授予租户模块版本（骨架）",
+        "summary": "把已登记的企业功能开通给企业（已落库）",
         "tags": [
           "capability-admission"
         ],
@@ -549,17 +549,69 @@
         },
         "responses": {
           "201": {
-            "description": "骨架占位 · 未实现",
+            "description": "首次开通，已落库并回读",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CapabilityTenantGrant"
+                  "$ref": "#/components/schemas/CapabilityTenantGrantOpened"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "重复开通，返回原行，不覆盖指向或 granted_at",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityTenantGrantOpened"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请按要求填写开通内容；未知字段：有无法识别的字段，请检查后再提交",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
                 }
               }
             }
           },
           "401": {
-            "description": "会话无效（骨架占位）",
+            "description": "还没有登录，请先登录后再试",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -569,7 +621,15 @@
             }
           },
           "403": {
-            "description": "资格或 CSRF 不符合（骨架占位）",
+            "description": "登录校验未通过，请刷新页面后再试",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -578,8 +638,34 @@
               }
             }
           },
-          "501": {
-            "description": "骨架未实现（Not Implemented）",
+          "404": {
+            "description": "企业不存在或尚未登记",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "已经开通过了，不能改成另一项",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -806,15 +892,43 @@
       "CapabilityTenantGrantCreate": {
         "type": "object",
         "required": [
-          "moduleVersionId",
-          "isDefault"
+          "capabilityId",
+          "enterpriseFunction"
         ],
         "properties": {
-          "moduleVersionId": {
+          "capabilityId": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "enterpriseFunction": {
+            "$ref": "#/components/schemas/EnterpriseFunction"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CapabilityTenantGrantOpened": {
+        "type": "object",
+        "required": [
+          "tenantId",
+          "capabilityId",
+          "enterpriseFunction",
+          "grantedAt"
+        ],
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "capabilityId": {
             "type": "string"
           },
-          "isDefault": {
-            "type": "boolean"
+          "enterpriseFunction": {
+            "$ref": "#/components/schemas/EnterpriseFunction"
+          },
+          "grantedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "additionalProperties": false

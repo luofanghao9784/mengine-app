@@ -119,9 +119,11 @@ class CapabilityRegistryIntegrationTest {
     }
 
     @Test void foreignCookiesAndInvalidAgentSessionsCannotAuthenticate() throws Exception {
-        for (String cookie : new String[]{"DREAMCORE_PLATFORM=" + sessionToken, "DREAMCORE_SESSION=" + sessionToken,
+        for (String cookie : new String[]{"DREAMCORE_PLATFORM=00000000-0000-0000-0000-0000000000aa",
+                "DREAMCORE_SESSION=00000000-0000-0000-0000-0000000000aa",
                 "JSESSIONID=" + sessionToken, "DREAMCORE_AGENT=invalid", "DREAMCORE_AGENT=" + "x".repeat(43)}) {
-            assertEquals(401, send("POST", PATH, BODY, cookie, csrf).statusCode());
+            assertError(send("POST", PATH, BODY, cookie, csrf), 401,
+                    "AUTHENTICATION_REQUIRED", "还没有登录，请先登录后再试");
         }
         db.update("UPDATE agent_platform_sessions SET expires_at=now()-interval '1 second' WHERE token_hash=?", IdentityService.hash(sessionToken));
         assertEquals(401, send("POST", PATH, BODY, cookie(), null).statusCode());
