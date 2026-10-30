@@ -37,6 +37,13 @@ public class AgentAdminSecurity {
                 @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain) throws ServletException,IOException {
                     var session=identities.read(request);
                     response.setHeader("Cache-Control","no-store");
+                    // Only the bootstrap/login endpoints accept a pre-login session.
+                    // Protected routes must reject missing/revoked/anonymous sessions before CSRF.
+                    boolean publicAuthEndpoint=List.of("/api/agent-admin/v1/auth/csrf","/api/agent-admin/v1/auth/login")
+                        .contains(request.getServletPath());
+                    if(!publicAuthEndpoint && (session==null || session.actor()==null)) {
+                        AgentAdminErrors.writeError(response,401,"AUTHENTICATION_REQUIRED"); return;
+                    }
                     if(!List.of("GET","HEAD","OPTIONS").contains(request.getMethod()) && !identities.validCsrf(session,request.getHeader("X-CSRF-TOKEN"))) {
                         AgentAdminErrors.writeError(response,403,"ACCESS_DENIED"); return;
                     }

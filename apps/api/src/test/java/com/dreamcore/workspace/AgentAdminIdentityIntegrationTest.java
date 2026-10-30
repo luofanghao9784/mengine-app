@@ -194,7 +194,7 @@ class AgentAdminIdentityIntegrationTest {
         assertEquals(401,curl("POST",AGENT+"/login",JSON.writeValueAsString(Map.of("username",fixture.login(),"password","incorrect")),cookie,csrf));
         assertEquals(200,curl("POST",AGENT+"/login",JSON.writeValueAsString(Map.of("username",fixture.login(),"password",PASSWORD)),cookie,csrf));
         assertEquals(401,curl("GET",AGENT+"/me",null,null,null));
-        assertEquals(501,curl("POST","/api/agent-admin/v1/capabilities","{}",null,null));
+        assertEquals(401,curl("POST","/api/agent-admin/v1/capabilities","{}",null,null));
     }
     int curl(String method,String path,String body,String cookie,String csrf) throws Exception {
         var command=new ArrayList<>(List.of("curl","-sS","--max-time","20","-o","/dev/null","-w","%{http_code}","-X",method,"http://127.0.0.1:"+port+path));
