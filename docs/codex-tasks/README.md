@@ -13,7 +13,11 @@
 | CT-005 | [Mac 本机预览脚本 + smoke workflow + 账号种子](CT-005-mac-preview.md) | Mac 预览首版（DQ 裁定 v0.2；workflow 老板推） | 安全审查 + 发布验收 + 质量性能 | 待执行 | CT-004 合入后 |
 | CT-001 | [简报生成：全部来源未就绪时写回具体等待原因（#230 回归，:340）](CT-001-pr7-native-continuity-340-fix.md) | #230（3a29ed3）回归 | 架构逻辑 + 质量性能 | 已合入（#22） | 第 3（与 CT-002 可并行） |
 | CT-002 | [生命周期时间戳对齐 Postgres 微秒精度](CT-002-api-lifecycle-micros-truncation.md) | ProfileMethodLifecycle 3 例 + FeedbackAdjustment 1 例 | 架构逻辑 + 质量性能 | 已合入（#21） | 第 3（与 CT-001 可并行） |
-| CT-007 | [审批流程整改（合入硬闸门/两人审/体验验收/周偏离检查/暂停令优先）](CT-007-review-process-hardening.md) | 老板经 DQ 批准（2026-10-30） | 质量性能 + 发布验收 | 待提交 PR | 纯文档，不依赖 |
+| CT-007 | [审批流程整改（合入硬闸门/两人审/体验验收/周偏离检查/暂停令优先）](CT-007-review-process-hardening.md) | 老板经 DQ 批准（2026-10-30） | 质量性能 + 发布验收 | 已合入（#25） | 纯文档 |
+| CT-008 | [纯 docs paths-ignore 免跑重门禁](CT-008-docs-path-filter.md) | 三 workflow paths-ignore | 质量性能 + 架构逻辑 | 待执行（workflow 老板推） | 无；见 QUEUE |
+| CT-024 | TaskContext 慢测/lease（#7 ④/⑥） | #7 遗留质量债 | 质量性能 + 架构逻辑 | 待写执行单 | 见 [QUEUE](QUEUE.md) |
+| CT-025 | Mac 实测（交付） | 编号冻结 | 发布验收 + 质量性能 | 待写 | 见 QUEUE |
+| CT-026 | 后端 wiki 基线红 backlog | 编号冻结 | 质量性能 + 架构逻辑 | 待写 | 见 QUEUE |
 | （模板） | [Codex 机审提示（可粘贴）](CODEX-REVIEW-PROMPT.md) | 每个业务/流程 PR 合入前第一道 | — | 即日生效 | 随 CT-007 |
 | CT-003 | [NativeAutomaticContinuity 测试契约按 #208 修订（只改测试）](CT-003-native-continuity-208-test-contract.md) | #208（865ccdc）漏改测试 | 架构逻辑 + 质量性能 | 待执行 | 第 6（#7 合入后） |
 
