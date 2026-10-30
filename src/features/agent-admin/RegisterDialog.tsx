@@ -17,44 +17,50 @@ export function RegisterDialog({ open, onClose }: { open: boolean; onClose: () =
       onClose={onClose}
     >
       <header className="agent-register-header">
-        <h2 id="agent-register-title">登记实现</h2>
+        <h2 id="agent-register-title">登记实现方案</h2>
         <button type="button" className="button" aria-label="关闭登记面板" onClick={onClose}>
           <X size={18} />
         </button>
       </header>
-      <p className="agent-intro">质量检查登记种子 · 表单骨架，填写内容不会保存。</p>
+      <p className="agent-intro">质量检查 AI 功能实现方案预览，填写内容不会保存。</p>
       <form onSubmit={(event) => event.preventDefault()}>
         <label>
-          企业端功能（enterpriseFunction）
+          企业功能
           <input value="quality-check" readOnly />
         </label>
         <label>
-          模型厂商（modelVendor）
+          模型厂商
           <input placeholder="待填写模型厂商" />
         </label>
         <label>
-          运行方式（runtimeKind）
+          运行方式
           <select disabled defaultValue="in-process">
-            <option value="in-process">in-process（示意）</option>
+            <option value="in-process">在系统内运行（示意）</option>
           </select>
         </label>
         <label>
-          能力标识（capabilityKey，可选）
-          <input placeholder="待填写能力标识" />
+          AI 功能标识（可选）
+          <input placeholder="待填写 AI 功能标识" />
         </label>
         <label>
-          版本（version，可选）
+          版本（可选）
           <input placeholder="待填写版本" />
         </label>
         <p id="agent-register-note" className="agent-intro">
-          写 API 未就绪（CT-018）
+          AI 功能登记暂不能保存（后台开通中）
         </p>
         <footer className="agent-register-actions">
           <button type="button" className="button" onClick={onClose}>
-            返回目录
+            返回功能上架
           </button>
-          <button type="submit" className="button primary" disabled aria-describedby="agent-register-note">
-            提交登记
+          <button
+            type="submit"
+            className="button"
+            disabled
+            title="暂时不能保存（后台开通中）"
+            aria-describedby="agent-register-note"
+          >
+            保存登记
           </button>
         </footer>
       </form>

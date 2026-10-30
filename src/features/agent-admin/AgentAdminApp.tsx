@@ -8,9 +8,9 @@ import { probeCapabilities } from './client';
 import { RegisterDialog } from './RegisterDialog';
 
 const functions = [
-  ['document-parse', '文档解析', '将文档转为可用的结构化内容', '只读种子'],
-  ['table-compare', '表格比对', '比较表格内容与差异', '只读种子'],
-  ['quality-check', '质量检查', '浏览并登记质量检查的能力实现', '开放登记入口'],
+  ['document-parse', '文档解析', '将文档转为可用的结构化内容', '仅供查看'],
+  ['table-compare', '表格比对', '比较表格内容与差异', '仅供查看'],
+  ['quality-check', '质量检查', '查看质量检查说明，预览 AI 功能实现方案登记表', '可登记说明'],
   ['semantic-annotation', '语义标注', '为内容补充语义信息', '未启用'],
   ['repair-suggestion', '修复建议', '为发现的问题提供修复建议', '未启用'],
 ];
@@ -35,7 +35,7 @@ export function AgentAdminApp() {
   }, []);
   return (
     <div className={`admin-shell admin-control agent-admin ${collapsed ? 'admin-navigation-collapsed' : ''}`}>
-      <aside className="admin-sidebar" aria-label="统一 Agent 管理导航">
+      <aside className="admin-sidebar" aria-label="AI 功能管理导航">
         <div className="admin-brand">
           <DreamcoreLogo />
           <div className="admin-brand-label">
@@ -43,14 +43,14 @@ export function AgentAdminApp() {
             <span className="admin-brand-english">Mengine</span>
           </div>
         </div>
-        <div className="admin-scope">统一 Agent 管理</div>
+        <div className="admin-scope">AI 功能管理台</div>
         <section className="admin-nav-group">
-          <div className="admin-nav-group-title">平台能力</div>
-          <nav id="agent-navigation" aria-label="平台能力">
+          <div className="admin-nav-group-title">AI 功能</div>
+          <nav id="agent-navigation" aria-label="AI 功能">
             {(
               [
-                ['functions', '企业端功能', LayoutGrid],
-                ['capability-registry', '能力登记', Boxes],
+                ['functions', '企业功能', LayoutGrid],
+                ['capability-registry', '功能上架', Boxes],
               ] as const
             ).map(([view, title, Icon]) => (
               <a
@@ -77,27 +77,25 @@ export function AgentAdminApp() {
           >
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
-          <p className="agent-session">独立会话 · 免登浏览壳</p>
+          <p className="agent-session">预览页面 · 无需登录</p>
         </div>
       </aside>
       <div className="admin-main">
         <header className="admin-header">
-          <h1>{route.view === 'functions' ? '企业端功能' : '能力登记'}</h1>
-          <span>平台级模型能力与 Agent 注册</span>
+          <h1>{route.view === 'functions' ? '企业功能' : '功能上架'}</h1>
+          <span>总部给企业上架、开通 AI 功能的后台</span>
         </header>
         <main className="admin-content" id="agent-main">
           <p className="agent-connection" role="status">
             {connected === null
-              ? '正在探测后端连接…'
+              ? '正在检查后台连接…'
               : connected
-                ? '只读接口已连接；能力目录契约待对接，当前不展示实现列表。'
-                : '尚未连接后端或未登录'}
+                ? '已连接后台；AI 功能列表暂未接入，当前无法展示。'
+                : '尚未连接后台或未登录'}
           </p>
           {route.view === 'functions' ? (
             <>
-              <p className="agent-intro">
-                按企业端功能管理能力实现。以下为功能闭集说明，不代表已登记的实现。
-              </p>
+              <p className="agent-intro">按企业功能查看 AI 功能说明。以下为说明样例，不代表已经上架。</p>
               <div className="agent-functions">
                 {functions.map(([id, title, description, status]) => (
                   <section className="admin-panel agent-function" key={id}>
@@ -108,7 +106,7 @@ export function AgentAdminApp() {
                     <p>{description}</p>
                     {id === 'quality-check' ? (
                       <a className="button primary" href="#view=capability-registry&tab=catalog">
-                        查看能力登记 →
+                        去功能上架 →
                       </a>
                     ) : (
                       <small>当前未开放登记</small>
@@ -119,12 +117,12 @@ export function AgentAdminApp() {
             </>
           ) : (
             <>
-              <nav className="agent-tabs" aria-label="能力登记分类">
+              <nav className="agent-tabs" aria-label="功能上架分类">
                 {(
                   [
-                    ['catalog', '能力目录'],
-                    ['versions', '版本管理'],
-                    ['grants', '授权管理'],
+                    ['catalog', '功能上架'],
+                    ['versions', '版本'],
+                    ['grants', '企业开通'],
                   ] as const
                 ).map(([tab, title]) => (
                   <a
@@ -139,9 +137,9 @@ export function AgentAdminApp() {
               {route.tab === 'catalog' ? (
                 <>
                   <section aria-labelledby="agent-seeds-title" className="agent-catalog-section">
-                    <h2 id="agent-seeds-title">登记种子</h2>
+                    <h2 id="agent-seeds-title">说明样例</h2>
                     <p className="agent-intro">
-                      前端闭集说明卡，不代表 Live 已登记实现。首版仅开放质量检查的登记面板。
+                      以下样例说明这里管理哪些 AI 功能，不代表已经上架。目前仅可从质量检查打开实现方案登记表。
                     </p>
                     <div className="agent-functions">
                       {[functions[2], functions[0], functions[1]].map(([id, title, description]) => (
@@ -150,14 +148,14 @@ export function AgentAdminApp() {
                           <span
                             className={`agent-badge ${id === 'quality-check' ? '' : 'agent-badge-readonly'}`}
                           >
-                            {id === 'quality-check' ? '登记种子 · 可登记' : '只读种子'}
+                            {id === 'quality-check' ? '可登记说明' : '仅供查看'}
                           </span>
                           <h3>{title}</h3>
                           <code>{id}</code>
                           <p>{description}</p>
                           {id === 'quality-check' ? (
                             <button className="button primary" onClick={() => setRegisterOpen(true)}>
-                              从本种子登记
+                              登记实现方案
                             </button>
                           ) : (
                             <small>仅供查看，暂不开放登记与编辑</small>
@@ -167,21 +165,21 @@ export function AgentAdminApp() {
                     </div>
                   </section>
                   <section className="agent-catalog-section" aria-labelledby="agent-live-title">
-                    <h2 id="agent-live-title">Live 已登记实现</h2>
+                    <h2 id="agent-live-title">已上架</h2>
                     <div className="admin-panel agent-empty">
                       <Boxes size={40} aria-hidden="true" />
-                      <h3>尚无 Live 已登记实现</h3>
+                      <h3>暂时无法展示已上架的实现</h3>
                       <p>
                         {connected === null
-                          ? '正在探测后端连接，尚未加载登记列表。'
+                          ? '正在检查后台连接，尚未加载已上架列表。'
                           : connected
-                            ? '只读接口已连接；列表契约待对接，当前无可安全展示的实现。'
-                            : '尚未连接后端或未登录，当前未加载登记列表。'}
+                            ? '已连接后台；AI 功能列表暂未接入，当前无法展示已上架的实现。'
+                            : '尚未连接后台或未登录，当前未加载已上架列表。'}
                       </p>
                       <button className="button primary" onClick={() => setRegisterOpen(true)}>
-                        登记第一个实现
+                        登记实现方案
                       </button>
-                      <p>仅打开登记面板；写 API 未就绪（CT-018）</p>
+                      <p>仅预览 AI 功能登记表，暂不能保存或上架（后台开通中）</p>
                     </div>
                   </section>
                   <RegisterDialog open={registerOpen} onClose={() => setRegisterOpen(false)} />
@@ -190,23 +188,29 @@ export function AgentAdminApp() {
                 <section className="admin-panel agent-empty" aria-labelledby="agent-readonly-title">
                   <Boxes size={40} aria-hidden="true" />
                   <h2 id="agent-readonly-title">
-                    {route.tab === 'versions' ? '版本管理 · 只读' : '授权管理 · 只读'}
+                    {route.tab === 'versions' ? '版本 · 只读' : '企业开通 · 只读'}
                   </h2>
-                  <h3>{route.tab === 'versions' ? '尚无可展示的版本' : '尚无可展示的租户授权'}</h3>
+                  <h3>{route.tab === 'versions' ? '尚无可展示的版本' : '尚无可展示的企业开通记录'}</h3>
                   <p>
                     {connected === null
-                      ? '正在探测后端连接，当前未加载列表。'
+                      ? '正在检查后台连接，当前未加载列表。'
                       : connected
-                        ? '只读接口已连接；列表契约待对接，当前无可安全展示的数据。'
-                        : '尚未连接后端或未登录，当前未加载列表。'}
+                        ? '已连接后台；AI 功能列表暂未接入，当前无法展示。'
+                        : '尚未连接后台或未登录，当前未加载列表。'}
                   </p>
-                  <p>写 API 未就绪（CT-018）</p>
-                  <div className="agent-readonly-actions" aria-label="暂未开放的写操作">
-                    {(route.tab === 'versions'
-                      ? ['登记版本', '退役版本', '变更准入状态']
-                      : ['新增授权', '变更授权', '设为默认']
-                    ).map((label) => (
-                      <button key={label} className="button" disabled title="写 API 未就绪（CT-018）">
+                  <p>AI 功能暂不能上架或开通给企业（后台开通中）</p>
+                  <div className="agent-readonly-actions" aria-label="暂未开放的 AI 功能操作">
+                    {(route.tab === 'versions' ? ['上架功能'] : ['开通给企业']).map((label) => (
+                      <button
+                        key={label}
+                        className="button"
+                        disabled
+                        title={
+                          route.tab === 'versions'
+                            ? '暂时不能上架（后台开通中）'
+                            : '暂时不能开通（后台开通中）'
+                        }
+                      >
                         {label}
                       </button>
                     ))}
