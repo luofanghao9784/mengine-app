@@ -101,7 +101,7 @@
 |---|---|
 | CT-000 / CT-004 | PR 0（#7）workflow 补丁（已合 main） |
 | CT-001 / CT-002 | #230 / 生命周期微秒（已合） |
-| CT-003 | NativeAutomaticContinuity #208 测试契约（待执行） |
+| CT-003 | NativeAutomaticContinuity #208 测试契约（**迁 mengine-app**；10-31 12:00 前开 PR） |
 | CT-005 / CT-006 | Mac 本机预览与落地 |
 | CT-007 | 审批流程整改纯文档（#25，已合 main `42cdfd8`） |
 
