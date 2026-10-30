@@ -73,6 +73,12 @@
 .agent-empty > svg {
   color: var(--champagne);
 }
+.agent-readonly-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
 .agent-empty p {
   color: var(--muted);
   line-height: 1.8;
