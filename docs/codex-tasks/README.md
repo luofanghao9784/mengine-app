@@ -9,14 +9,16 @@
 | 编号 | 标题 | 对应 PR/问题 | 审查人（PR 后单审） | 状态 | 依赖顺序 |
 |---|---|---|---|---|---|
 | CT-000 | [PR #7 补 build:engine 步骤](CT-000-pr7-build-engine-workflow.md) | PR #7（workflow，老板账号推，因组内令牌无 workflow 权限） | 测试审查（CI 门禁） | 待执行 | 第 1 |
-| CT-001 | [简报生成：全部来源未就绪时写回具体等待原因（#230 回归，:340）](CT-001-pr7-native-continuity-340-fix.md) | #230（3a29ed3）回归 | 架构逻辑 | 待执行 | 第 2（与 CT-002 可并行） |
-| CT-002 | [生命周期时间戳对齐 Postgres 微秒精度](CT-002-api-lifecycle-micros-truncation.md) | ProfileMethodLifecycle 3 例 + FeedbackAdjustment 1 例 | 测试审查 | 待执行 | 第 2（与 CT-001 可并行） |
-| CT-003 | [NativeAutomaticContinuity 测试契约按 #208 修订（只改测试）](CT-003-native-continuity-208-test-contract.md) | #208（865ccdc）漏改测试 | 测试审查 | 待执行 | 见第 1.1 节（待 DQ 定） |
+| CT-004 | [PR #7 API·Postgres 作业分 4 片 + 上传 surefire 报告](CT-004-pr7-api-shards-surefire-upload.md) | PR #7 整套 90 分钟超时、无报告产物（workflow，老板账号推） | 测试审查 | 待执行 | 第 2 |
+| CT-001 | [简报生成：全部来源未就绪时写回具体等待原因（#230 回归，:340）](CT-001-pr7-native-continuity-340-fix.md) | #230（3a29ed3）回归 | 架构逻辑 | 待执行 | 第 3（与 CT-002 可并行） |
+| CT-002 | [生命周期时间戳对齐 Postgres 微秒精度](CT-002-api-lifecycle-micros-truncation.md) | ProfileMethodLifecycle 3 例 + FeedbackAdjustment 1 例 | 测试审查 | 待执行 | 第 3（与 CT-001 可并行） |
+| CT-003 | [NativeAutomaticContinuity 测试契约按 #208 修订（只改测试）](CT-003-native-continuity-208-test-contract.md) | #208（865ccdc）漏改测试 | 测试审查 | 待执行 | 第 6（#7 合入后） |
 
-### 1.1 推荐顺序（老板操作最少、全程不用 force push）
-1. **CT-000**：推到 #7 分支，#7 带上 build:engine，CI 自动重跑。
-2. **CT-001、CT-002**：各自从 main 切分支、各自开 PR、单审后合入 main。验收暂定「老板 Mac 本地绿 + 附 surefire 报告」（main 上还没有 API CI）。
-3. **#7 同步 main**：首选 PR #7 页面底部的 **Update branch** 按钮，点旁边下拉箭头选 **Update with merge commit**，**不要选 Update with rebase**（rebase 会改写分支历史）。命令行备选：
+### 1.1 执行顺序（已定；全程不用 force push）
+1. **CT-000**：推到 #7 分支，补 build:engine。
+2. **CT-004**：紧接着推到 #7 分支，分 4 片并上传 surefire 报告（不调大超时）。
+3. **CT-001、CT-002**：各自从 main 切分支、开 PR、单审后合入 main。验收用「老板 Mac 本地绿 + 附 surefire 报告」，因为 main 上还没有 API CI。
+4. **#7 同步 main**：首选 PR #7 页面底部的 **Update branch** 按钮，点旁边下拉箭头选 **Update with merge commit**，**不要选 Update with rebase**（rebase 会改写分支历史）。命令行备选：
    ```bash
    cd ~/dreamcore-workspace && git status
    git fetch origin && git switch cursor/api-postgres-gate-1c11 && git pull
@@ -24,19 +26,18 @@
    git push
    ```
    （`git merge` 若报 CONFLICT：停下发 DQ。）
-4. **#7 跑完、合入 main**（条件见 1.2）。
-5. **CT-003**：#7 合入后从最新 main 切；此时 PR 自带 API CI，可在 Actions 上验证「连续两次绿」。
+5. **#7 带已知红合入**：只剩 1.2 节的已知红时合入。该 workflow **暂不设为必需检查**，红项清零后再按 CT-004 的 4 个分片检查名设置。
+6. **CT-003**：#7 合入后从最新 main 切；PR 自带 API CI，在 Actions 上验证「连续两次绿」。
 
-理由：#7 一旦合入，main 之后的每个 PR 都自动跑 API 门禁，CT-003 的 CI 验收才有地方做；CT-001/002 不依赖 CI，可先合，让 #7 同步后少几项红。
-
-### 1.2 如实说明与「待 DQ 定」的循环
-- **不在这四单里的 #7 红项**（据 run 40937260088 定性）：整套约 90 分钟超时（慢类 PlatformExperienceAdjustment 1589s、GeneralExperienceTaskContext 701s、PublicationFeedback 648s、FeedbackAdjustment 340s，GeneralExperiencePipeline 及之后的类来不及跑）；GeneralExperienceTaskContext 的 TASK_ACCESS_DENIED；CrossWorkspaceBriefing 数据集 ID 不一致；WeKnora INDEX_NOT_READY；LiveAnswer SSE 15s 超时。（原先标为「ExperienceAnalysisRuntime URI 为空」的 NPE 已更正为缺 engine/dist，CT-000 预计可修；未经 CI 证实。）
-- 因此**即使 CT-000/001/002 都完成，#7 也不会全绿**；NativeAutomaticContinuity 的 5 例要等 CT-003 才绿。
-- **循环**：CT-003 想在 CI 上验收，需要 #7 先合入；#7 想全绿，又需要 CT-003 及其他未排单的修复。
-- **待 DQ 定**：(a) 允许 #7 在「已知红、逐项列清」的状态下合入；或 (b) 把 CT-003 提前到 #7 合入前，验收改为老板 Mac 本地两次绿 + surefire。
-- **我的建议：选 (a)**，但设门槛：#7 合入前在 PR 描述里列出剩余红项清单（每项写明归属与后续单号），且确认这些红在 main 上同样存在（#7 只加 workflow，不可能引入业务回归）；合入后把该 workflow 暂设为非必需检查，直到红项清零。理由：#7 不合入，所有后续修复都没有 CI 可用；(b) 让 CT-003 的「CI 连续两次绿」无从做起，只能退回本地验收。
-
-**为什么三单都从 main 新切分支、不在 #7 上追加**：PR #7 保持「只加 workflow、不动 apps/api」的纯 workflow PR，这是 DQ 已定的拆分口径；每类修复独立 PR、独立审查、先于 #7 合入。
+### 1.2 已知红（#7 合入时允许存在）
+详见 #7 描述「已知红」一节：https://github.com/luofanghao9784/dreamcore-workspace/pull/7
+- CrossWorkspaceBriefing：选中的数据集 ID 不一致。
+- WeKnora：KNOWLEDGE_INDEX_NOT_READY。
+- LiveAnswer：SSE 用例 15s 超时。
+- 另：GeneralExperienceTaskContext 的 TASK_ACCESS_DENIED 是**本地现象，待查**，不算已知红；在 CI 上出现时报 DQ。
+- NativeAutomaticContinuity 5 例在 CT-003 合入前保持红，属于计划内。
+- 仓库目前未开启 Issues，所以以上各项暂记在 #7 描述里；Issues 开启后再逐条转成 issue。
+- **循环问题（已定）**：选方案 (a)。#7 带上述已知红合入，workflow 暂不设为必需检查，CT-003 在 #7 合入后到 CI 上验收。
 
 ## 2. 状态取值
 `待执行`（已交老板）→ `执行中`（老板在跑 Codex）→ `PR 已开`（写上 PR 号）→ `已合入` ；异常：`卡住`（已把输出发 DQ）、`待定`（有外部阻塞，写明原因）、`作废`。

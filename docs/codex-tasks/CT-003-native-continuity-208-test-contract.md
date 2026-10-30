@@ -1,6 +1,6 @@
 # CT-003 NativeAutomaticContinuity 测试契约按 #208 修订（方案 A，只改测试）
 
-状态：待执行（**须等 #7 合入 main 之后**，顺序见 README 1.1；循环问题待 DQ 定）　｜　分支：`codex/ct-003-native-continuity-208-contract`　｜　审查人（老板推送 PR 后单审）：测试审查　｜　基准：origin/main a2a41d5（行号为修订前）
+状态：待执行（**须等 #7 合入 main 之后**，顺序见 README 1.1，已定）　｜　分支：`codex/ct-003-native-continuity-208-contract`　｜　审查人（老板推送 PR 后单审）：测试审查　｜　基准：origin/main a2a41d5（行号为修订前）
 
 ## ① 目标与范围
 - **背景**：#208（865ccdc「接入模型治理并统一知识星链来源」）要求每个当前数据快照都要有当前模型审阅依据（`docs/技术/模型治理与知识星链统一来源设计-2026-10-27.md:11`：“每个当前数据快照/资料版本均需要当前模型审阅依据；稳定字段定义可以复用，但不能用旧批次模型审阅冒充新批次。”）。`FoundationModelReviewProjection` 中 `checksPassed = parsed && deterministic && modelReady`。#208 合入时漏改了 `NativeAutomaticContinuityIntegrationTest`，5 例因此失败。DQ 已书面确认方案 A；架构逻辑同意；测试审查同意（条件已写入本单）。

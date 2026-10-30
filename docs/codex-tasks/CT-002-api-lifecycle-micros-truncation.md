@@ -1,6 +1,6 @@
 # CT-002 生命周期时间戳对齐 Postgres 微秒精度
 
-状态：待执行（顺序第 2，CT-000 之后；CT-001/002 可并行）　｜　分支：`codex/ct-002-lifecycle-micros`　｜　审查人（老板推送 PR 后单审）：测试审查　｜　基准：origin/main a2a41d5
+状态：待执行（顺序第 3，CT-000、CT-004 之后；CT-001/002 可并行）　｜　分支：`codex/ct-002-lifecycle-micros`　｜　审查人（老板推送 PR 后单审）：测试审查　｜　基准：origin/main a2a41d5
 
 ## ① 目标与范围
 - **根因**：Linux 上 JDK 的 `Instant.now()` 精度到纳秒，Postgres `timestamptz` 只存微秒，读回来会舍入。macOS 的 `Instant.now()` 只到微秒，所以 Mac 上不暴露，Linux CI 必红（PR #7 run 40937260088，full.log:4407-4435、4775-4776）。
