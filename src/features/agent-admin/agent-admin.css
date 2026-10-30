@@ -219,3 +219,16 @@
     animation: none;
   }
 }
+
+.agent-grant-form {
+  width: min(100%, 400px);
+  margin: 24px auto 0;
+}
+.agent-grant-form .field {
+  display: grid;
+  text-align: left;
+}
+.agent-grant-form input {
+  width: 100%;
+  min-width: 0;
+}
