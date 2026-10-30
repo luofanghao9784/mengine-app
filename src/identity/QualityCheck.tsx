@@ -54,12 +54,21 @@ export function QualityCheck({ opened }: { opened: OpenedCapabilitiesState }) {
     );
   if (!opened.items) return <Loading />;
   if (!opened.items.some((item) => item.enterpriseFunction === 'quality-check'))
-    return <Empty icon={ClipboardCheck} title={qualityCheckNotOpened} text="请联系企业管理员确认，开通后可以在这里提交检查材料。" />;
+    return (
+      <Empty
+        icon={ClipboardCheck}
+        title={qualityCheckNotOpened}
+        text="请联系企业管理员确认，开通后可以在这里提交检查材料。"
+      />
+    );
   return (
     <div className="quality-check">
       <section className="access-panel" aria-labelledby="quality-check-intro">
         <h2 id="quality-check-intro">① 进入说明</h2>
-        <p>输入需要检查的文字，提交后在下方查看本次结果。刷新页面后，本次结果不会保留。</p>
+        <p>按约定规则提取问题行，提交后在下方查看本次结果。刷新页面后，本次结果不会保留。</p>
+        <p id="quality-check-scope">
+          仅识别以“问题：”或“问题:”开头且冒号后有非空内容的行，其他文字不在识别范围内。例如：问题：尺寸超差。此功能不做全文质量检查。
+        </p>
       </section>
       <section className="access-panel" aria-labelledby="quality-check-submit">
         <h2 id="quality-check-submit">② 提交检查材料</h2>
@@ -73,7 +82,7 @@ export function QualityCheck({ opened }: { opened: OpenedCapabilitiesState }) {
               onChange={(event) => setMaterialText(event.target.value)}
               rows={8}
               disabled={submitting}
-              aria-describedby="quality-check-count"
+              aria-describedby="quality-check-scope quality-check-count"
               aria-invalid={materialText.length > 20_000}
             />
           </Field>
@@ -95,7 +104,7 @@ export function QualityCheck({ opened }: { opened: OpenedCapabilitiesState }) {
             <>
               <p>
                 {submission.value.result.verdict === 'NO_ISSUES'
-                  ? '没有发现需要注意的地方'
+                  ? '本次未提取到符合约定规则的问题行，不代表全文没有质量问题'
                   : `发现 ${submission.value.result.issues.length} 处需要注意`}
               </p>
               {submission.value.result.issues.length > 0 && (
