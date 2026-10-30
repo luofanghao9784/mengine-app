@@ -12,7 +12,7 @@
 - 无前置单。CT-003 改同一测试文件，**本单先合**，CT-003 在本单合入后再从最新 main 切。
 - 已完成 README 第 6 节一次性准备。
 ```bash
-cd ~/mengine
+cd ~/mengine-app
 git status
 # 干净时显示：On branch main ... nothing to commit, working tree clean
 git switch main && git pull
@@ -25,7 +25,7 @@ codex -m gpt-6.1-sol
 
 ## ③ Codex 提示词（整段复制）
 ```text
-你在 mengine 仓库（Java 21 / Spring / Postgres 18）。请修复一个生产回归，严格按以下约束，只做这一件事。
+你在 mengine-app 仓库（Java 21 / Spring / Postgres 18）。请修复一个生产回归，严格按以下约束，只做这一件事。
 
 【背景与根因】
 - 回归来自提交 3a29ed3（#230「手动画报不被同空间未交付表拖死」）：BriefingGenerationService 现在只把“已就绪”的数据来源放进 selected。
@@ -84,7 +84,7 @@ Codex 修改与自测 30–60 分钟（含它自己跑 2 次整类，每次约 3
 ## ⑥ 跑完如何提交
 1）本地复核测试：
 ```bash
-cd ~/mengine
+cd ~/mengine-app
 git diff --stat
 # 只应出现 BriefingGenerationService.java 与 NativeAutomaticContinuityIntegrationTest.java 两个文件
 python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml -Dtest=NativeAutomaticContinuityIntegrationTest test 2>&1 | tee /tmp/ct-001-test.log
@@ -125,14 +125,14 @@ PR
 gh pr create --base main --head codex/ct-001-briefing-hold-reason --title "fix(briefing): 全部来源未就绪时写回具体等待原因（#230 回归，NativeAutomaticContinuity :340）" --body-file /tmp/ct-001-pr.md
 ```
 先用文本编辑器把 `/tmp/ct-001-pr.md` 里的 `__` 填上真实数字再执行最后一行（`open -e /tmp/ct-001-pr.md`）。
-网页备用：<https://github.com/luofanghao9784/mengine/compare/main...codex/ct-001-briefing-hold-reason>
+网页备用：<https://github.com/luofanghao9784/mengine-app/compare/main...codex/ct-001-briefing-hold-reason>
 开好后把 PR 链接发给 DQ（一条消息）。
 
 
 ### 验收（#7 合入前，main 无 API CI）
 老板 Mac 本地测试绿 + 附 surefire 报告。打包到桌面：
 ```bash
-cd ~/mengine
+cd ~/mengine-app
 zip -j ~/Desktop/CT-001-surefire.zip apps/api/target/surefire-reports/*NativeAutomaticContinuity*
 ```
 把 `~/Desktop/CT-001-surefire.zip` 拖进 PR 页面底部评论框发出；或发文字摘要：

@@ -20,7 +20,7 @@
 - **CT-001 必须已合入 main**（同一测试文件，先合可避免冲突）。确认：在 PR 页看到 CT-001 为 `Merged`。
 - 若在 CT-001 合入前已开始，本分支会冲突：不要自己解，停下，等 CT-001 合入后删掉本地分支重来（`git switch main && git branch -D codex/ct-003-native-continuity-208-contract`，未推送的分支删除只影响本机）。
 ```bash
-cd ~/mengine
+cd ~/mengine-app
 git status
 # 干净时显示：nothing to commit, working tree clean
 git switch main && git pull
@@ -35,7 +35,7 @@ codex -m gpt-6.1-sol
 
 ## ③ Codex 提示词（整段复制）
 ```text
-你在 mengine 仓库。任务：只修改测试文件 apps/api/src/test/java/com/dreamcore/workspace/NativeAutomaticContinuityIntegrationTest.java，使其符合 #208（865ccdc）确立的产品规则。不得修改任何 src/main 代码。
+你在 mengine-app 仓库。任务：只修改测试文件 apps/api/src/test/java/com/dreamcore/workspace/NativeAutomaticContinuityIntegrationTest.java，使其符合 #208（865ccdc）确立的产品规则。不得修改任何 src/main 代码。
 
 【规则来源】
 - docs/技术/模型治理与知识星链统一来源设计-2026-10-27.md 第 11 行：每个当前数据快照/资料版本均需要当前模型审阅依据；稳定字段定义可以复用，但不能用旧批次模型审阅冒充新批次。
@@ -96,7 +96,7 @@ Codex 60–120 分钟（含多次整类运行，每次约 308 秒）；老板本
 
 ## ⑥ 跑完如何提交
 ```bash
-cd ~/mengine
+cd ~/mengine-app
 git diff --stat
 # 只应有 apps/api/src/test/java/com/dreamcore/workspace/NativeAutomaticContinuityIntegrationTest.java
 git diff --stat -- apps/api/src/main
@@ -146,7 +146,7 @@ open -e /tmp/ct-003-pr.md
 gh pr create --base main --head codex/ct-003-native-continuity-208-contract --title "test(native-continuity): 按 #208 修订测试契约（方案 A，只改测试）" --body-file /tmp/ct-003-pr.md
 ```
 填好 `__` 和对照表后再执行最后一行。surefire 报告：PR 开好后在网页评论框把 `~/Desktop/ct-003-surefire` 里的文件拖进去（.txt 可直接拖；.xml 先压缩：`cd ~/Desktop && zip -r ct-003-surefire.zip ct-003-surefire`）。
-网页备用：<https://github.com/luofanghao9784/mengine/compare/main...codex/ct-003-native-continuity-208-contract>　开好后把链接发 DQ。
+网页备用：<https://github.com/luofanghao9784/mengine-app/compare/main...codex/ct-003-native-continuity-208-contract>　开好后把链接发 DQ。
 
 
 ### 验收：Actions 连续两次绿（#7 合入后，PR 自带 API CI）
