@@ -1,5 +1,7 @@
 # CT-041 企业读口改读租户授权表
 
+> **现状**：#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。下文若仍写 Empty 恒空或「尚未合入」，以本句为准。
+
 状态：架构已裁可跑 · 待 docs 入库后交老板 Mac Codex　｜　分支：`codex/ct-041-catalog-read-from-tenant-grants`　｜　**审查人（实现 PR 后）：架构逻辑 + 安全审查 + 质量性能**　｜　基准：本执行单 docs 对照 `727063f` / [#33](https://github.com/luofanghao9784/mengine-app/pull/33)（CT-040 执行单）。**实现分支**必须含 CT-040 实现 tip。撰写时该 tip **尚未合入**，见脚注【待合-CT-040-实现】。合入后把脚注与②里的 SHA 改成已合值再派。其前已在 main 的还有：#35 接真 `7fa4946`、CT-037 `1d847e6` / #32、CT-039 实现 `701c3ca` / [#31](https://github.com/luofanghao9784/mengine-app/pull/31)、CT-034-A 实现 `75ab17a` / [#30](https://github.com/luofanghao9784/mengine-app/pull/30)。
 
 > **日切片：D6 读侧真源 / 可演示点**：企业会话 `GET /api/tenant-admin/v1/opened-capabilities`。该企业在 `qo_capability_tenant_grant` 有 `quality-check` 行时，**200**，`items` 含 `enterpriseFunction=quality-check` 且 `displayName=质量检查`。没有授权行时仍 **200**，`items` 为 `[]`（`qo_capability` 里已有登记也不算开通）。path 与字段保持 CT-039。  
@@ -9,7 +11,7 @@
 
 规格依据：
 
-- 企业读口已合：[`CT-039-tenant-opened-capabilities-readonly.md`](CT-039-tenant-opened-capabilities-readonly.md)（实现 `701c3ca` / #31）。path `GET /api/tenant-admin/v1/opened-capabilities`，operationId `listOpenedCapabilities`。契约 `contracts/public-api/opened-capabilities.openapi.json`。控制器 `com.dreamcore.workspace.qualityops.OpenedCapabilitiesController`。端口 `com.dreamcore.workspace.capability.registry.CapabilityCatalogPort#listOpenedCapabilities(UUID)`。生产实现今日是 `com.dreamcore.workspace.capability.adapter.EmptyCapabilityCatalogAdapter`（恒空）
+- 企业读口已合：[`CT-039-tenant-opened-capabilities-readonly.md`](CT-039-tenant-opened-capabilities-readonly.md)（实现 `701c3ca` / #31）。path `GET /api/tenant-admin/v1/opened-capabilities`，operationId `listOpenedCapabilities`。契约 `contracts/public-api/opened-capabilities.openapi.json`。控制器 `com.dreamcore.workspace.qualityops.OpenedCapabilitiesController`。端口 `com.dreamcore.workspace.capability.registry.CapabilityCatalogPort#listOpenedCapabilities(UUID)`。#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删
 - 开通写执行单已合：[`CT-040-agent-admin-grant-tenant-opened.md`](CT-040-agent-admin-grant-tenant-opened.md)（`727063f` / #33）。表 `qo_capability_tenant_grant` 与 `POST /api/agent-admin/v1/tenants/{tenantId}/grants` 归那张实现单，迁移 **V193+**。本单不建表、不改写口
 - 前端已接该读口：#35 / `7fa4946`。本单不改 `src/**`
 - ADR-B8 **R-B8-2**：`docs/architecture/backend-v0/ADR-B8-第四端边界-统一agent管理平台.md`。`qualityops` 只经 `CapabilityCatalogPort`，不依赖 `agentregistry` / `agentadmin`，不 SQL 授权表

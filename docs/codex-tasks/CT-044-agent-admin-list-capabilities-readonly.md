@@ -14,11 +14,11 @@
 - 表：`apps/api/src/main/resources/db/migration-common/V191__platform_capability_registry.sql`。`qo_capability` 列是 `capability_id`、`name`、`kind`、`enterprise_function`、`created_at`。**无 `tenant_id`**。写者今日是 `CapabilityRegistryStore.insert`
 - 会话：`com.dreamcore.workspace.identity.AgentAdminSecurity` 匹配 `/api/agent-admin/**`。Cookie 默认名 `DREAMCORE_AGENT`（`AgentAdminIdentity`）。未登录走 `AgentAdminErrors`，401，`AUTHENTICATION_REQUIRED`，人话「还没有登录，请先登录后再试」。同一过滤器对 `GET` / `HEAD` / `OPTIONS` **不检查** `X-CSRF-TOKEN`；CSRF 只挡写方法
 - 开通写已合，本单不读它的名单：`qo_capability_tenant_grant`（V193），`CapabilityTenantGrantController` 只有 POST。`CapabilityTenantGrantStore` 按 `capability_id` 锁目录行是开通写的校验，不是本列表
-- 企业读口：`GET /api/tenant-admin/v1/opened-capabilities`，`qualityops.OpenedCapabilitiesController`，经 `CapabilityCatalogPort`。生产仍是 `EmptyCapabilityCatalogAdapter`。那条口的成功体是 `{"items":[]}`，**不要**抄到本 GET
+- 企业读口：`GET /api/tenant-admin/v1/opened-capabilities`，`qualityops.OpenedCapabilitiesController`，经 `CapabilityCatalogPort`。#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。那条口的成功体是 `{"items":[]}`，**不要**抄到本 GET
 - ADR-B8 **R-B8-2**：`docs/architecture/backend-v0/ADR-B8-第四端边界-统一agent管理平台.md`。`qualityops` 不得 SQL 直读 `qo_capability`
 
 > **脚注（CT-040 实现已合）**：开通写已合 main `ea6e827` / [#38](https://github.com/luofanghao9784/mengine-app/pull/38)。表 `qo_capability_tenant_grant`，迁移 **V193**。本单不改该 POST、该 Store、该迁移。目录列表不 JOIN 这张表，响应里不出现租户、开通时间或「已给哪家企业开过」。  
-> **脚注（CT-041）**：执行单已合 `a514be5` / [#36](https://github.com/luofanghao9784/mengine-app/pull/36)。实现 PR [#41](https://github.com/luofanghao9784/mengine-app/pull/41)（`codex/ct-041-catalog-read-from-tenant-grants`）撰写时 **仍开放，未合入**。本单**不叠**那条分支，也不等它。开跑前若 #41 已经进了 main，实现分支 rebase 到当时的 main 即可，仍然不要改 `GrantCatalogAdapter`、`EmptyCapabilityCatalogAdapter`、`opened-capabilities.openapi.json`、`OpenedCapabilitiesIntegrationTest`。企业读口换源继续归 CT-041。
+> **脚注（CT-041）**：执行单已合 `a514be5` / [#36](https://github.com/luofanghao9784/mengine-app/pull/36)。实现 PR [#41](https://github.com/luofanghao9784/mengine-app/pull/41)（`codex/ct-041-catalog-read-from-tenant-grants`）#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。不要改 `GrantCatalogAdapter`。
 
 ### 架构已裁（2026-10-30）
 

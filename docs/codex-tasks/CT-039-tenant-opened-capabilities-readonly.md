@@ -1,5 +1,7 @@
 # CT-039 企业侧「本租户已开通」只读
 
+> **现状**：#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。下文若仍写 Empty 恒空，以本句为准。
+
 状态：架构已裁可跑 · 待 docs 入库后交老板 Mac Codex　｜　分支：`codex/ct-039-tenant-opened-capabilities-readonly`　｜　**审查人（实现 PR 后）：架构逻辑 + 安全审查 + 质量性能**　｜　基准：切单时对照 `fdc22fe`（CT-034-A 执行单 [#28](https://github.com/luofanghao9784/mengine-app/pull/28)）。其后目录实现已合 `75ab17a` / [#30](https://github.com/luofanghao9784/mengine-app/pull/30)（平台全局 `qo_capability`，不是开通数据）。**实现已合** main `701c3ca` / [#31](https://github.com/luofanghao9784/mengine-app/pull/31)。生产 `EmptyCapabilityCatalogAdapter` 仍空。**#35 接真已合** `7fa4946`（企业侧消费该读口，未改生产 adapter）。开通真源仍靠 [CT-040](CT-040-agent-admin-grant-tenant-opened.md) 写口，合入后由读口接。测试可对照授权表。**CT-037 已合** `1d847e6`。
 
 > **本单只做后端 / 契约读口。** 供 CT-036 钉死【待补-读口】。CT-036 仍是消费骨架，不是本读口的实现单。  

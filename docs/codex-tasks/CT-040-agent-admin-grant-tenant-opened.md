@@ -1,5 +1,7 @@
 # CT-040 第四端「开通给企业」写口
 
+> **现状**：#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。下文若仍写 Empty 恒空，以本句为准。
+
 状态：架构已裁可跑 · 待 docs 入库后交老板 Mac Codex　｜　分支：`codex/ct-040-agent-admin-grant-tenant-opened`　｜　**审查人（PR 后两人审）：架构逻辑 + 安全审查 + 质量性能**　｜　基准：切单时最新 `origin/main`（须含 tip `7fa4946` / #35 接真；其前含 CT-037 `1d847e6` / #32、CT-039 实现 `701c3ca` / [#31](https://github.com/luofanghao9784/mengine-app/pull/31)、CT-034-A 实现 `75ab17a` / [#30](https://github.com/luofanghao9784/mengine-app/pull/30)、CT-039 执行单 `e2415b8` / [#29](https://github.com/luofanghao9784/mengine-app/pull/29)、CT-034-A 执行单 `fdc22fe` / #28、空态壳 `#25`/`7e21bc0`、登记鉴权 `#22`/`022768b`、第四端登录 `#21`/`bd06caf`）
 
 > **日切片：D6 写侧 / 可演示点**：已登录且 CSRF 有效时，`POST /api/agent-admin/v1/tenants/{tenantId}/grants` 把一条**已登记**的企业功能授权给路径上的那个企业，返回 **201**，同一测试库能读到带 `tenant_id` 的行。无会话仍 **401**。有会话无 CSRF 仍 **403**。重复开通同一项 → **200**，不插第二行，不改已有审计列。禁止无落库的 201，禁止把登记目录 POST 再做成开通。  
