@@ -1,6 +1,6 @@
 # CT-001 简报生成：全部来源未就绪时写回具体等待原因（#230 回归，NativeAutomaticContinuity :340）
 
-状态：待执行（顺序第 3，CT-000、CT-004 之后；CT-001/002 可并行）　｜　分支：`codex/ct-001-briefing-hold-reason`　｜　审查人（老板推送 PR 后单审）：架构逻辑　｜　基准：origin/main a2a41d5
+状态：待执行（顺序第 3，CT-000、CT-004 之后；CT-001/002 可并行）　｜　分支：`codex/ct-001-briefing-hold-reason`　｜　审查人（2026-10-30 起按 CT-007 两人审口径）：架构逻辑 + 质量性能（历史：#22 当时由架构逻辑单审）　｜　基准：origin/main a2a41d5
 
 ## ① 目标与范围
 - **目标**：修复 #230（3a29ed3「手动画报不被同空间未交付表拖死」）引入的回归。#230 之后只挑「已就绪」的数据来源；当一个都没挑到时，`BriefingGenerationService` 提前 `hold(...,"RESULT_NOT_READY")` 返回，**没有**把具体原因（如 `SOURCE_RECEIPT_REQUIRED`）写进 `briefing_generation_policies.reason`。导致 `NativeAutomaticContinuityIntegrationTest.missingAcceptanceWaitsWithoutPaidTaskAndReceiptResumesExactlyOnce` 第 340 行失败（期望 `SOURCE_RECEIPT_REQUIRED`，实际 `null`）。
@@ -120,7 +120,7 @@ cat > /tmp/ct-001-pr.md <<'PR'
 - TASK_ACCESS_DENIED（deliveringCalculatedOlderSnapshot...）：出现/未出现，修改前是否同样出现：__
 
 ## 范围
-不并入 #7；不碰 .github/workflows；不重构。审查：架构逻辑（单审）。
+不并入 #7；不碰 .github/workflows；不重构。审查：架构逻辑 + 质量性能（两人审，CT-007）。
 PR
 gh pr create --base main --head codex/ct-001-briefing-hold-reason --title "fix(briefing): 全部来源未就绪时写回具体等待原因（#230 回归，NativeAutomaticContinuity :340）" --body-file /tmp/ct-001-pr.md
 ```

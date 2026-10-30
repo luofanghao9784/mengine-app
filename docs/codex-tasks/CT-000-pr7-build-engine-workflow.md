@@ -1,6 +1,6 @@
 # CT-000 PR #7 补 build:engine 步骤（workflow，老板账号推送）
 
-状态：待执行（**最先做**）　｜　分支：已有的 #7 分支 `cursor/api-postgres-gate-1c11`（当前头 622dfea）　｜　**审查人（老板推送后单审）：测试审查（CI 门禁）**　｜　PR：<https://github.com/luofanghao9784/dreamcore-workspace/pull/7>
+状态：待执行（**最先做**）　｜　分支：已有的 #7 分支 `cursor/api-postgres-gate-1c11`（当前头 622dfea）　｜　**审查人（2026-10-30 起按 CT-007 两人审口径）：质量性能 + 架构逻辑**（历史：当时为测试审查单审，已停用）　｜　PR：<https://github.com/luofanghao9784/dreamcore-workspace/pull/7>
 
 ## ① 目标与范围
 - **目标**：在 `.github/workflows/api-postgres-gate.yml` 的 `Install engine dependencies` 步骤之后、`test:api` 步骤之前，新增 1 个 `Build engine` 步骤（7 行，含 1 行空行）。CI 里缺 `engine/dist`，导致 BriefingFaceAlignment、ExperienceAdjustment、PlatformExperienceProcessing、Presentation、NativeSchedules 等测试失败（定性文档第 3、5 条），这一步就是补上它。
@@ -98,7 +98,7 @@ git commit -m "ci(api): test:api 前构建 engine/dist（build:engine）"
 # ⑦ 普通推送（分支已存在）
 git push
 ```
-⑧ **PR 已存在，推完即自动重跑**：打开 <https://github.com/luofanghao9784/dreamcore-workspace/pull/7>，在 Checks 里能看到 `API · Postgres gate` 重新开始。无需新建 PR，也不用盯着等。推完给测试审查发一条：「#7 已推 build:engine，提交 <git log --oneline -1 的结果>」。
+⑧ **PR 已存在，推完即自动重跑**：打开 <https://github.com/luofanghao9784/dreamcore-workspace/pull/7>，在 Checks 里能看到 `API · Postgres gate` 重新开始。无需新建 PR，也不用盯着等。推完给审查人（质量性能）发一条：「#7 已推 build:engine，提交 <git log --oneline -1 的结果>」。
 
 ## ⑦ 失败/卡住时怎么办
 | 症状 | 动作 |

@@ -1,24 +1,26 @@
 # 梦擎 Codex 执行单（docs/codex-tasks）
 
 > 本目录是给老板在 OpenAI Codex 里自己跑业务代码修复用的「执行单」。一单 = 一个 PR。组内成员只写执行单，不直接改业务代码。
-> 执行单写好直接交老板执行，不等专家预审；审查放在老板开出 PR 之后（单审）。
+> 执行单写好直接交老板执行，不等专家预审；审查放在老板开出 PR 之后（**两人审，P0/P1 都拦**，见第 3 节；2026-10-30 起按 CT-007）。
 > 代码行号基准：`origin/main` = `a2a41d5`（2026-10-30 核对）。main 前进后行号可能偏移，Codex 提示词里同时给了方法名/代码片段，以片段为准。
 
 ## 1. 总索引
 
-| 编号 | 标题 | 对应 PR/问题 | 审查人（PR 后单审） | 状态 | 依赖顺序 |
+| 编号 | 标题 | 对应 PR/问题 | 审查人（两人审，2026-10-30 起） | 状态 | 依赖顺序 |
 |---|---|---|---|---|---|
-| CT-000 | [PR #7 补 build:engine 步骤](CT-000-pr7-build-engine-workflow.md) | PR #7（workflow，老板账号推，因组内令牌无 workflow 权限） | 测试审查（CI 门禁） | 待执行 | 第 1 |
-| CT-004 | [PR #7 API·Postgres 作业分 4 片 + 上传 surefire 报告](CT-004-pr7-api-shards-surefire-upload.md) | PR #7 整套 90 分钟超时、无报告产物（workflow，老板账号推） | 测试审查 | 待执行 | 第 2 |
-| CT-005 | [Mac 本机预览脚本 + smoke workflow + 账号种子](CT-005-mac-preview.md) | Mac 预览首版（DQ 裁定 v0.2；workflow 老板推） | 安全审查（涉及密钥/认证） | 待执行 | CT-004 合入后 |
-| CT-001 | [简报生成：全部来源未就绪时写回具体等待原因（#230 回归，:340）](CT-001-pr7-native-continuity-340-fix.md) | #230（3a29ed3）回归 | 架构逻辑 | 待执行 | 第 3（与 CT-002 可并行） |
-| CT-002 | [生命周期时间戳对齐 Postgres 微秒精度](CT-002-api-lifecycle-micros-truncation.md) | ProfileMethodLifecycle 3 例 + FeedbackAdjustment 1 例 | 测试审查 | 待执行 | 第 3（与 CT-001 可并行） |
-| CT-003 | [NativeAutomaticContinuity 测试契约按 #208 修订（只改测试）](CT-003-native-continuity-208-test-contract.md) | #208（865ccdc）漏改测试 | 测试审查 | 待执行 | 第 6（#7 合入后） |
+| CT-000 | [PR #7 补 build:engine 步骤](CT-000-pr7-build-engine-workflow.md) | PR #7（workflow，老板账号推，因组内令牌无 workflow 权限） | 质量性能 + 架构逻辑 | 已合入（随 #7） | 第 1 |
+| CT-004 | [PR #7 API·Postgres 作业分 4 片 + 上传 surefire 报告](CT-004-pr7-api-shards-surefire-upload.md) | PR #7 整套 90 分钟超时、无报告产物（workflow，老板账号推） | 质量性能 + 架构逻辑 | 已合入（随 #7） | 第 2 |
+| CT-005 | [Mac 本机预览脚本 + smoke workflow + 账号种子](CT-005-mac-preview.md) | Mac 预览首版（DQ 裁定 v0.2；workflow 老板推） | 安全审查 + 发布验收 + 质量性能 | 待执行 | CT-004 合入后 |
+| CT-001 | [简报生成：全部来源未就绪时写回具体等待原因（#230 回归，:340）](CT-001-pr7-native-continuity-340-fix.md) | #230（3a29ed3）回归 | 架构逻辑 + 质量性能 | 已合入（#22） | 第 3（与 CT-002 可并行） |
+| CT-002 | [生命周期时间戳对齐 Postgres 微秒精度](CT-002-api-lifecycle-micros-truncation.md) | ProfileMethodLifecycle 3 例 + FeedbackAdjustment 1 例 | 架构逻辑 + 质量性能 | 已合入（#21） | 第 3（与 CT-001 可并行） |
+| CT-007 | [审批流程整改（合入硬闸门/两人审/体验验收/周偏离检查/暂停令优先）](CT-007-review-process-hardening.md) | 老板经 DQ 批准（2026-10-30） | 质量性能 + 发布验收 | 待提交 PR | 纯文档，不依赖 |
+| （模板） | [Codex 机审提示（可粘贴）](CODEX-REVIEW-PROMPT.md) | 每个业务/流程 PR 合入前第一道 | — | 即日生效 | 随 CT-007 |
+| CT-003 | [NativeAutomaticContinuity 测试契约按 #208 修订（只改测试）](CT-003-native-continuity-208-test-contract.md) | #208（865ccdc）漏改测试 | 架构逻辑 + 质量性能 | 待执行 | 第 6（#7 合入后） |
 
 ### 1.1 执行顺序（已定；全程不用 force push）
 1. **CT-000**：推到 #7 分支，补 build:engine。
 2. **CT-004**：紧接着推到 #7 分支，分 4 片并上传 surefire 报告（不调大超时）。
-3. **CT-001、CT-002**：各自从 main 切分支、开 PR、单审后合入 main。验收用「老板 Mac 本地绿 + 附 surefire 报告」，因为 main 上还没有 API CI。
+3. **CT-001、CT-002**：各自从 main 切分支、开 PR、审查后合入 main（历史：当时单审；现行合入条件见第 3 节）。验收用「老板 Mac 本地绿 + 附 surefire 报告」，因为 main 上还没有 API CI。
 4. **#7 同步 main**：首选 PR #7 页面底部的 **Update branch** 按钮，点旁边下拉箭头选 **Update with merge commit**，**不要选 Update with rebase**（rebase 会改写分支历史）。命令行备选：
    ```bash
    cd ~/dreamcore-workspace && git status
@@ -27,42 +29,61 @@
    git push
    ```
    （`git merge` 若报 CONFLICT：停下发 DQ。）
-5. **#7 带已知红合入**：只剩 1.2 节的已知红时合入。该 workflow **暂不设为必需检查**，红项清零后再按 CT-004 的 4 个分片检查名设置。
+5. **#7 合入**（历史，已发生）：#7 当时按降档令带已知红合入。**2026-10-30 起废止「带已知红合入」，以后任何 PR 不允许带红合入**（CT-007，见第 3 节合入硬闸门）。
 6. **CT-003**：#7 合入后从最新 main 切；PR 自带 API CI，在 Actions 上验证「连续两次绿」。
 
-### 1.2 已知红（#7 合入时允许存在）
-详见 #7 描述「已知红」一节：https://github.com/luofanghao9784/dreamcore-workspace/pull/7
-- CrossWorkspaceBriefing：选中的数据集 ID 不一致。
-- WeKnora：KNOWLEDGE_INDEX_NOT_READY。
-- LiveAnswer：SSE 用例 15s 超时。
-- 另：GeneralExperienceTaskContext 的 TASK_ACCESS_DENIED 是**本地现象，待查**，不算已知红；在 CI 上出现时报 DQ。
-- NativeAutomaticContinuity 5 例在 CT-003 合入前保持红，属于计划内。
-- 仓库目前未开启 Issues，所以以上各项暂记在 #7 描述里；Issues 开启后再逐条转成 issue。
-- **循环问题（已定）**：选方案 (a)。#7 带上述已知红合入，workflow 暂不设为必需检查，CT-003 在 #7 合入后到 CI 上验收。
+### 1.2 （已删除）
+原「已知红（#7 合入时允许存在）」条款已于 2026-10-30 按 CT-007 删除：**以后不允许带红合入**。#7 合入时遗留的红项转入 `P1-backlog-20261030.md`「等级待定」一节跟踪。
 
 
 ### 1.3 部署预览
 | 编号 | 说明 |
 |---|---|
-| CT-005 | 老板 Mac（Apple Silicon /opt/homebrew）本机预览脚本、`trial.py --parser`、账号种子；`macos-preview-smoke.yml` **由老板账号推**（Codex 不推 workflow）。依赖：CT-004 已合入。审查：安全审查。 |
+| CT-005 | 老板 Mac（Apple Silicon /opt/homebrew）本机预览脚本、`trial.py --parser`、账号种子；`macos-preview-smoke.yml` **由老板账号推**（Codex 不推 workflow）。依赖：CT-004 已合入。审查：安全审查 + 发布验收 + 质量性能。 |
 
 ## 2. 状态取值
 `待执行`（已交老板）→ `执行中`（老板在跑 Codex）→ `PR 已开`（写上 PR 号）→ `已合入` ；异常：`卡住`（已把输出发 DQ）、`待定`（有外部阻塞，写明原因）、`作废`。
 
-## 3. 审查流程（单审，老板降档令）
-写执行单 → 直接交老板 → 老板跑 Codex（CT-000 不用）→ 老板本地测试 → 老板开 PR → **单审人**审查 → 合入 → 本索引更新状态。
-- 每个 PR 只有一位最对口的审查人，写在各单抬头「审查人」栏，指老板开 PR 后的单审人。
-- 安全审查只在改动涉及认证、租户隔离、密钥、执行端口时介入；CT-000～CT-004 都不涉及。**CT-005 涉及密钥/认证，PR 后由安全审查单审。**
-- 只拦 P0（会造成错误结果、数据损坏、安全问题或违反执行单硬约束）；P1/P2 记待办，不挡合入。
-- 能交给 CI 自动检查的不靠人审。
+## 3. 审查流程（两人审，2026-10-30 起，CT-007；取代降档令「单审、只拦 P0」）
+**⓪ 暂停令自查（优先级最高）** → 写执行单 → 直接交老板 → 老板跑 Codex（CT-000 不用）→ 老板本地测试 → 老板开 PR → CI 全绿 → **① Codex 机审**（老板 Mac，模板 `CODEX-REVIEW-PROMPT.md`，结论贴 PR Comment）→ **② 人审**（质量性能 + 发布验收等，参考机审，拦 P0+P1；体验与方向由人定）→ 非作者正式 Approve（账号未就绪前：非作者在岗审查人正式 Comment 写明「放行/可合」即闸门留痕，可合入）→ 合入人合前自查 → 合入 → 本索引更新状态。
+
+### 3.1 合入硬闸门（缺一不可）
+1. 该 PR 的 CI **全绿**（红、取消、超时都不算绿）。**不允许带红合入**，原 1.2「带已知红合入」条款已删除。**例外（总负责人 2026-10-30）**：本单未改动路径上的基线已知红，经 PR 正文举证 main 同源后不挡合入；本单新引入红仍挡。
+2. 至少一名**非作者**在 GitHub 上提交正式 **Approve review**；口头说的或消息里写的「可以合」**都不算**。
+3. 不升级 GitHub Pro、不开分支保护，靠纪律执行：**合入人合前自查**以上两条，并在合入说明里写明 CI run 链接和 Approve 人。
+4. **Approve 账号待定**：目前所有 PR 都由 luofanghao9784 单账号开，GitHub 不允许作者 Approve 自己的 PR，用哪个账号 Approve 待老板定。
+5. **过渡期（账号未就绪，DQ 裁定）**：**非作者在岗审查人**在 PR 下发 GitHub **正式 Comment**，且明确写「**放行**」或「**可合**」，即视为合入闸门的审查留痕（仍须两人审、拦 P0+P1），**不必再等 Approve 账号就绪或老板另裁**；口头/聊天不算。纯文档 PR 两人审固定为**质量性能 + 发布验收**。账号就绪后改回正式 Approve，本条废止。
+
+### 3.2 Codex 机审（第一道，即日）
+- 每个**业务/流程 PR** 合入前，在老板 Mac 用 Codex 机审（见 [`CODEX-REVIEW-PROMPT.md`](CODEX-REVIEW-PROMPT.md)）。
+- **流程/执行单类 docs PR 仍须机审**（含 CT-007 自身）；仅错别字/标点超短 docs 可免，且 PR 须注明「免机审：仅错别字/标点」。
+- 机审结论贴到 PR；人审在 Approve 账号未就绪前用 GitHub **正式 Comment「放行/可合」** 作为合入闸门留痕。
+- **人审是第二道**：质量性能 + 发布验收参考机审，拦 P0+P1；体验与方向仍由人定。机审不能单独放行。
+- 架构偏离检查可让 Codex 对照 ADR 标边界，**结论由架构逻辑签字**。
+
+### 3.3 两人审，P0 和 P1 都拦
+- 每个 PR 至少两名在岗审查人：**架构逻辑 / 质量性能 / 安全审查 / 发布验收**。「测试审查」已停用，不再担任审查人。
+- 按类型配人：后端、契约、架构类 = 架构逻辑 + 质量性能；涉及认证、租户隔离、密钥、执行端口、parser 时**另加安全审查**；CI、workflow、脚本 = 质量性能 + 架构逻辑；前端、预览、体验 = 发布验收 + 质量性能。
+- **P0 和 P1 都拦合入**；只有 P2 记待办，不挡合入。作者不审自己的 PR。
+- 能交给 CI 自动检查的仍交 CI，但 CI 绿不能代替两人审。
+
+### 3.4 体验验收
+- 发布验收负责**体验走查**（前端、预览、四端可见改动）；体验问题可以拦合入。
+
+### 3.5 每周偏离检查
+- 架构逻辑每周对照 ADR 与路线图做一次偏离检查；可先让 Codex 对照 ADR 标偏离候选，**结论由架构逻辑签字**后经 DQ 报总负责人。
+
+### 3.6 暂停令优先级最高
+- 任何人在老板 Mac 开 Codex 前，先确认当前**没有暂停令**；暂停期间**禁止任何 Codex 启动**。拿不准就当作有暂停令，先问 DQ。
+- 每份 CT 的第 ② 节第一步必须是这条自查（见第 5 节模板）。
 
 ## 4. 命名规则
 `CT-NNN-<英文短名>.md`：NNN 三位递增编号，永不复用；英文短名用小写加连字符，说明改什么。分支名统一 `codex/ct-NNN-<英文短名>`。
 
 ## 5. 每份执行单的固定格式（七节，缺一不可）
 1. **目标与范围**：要修什么、改哪些文件、**不做什么**。
-0. **抬头**：状态、分支、审查人（一位，PR 后单审）。
-2. **前置条件与分支名**：依赖哪单先合；完整 git 步骤（见下方「固定 git 步骤」）。
+0. **抬头**：状态、分支、审查人（**两人**，按 3.3 配人）。
+2. **前置条件与分支名**：**第一步为「⓪ 暂停令自查」**（见 3.6）；依赖哪单先合；完整 git 步骤（见下方「固定 git 步骤」）。
 3. **完整 Codex 提示词**：一个代码块，可整段粘贴；含背景根因、文件与行号、修法、专家约束、**不许碰的文件清单**、验收标准、必跑测试命令、禁止事项（skip/@Disabled/放宽断言/调大超时）、做完输出什么。
 4. **推荐模型与思考强度**（low/medium/high）并说明理由。
 5. **预计耗时**（Codex 运行 + 本地测试）。
@@ -71,6 +92,7 @@
 
 ### 固定 git 步骤（每单照此写，替换 `<分支名>`）
 ```bash
+# ⓪ 暂停令自查（优先级最高）：确认 DQ/总负责人当前没有暂停令；有或拿不准 → 不开 Codex，停下问 DQ
 # ① 进仓库
 cd ~/dreamcore-workspace
 # ② 确认干净：应看到 "nothing to commit, working tree clean"

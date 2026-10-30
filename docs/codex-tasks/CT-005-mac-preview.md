@@ -1,6 +1,6 @@
 # CT-005 Mac 本机预览脚本 + smoke workflow + 账号种子
 
-状态：待执行　｜　分支：`codex/ct-005-mac-preview`　｜　**审查人（老板推送 PR 后单审）：安全审查（涉及密钥/认证）**　｜　基准：`origin/main` `050e414`（CT-004 已合入）
+状态：待执行　｜　分支：`codex/ct-005-mac-preview`　｜　**审查人（2026-10-30 起按 CT-007 两人审口径）：安全审查 + 发布验收 + 质量性能**（涉及密钥/认证 + 预览体验）　｜　基准：`origin/main` `050e414`（CT-004 已合入）
 
 > DQ 裁定 v0.2（2026-10-30）：`/` 302→`/workspace/` 归 PR 7a；`version.json` 按现状；`QUALITY_OPS_REAL_ENABLED=false` 占位同意、正式键名待 PR4a；parser 加显式开关、首版默认关；只读角色定名 `dreamcore_ro`；密钥本机 600 文件、**不上钥匙串**；不做手机访问（手机截图用浏览器 390 宽模拟）；**Mac = Apple Silicon，Homebrew 以 `/opt/homebrew` 为主**（系统版本脚本自动探测，不为 Intel 另开一套）。
 > **`.github/workflows/macos-preview-smoke.yml` 由老板账号推送；Codex 本单不推 workflow 文件**（组内令牌无 workflow 权限，同 CT-000/CT-004）。
@@ -22,9 +22,10 @@
 
 ## ② 前置条件与分支名
 
+- **⓪ 暂停令自查（CT-007，优先级最高）**：在老板 Mac 开 Codex 前，先确认 DQ/总负责人当前没有生效的暂停令；有暂停令或无法确认时，**禁止启动 Codex**，停下问 DQ。
 - CT-004 已合入 main（基准 `050e414`）。
 - 已完成 README 第 6 节工具准备（JDK 21、Node 按 `.node-version`、PostgreSQL 18、`gh`、`codex`）。
-- 本单涉及密钥与认证 → PR 后由**安全审查**单审。
+- 本单涉及密钥与认证、预览体验 → PR 后由**安全审查 + 发布验收 + 质量性能**审（CT-007 两人及以上，P0/P1 都拦；发布验收做体验走查）。
 ```bash
 # ① 进仓库
 cd ~/dreamcore-workspace

@@ -1,6 +1,6 @@
 # CT-004 PR #7 API·Postgres 作业分片 + 上传 surefire 报告（workflow，老板账号推）
 
-状态：待执行（**紧接 CT-000**）　｜　分支：已有的 #7 分支 `cursor/api-postgres-gate-1c11`　｜　**审查人（老板推送后单审）：测试审查**　｜　PR：<https://github.com/luofanghao9784/dreamcore-workspace/pull/7>
+状态：待执行（**紧接 CT-000**）　｜　分支：已有的 #7 分支 `cursor/api-postgres-gate-1c11`　｜　**审查人（2026-10-30 起按 CT-007 两人审口径）：质量性能 + 架构逻辑**（历史：当时为测试审查单审，已停用）　｜　PR：<https://github.com/luofanghao9784/dreamcore-workspace/pull/7>
 
 ## ① 目标与范围
 - **目标**：改 `.github/workflows/api-postgres-gate.yml`，把单个 `api` 作业改成 4 个并行分片（matrix），每片结束后**无论成败**（`if: always()`）都把 `apps/api/target/surefire-reports` 上传成产物 `surefire-reports-<分片>`。

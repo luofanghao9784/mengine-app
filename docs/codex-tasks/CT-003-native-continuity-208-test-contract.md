@@ -1,9 +1,9 @@
 # CT-003 NativeAutomaticContinuity 测试契约按 #208 修订（方案 A，只改测试）
 
-状态：待执行（**须等 #7 合入 main 之后**，顺序见 README 1.1，已定）　｜　分支：`codex/ct-003-native-continuity-208-contract`　｜　审查人（老板推送 PR 后单审）：测试审查　｜　基准：origin/main a2a41d5（行号为修订前）
+状态：待执行（**须等 #7 合入 main 之后**，顺序见 README 1.1，已定）　｜　分支：`codex/ct-003-native-continuity-208-contract`　｜　审查人（2026-10-30 起按 CT-007 两人审口径）：架构逻辑 + 质量性能　｜　基准：origin/main a2a41d5（行号为修订前）
 
 ## ① 目标与范围
-- **背景**：#208（865ccdc「接入模型治理并统一知识星链来源」）要求每个当前数据快照都要有当前模型审阅依据（`docs/技术/模型治理与知识星链统一来源设计-2026-10-27.md:11`：“每个当前数据快照/资料版本均需要当前模型审阅依据；稳定字段定义可以复用，但不能用旧批次模型审阅冒充新批次。”）。`FoundationModelReviewProjection` 中 `checksPassed = parsed && deterministic && modelReady`。#208 合入时漏改了 `NativeAutomaticContinuityIntegrationTest`，5 例因此失败。DQ 已书面确认方案 A；架构逻辑同意；测试审查同意（条件已写入本单）。
+- **背景**：#208（865ccdc「接入模型治理并统一知识星链来源」）要求每个当前数据快照都要有当前模型审阅依据（`docs/技术/模型治理与知识星链统一来源设计-2026-10-27.md:11`：“每个当前数据快照/资料版本均需要当前模型审阅依据；稳定字段定义可以复用，但不能用旧批次模型审阅冒充新批次。”）。`FoundationModelReviewProjection` 中 `checksPassed = parsed && deterministic && modelReady`。#208 合入时漏改了 `NativeAutomaticContinuityIntegrationTest`，5 例因此失败。DQ 已书面确认方案 A；架构逻辑同意；当时的测试审查同意（条件已写入本单；该角色已停用）。
 - **要修的 5 例**（a2a41d5 行号）：
   | 用例（方法起始行） | 失败断言行 |
   |---|---|
@@ -12,10 +12,11 @@
   | refreshedRowsKeepDefinitionsButRecheckEverySnapshotAndDoNotCallModel（:251） | :258 checksPassed |
   | modelContractWithoutEvidenceAutomaticallyPublishesAndReusesDefinitionsWithoutModelJobs（:266） | :281 checksPassed；:279 model_jobs==0 |
   | transportedDefinitionsReusePublishedMeaningButNeverCarryForwardRowSuccess（:299） | :310 automaticAnalysisReady |
-- **只改** `apps/api/src/test/**`（实际只应改这一个测试文件）。碰到 `src/main` 测试审查直接打回。
+- **只改** `apps/api/src/test/**`（实际只应改这一个测试文件）。碰到 `src/main` 审查人直接打回。
 - **不做什么**：不改生产代码；不新增 `not_applicable` 之类状态（架构逻辑已否决）；不动 :336-343 用例（:338/:340，已由 CT-001 修好）；不动 CT-001 新增的 4 条用例；不并入 #7；不碰 workflow。
 
 ## ② 前置条件与分支名
+- **⓪ 暂停令自查（CT-007，优先级最高）**：在老板 Mac 开 Codex 前，先确认 DQ/总负责人当前没有生效的暂停令；有暂停令或无法确认时，**禁止启动 Codex**，停下问 DQ。
 - **CT-001 必须已合入 main**（同一测试文件，先合可避免冲突）。确认：在 PR 页看到 CT-001 为 `Merged`。
 - 若在 CT-001 合入前已开始，本分支会冲突：不要自己解，停下，等 CT-001 合入后删掉本地分支重来（`git switch main && git branch -D codex/ct-003-native-continuity-208-contract`，未推送的分支删除只影响本机）。
 ```bash
@@ -51,8 +52,13 @@ codex -m gpt-6.1-sol
 【修法与硬约束】
 A. 前置：在每个用例的失败断言之前，让“当前版本模型审阅通过”成立。只能走真实派发路径：复用本文件已有 helper publish()（governance.execute → engineAnswer → governance_model_dispatch SUCCEEDED → governance.publish），或在本文件新增私有 helper 包装同一真实路径（需要时参照 apps/api/src/test/java/com/dreamcore/workspace/ModelSemanticGovernanceIntegrationTest.java 的合成模型回包，例如 output 含 qualityReview=USABLE）。新快照出现后要为“该新快照”产生当前批次审阅。
    禁止：直接 UPDATE/INSERT nativeGovernance 或 modelReviewState 相关字段；mock 或替换 FoundationModelReviewProjection；新增测试专用开关/属性；ReflectionTestUtils 改生产逻辑开关（已有的 evidencePath/dispatchEnabled 用法保持原样）。
-B. 断言只强不弱：原有断言一条都不删、不放宽（不改 assertTrue 为 assertFalse、不改期望值），唯一例外是下面 C 中被规则直接推翻的 model_jobs=0，它要替换为更强断言。
-C. 用例 4 中 “governance_model_jobs 数 == 0” 改为“每个新快照恰好 1 个当前版本模型任务”（按快照计数断言），并保留原有关于字段定义复用的断言（source_contract_publications 数为 1 等）。
+B/C.【裁决补丁⑧·架构逻辑 2026-10-30，覆盖原 B/C；本段粘贴即生效，勿只读文末附录】
+   「被 #208 直接推翻、允许替换」的断言仅限三类旧契约：（a）全租户/全库 governance_model_jobs 或模型任务总数=0 或=1；（b）把「无模型任务」写进方法名或注释所绑定的计数；（c）因本用例为当前快照新增真实 publish 而导致的瞬时 releaseId / 知识条目 id / items.size 字面量。
+   替换规则：（a）（b）改为「当前快照恰好 1 个当前版本模型任务」（按 snapshot/version 过滤）；适用凡断言任务数且补了当前快照 publish 的用例（含 3、4、5）。允许「补前置前记 baseline，断言净增 1」当且仅当过滤键是当前快照。
+   （c）按当前快照语义查询；items.size 断言本快照可见条目数。必须保留：source_contract_publications=1、口径含「数据口径知识」、checksPassed/modelReviewState 方向。
+   仍禁止：放宽 checksPassed/ready；删断言；@Disabled；mock/直写 modelReviewState；动 CT-001 与 missingAcceptance…；把净增 1 写成全租户永久=1。
+   对照表逐条「原→替换」标「#208 推翻替换」；删除断言数=0。
+   （原 B「断言只强不弱」与原 C「仅用例4 model_jobs=0」以此段为准，不再单独适用。）
 D. 反例（每个补了前置的用例都要配一条）：去掉当前批次审阅，或只用旧批次审阅时，必须 checksPassed=false 或知识页不出现该项，证明前置是必要的。
    用例 3 必须包含这条：用旧批次（version 1）的审阅面对新快照 version(2)，断言 checksPassed=false 且 modelReviewState=WAITING —— 钉死“不得以旧冒新”。
    反例可写在同一用例内（先断言反例，再补前置断言正例），或新增独立 @Test；@Test 总数不得减少。
@@ -112,7 +118,7 @@ git commit -m "test(native-continuity): 按 #208 修订测试契约，补当前�
 git push -u origin codex/ct-003-native-continuity-208-contract
 cat > /tmp/ct-003-pr.md <<'PR'
 ## 背景
-#208（865ccdc）要求每个当前快照都需当前模型审阅（docs/技术/模型治理与知识星链统一来源设计-2026-10-27.md:11）。NativeAutomaticContinuityIntegrationTest 在 #208 合入时漏改，5 例失败。方案 A：生产不动，只修订测试契约（DQ 书面确认；架构逻辑同意；测试审查同意）。
+#208（865ccdc）要求每个当前快照都需当前模型审阅（docs/技术/模型治理与知识星链统一来源设计-2026-10-27.md:11）。NativeAutomaticContinuityIntegrationTest 在 #208 合入时漏改，5 例失败。方案 A：生产不动，只修订测试契约（DQ 书面确认；架构逻辑同意；当时的测试审查同意）。
 
 ## 对照表
 | 原名 | 新名 | 原前置 | 新前置 | 断言增 | 断言减 |
@@ -134,7 +140,7 @@ cat > /tmp/ct-003-pr.md <<'PR'
 - surefire 报告：见附件
 - TASK_ACCESS_DENIED：出现/未出现，改前是否同样：__
 
-审查：测试审查（单审）。
+审查：架构逻辑 + 质量性能（两人审，CT-007）。
 PR
 open -e /tmp/ct-003-pr.md
 gh pr create --base main --head codex/ct-003-native-continuity-208-contract --title "test(native-continuity): 按 #208 修订测试契约（方案 A，只改测试）" --body-file /tmp/ct-003-pr.md
@@ -162,3 +168,9 @@ gh pr create --base main --head codex/ct-003-native-continuity-208-contract --ti
 | push 被拒 | `git pull --rebase` 再 `git push`；仍失败停下 |
 | `CONFLICT` | 停下，不要自己解 |
 停下时发 DQ：三个 `/tmp/ct-003-*.log`、`git status`、`git diff --stat`、Codex 最后一段回答、报错原文。禁止 force push、reset --hard、直推 main。
+
+## ⑧ 裁决补丁存档（正文已并入第 ③ 节可粘贴提示词的 B/C）
+
+执行以第 ③ 节提示词内「裁决补丁⑧」段落为准；本节仅存档，避免只粘第 ③ 节时漏带。
+
+审查人：**架构逻辑 + 质量性能**（CT-007 两人审，覆盖本单原「测试审查」及此前「质量性能单审」）。
