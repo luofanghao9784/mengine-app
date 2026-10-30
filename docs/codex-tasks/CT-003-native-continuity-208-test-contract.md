@@ -1,6 +1,14 @@
 # CT-003 NativeAutomaticContinuity 测试契约按 #208 修订（方案 A，只改测试）
 
-状态：待执行（**须等 #7 合入 main 之后**，顺序见 README 1.1，已定）　｜　分支：`codex/ct-003-native-continuity-208-contract`　｜　审查人（2026-10-30 起按 CT-007 两人审口径）：架构逻辑 + 质量性能　｜　基准：origin/main a2a41d5（行号为修订前）
+状态：**待迁仓执行**（2026-10-30 评估）　｜　分支：`codex/ct-003-native-continuity-208-contract`　｜　审查人：架构逻辑 + 质量性能　｜　基准：切单时最新 `origin/main`（mengine-app）
+
+> **迁仓口径（DQ / 总负责人 2026-10-30）**  
+> - **只许**在正式仓 **`luofanghao9784/mengine-app`** 开 PR；**禁止**再往归档仓 `mengine` 推/复开。  
+> - 归档仓曾开 `mengine#26`（方案 A 测试修订）已由总负责人关闭并再归档——仅作补丁对照，**不算**合入。  
+> - `mengine-app` main 仍为旧测试方法名（如 `…DoNotCallModel` / `…WithoutModelJobs`）。  
+> - **补齐时点**：**2026-10-31 12:00**（Asia/Shanghai）前开出 mengine-app PR；**同日 21:00** 前力争双审合入。  
+> - CT-001 已在历史合入；本单不再阻塞于旧梦擎 #7 顺序句（以当前 main 干净切分支为准）。  
+> - 对照补丁：归档 PR 正文/diff（若仍可读）+ 本执行单裁决补丁⑧；Mac 跑 `NativeAutomaticContinuity*` 绿后再交审。
 
 ## ① 目标与范围
 - **背景**：#208（865ccdc「接入模型治理并统一知识星链来源」）要求每个当前数据快照都要有当前模型审阅依据（`docs/技术/模型治理与知识星链统一来源设计-2026-10-27.md:11`：“每个当前数据快照/资料版本均需要当前模型审阅依据；稳定字段定义可以复用，但不能用旧批次模型审阅冒充新批次。”）。`FoundationModelReviewProjection` 中 `checksPassed = parsed && deterministic && modelReady`。#208 合入时漏改了 `NativeAutomaticContinuityIntegrationTest`，5 例因此失败。DQ 已书面确认方案 A；架构逻辑同意；当时的测试审查同意（条件已写入本单；该角色已停用）。
@@ -20,7 +28,7 @@
 - **CT-001 必须已合入 main**（同一测试文件，先合可避免冲突）。确认：在 PR 页看到 CT-001 为 `Merged`。
 - 若在 CT-001 合入前已开始，本分支会冲突：不要自己解，停下，等 CT-001 合入后删掉本地分支重来（`git switch main && git branch -D codex/ct-003-native-continuity-208-contract`，未推送的分支删除只影响本机）。
 ```bash
-cd ~/mengine-app
+cd ~/Desktop/mengine-app-luofanghao9784   # 或已 clone 的 mengine-app 路径；origin 须 luofanghao9784/mengine-app
 git status
 # 干净时显示：nothing to commit, working tree clean
 git switch main && git pull
@@ -96,7 +104,7 @@ Codex 60–120 分钟（含多次整类运行，每次约 308 秒）；老板本
 
 ## ⑥ 跑完如何提交
 ```bash
-cd ~/mengine-app
+cd ~/Desktop/mengine-app-luofanghao9784   # 或已 clone 的 mengine-app 路径；origin 须 luofanghao9784/mengine-app
 git diff --stat
 # 只应有 apps/api/src/test/java/com/dreamcore/workspace/NativeAutomaticContinuityIntegrationTest.java
 git diff --stat -- apps/api/src/main
