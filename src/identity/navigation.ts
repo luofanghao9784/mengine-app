@@ -3,6 +3,7 @@ import { uuid } from './client.ts';
 const views = new Set([
   'briefing',
   'skills',
+  'quality-check',
   'conversations',
   'library',
   'documents',
