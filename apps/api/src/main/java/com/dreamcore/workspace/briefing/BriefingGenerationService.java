@@ -249,7 +249,8 @@ public class BriefingGenerationService {
           SELECT gen_random_uuid(),w.tenant_id,m.account_id,w.id FROM workspaces w
           JOIN tenant_memberships m ON m.tenant_id=w.tenant_id AND m.status='ACTIVE'
           JOIN accounts a ON a.id=m.account_id AND a.status='ACTIVE' JOIN tenants t ON t.id=w.tenant_id AND t.status='ACTIVE'
-          WHERE ((w.kind='PERSONAL' AND w.owner_id=m.account_id) OR EXISTS(SELECT 1 FROM workspace_members g WHERE g.workspace_id=w.id AND g.account_id=m.account_id))
+          WHERE NOT w.archived
+          AND ((w.kind='PERSONAL' AND w.owner_id=m.account_id) OR EXISTS(SELECT 1 FROM workspace_members g WHERE g.workspace_id=w.id AND g.account_id=m.account_id))
           AND NOT EXISTS(SELECT 1 FROM briefing_generation_policies p WHERE p.tenant_id=w.tenant_id AND p.owner_id=m.account_id AND p.workspace_id=w.id)
           ORDER BY w.id,m.account_id LIMIT 100 ON CONFLICT DO NOTHING
           """);
