@@ -10,7 +10,7 @@
 
 - ADR-B8 D8-4 / **R-B8-2**：`docs/architecture/backend-v0/ADR-B8-第四端边界-统一agent管理平台.md`（qualityops 只经 `CapabilityCatalogPort`，不依赖 `agentregistry`）
 - 契约骨架：`contracts/public-api/capability-registry.openapi.json`、`contracts/public-api/check-flow-config.openapi.json`、`contracts/public-api/error.schema.json`（骨架 ≠ 已实现）
-- 人话：[《全端文案规范》](https://www.notion.so/40966c386fbf8120aaefc0290f9dedb8)、[去黑话对照](https://app.notion.com/p/40966c386fbf81f3a2e3e1822ae6a9b9)、[CT-035/036 人话验收句](https://www.notion.so/40966c386fbf811a8a68f00cb5ac8a77)（E36-1～E36-5 对照 E1–E4）
+- 人话：[《全端文案规范》](https://www.notion.so/40966c386fbf8120aaefc0290f9dedb8)、[去黑话对照](https://app.notion.com/p/40966c386fbf81f3a2e3e1822ae6a9b9)、[CT-035/036 人话验收句](https://www.notion.so/40966c386fbf811a8a68f00cb5ac8a77)（E36-1～E36-5 对照 E1–E4；**E36-6** 总部开通可复验，见⑥）
 - 已合薄片：CT-034 `#14` / `c88699d` 仅 `POST /api/agent-admin/v1/capabilities` → **501**（`CapabilityRegistryController`）。这不是「本租户已开通」列表。
 
 > **脚注（补裁）**：下面凡标 **【待补】** 的路径、字段、cookie、hash、演示包文件名，在 CT-035 与 CT-034-P1 合入后改成钉死句再跑最稳。未合入时允许按本骨架开跑，但不得把【待补】填成臆造接口或假已开通。  
@@ -202,8 +202,9 @@ gh pr create -R luofanghao9784/mengine-app --base main --head codex/ct-036-enter
 | E2 | workspace 最小路径 | 员工打开已开通的「质量检查」：进入 → 提交一份检查材料（或【待补-演示包】）→ 处理结果，或诚实空态/进度。禁止假 Live | 点进 workspace 该页并走完三步。本条钉死演示路径，不表示产品只保留质量检查 |
 | E3 | 未开通不可见 | 未开通该功能的企业看不到或打不开；租户隔离可演示 | 对照企业登录后无入口；直链被拒，响应无其他企业的名称、名单或材料 |
 | E4 | 空态与灰钮诚实 | 能做给主按钮；不能做则灰钮 +「暂时不能…（后台开通中）」 | 与总部灰钮文案抽检一致；没有假成功 toast |
+| E36-6 | 总部开通可复验 | 总部「企业开通」能查到该企业已开通，且与企业侧所见一致。可挂 CT-034-P1 / grants **只读**对账。禁止两边名单打架 | 对照总部「企业开通」只读结果与 tenant / workspace 所见；不一致即不过。读模型未合入时两边都停在诚实空态，不得一边填假名单 |
 
-架构抽查（不替代上表）：消费代码无 `agentregistry` / `agentadmin` import；没有对登记表 / 授权表的 SQL。
+架构抽查（不替代上表）：消费代码无 `agentregistry` / `agentadmin` import；没有对登记表 / 授权表的 SQL。E36-6 的对账只读 grants 或 CT-034-P1 读模型，不在本单写授权。
 
 ## ⑦ 禁止操作 / 失败卡住
 
@@ -236,4 +237,8 @@ gh pr create -R luofanghao9784/mengine-app --base main --head codex/ct-036-enter
 
 ---
 
-**DQ 审路径**：本文件 + 两周日切片 D6～D8 + 验收句 E1–E4。通过后交老板 / 后端岗 / 前端岗 Mac 粘贴③开跑。CT-035 与 CT-034-P1 合入后，先把【待补】改成钉死句再跑完整 E1/E2；未合入时只允许诚实空态扩展，不允许假已开通。
+**DQ 审路径**：本文件 + 两周日切片 D6～D8 + 验收句 E1–E4、E36-6。通过后交老板 / 后端岗 / 前端岗 Mac 粘贴③开跑。CT-035 与 CT-034-P1 合入后，先把【待补】改成钉死句再跑完整 E1/E2；未合入时只允许诚实空态扩展，不允许假已开通。
+
+## 附录 · 【待补-演示包】
+
+产品稍后钉文件名/路径。
