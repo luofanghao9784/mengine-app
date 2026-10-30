@@ -1,6 +1,12 @@
 # CT-043 工作台「质量检查」最小提交（E2）
 
-状态：架构已裁可跑 · 待 docs 入库后交老板 Mac Codex　｜　**正式岗** id=`ec838a2d-d838-48cd-a789-e1af1424a7f3`（勿派重复岗）　｜　分支：`codex/ct-043-workspace-quality-check-min-submit`　｜　**审查人（实现 PR 后）：发布验收 + 质量性能 + 架构逻辑 + 安全审查**　｜　基准：切单时最新 `origin/main`（须含 tip `ea6e827` / [#38](https://github.com/luofanghao9784/mengine-app/pull/38) CT-040 实现；其前含 CT-042 执行单 `23da838` / [#37](https://github.com/luofanghao9784/mengine-app/pull/37)、CT-041 执行单 `a514be5` / [#36](https://github.com/luofanghao9784/mengine-app/pull/36)、#35 接真 `7fa4946`、CT-039 实现 `701c3ca` / [#31](https://github.com/luofanghao9784/mengine-app/pull/31)、CT-034-A 实现 `75ab17a` / #30、空态壳 `#25` / `7e21bc0`）
+> **拆子单（2026-10-30）**：本文件是前端 + e2e 总单。禁止改 `apps/api`、契约、迁移，禁止新增 qualityops 类。**后端部分由 [CT-043-A](CT-043-A-quality-check-submit-api.md) 放开，范围见 A。** 接线与 e2e 见 [CT-043-B](CT-043-B-workspace-submit-result.md)。不单列 C。A 与 B 写在同一个文档 PR；实现上 B 可按契约并行开发，**A 先合再合 B**。
+>
+> #41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。#41 `348cafc` 之后企业读口真读授权表，第四端开通后工作台会显示三步。
+>
+> **硬性**：A/B 合入前，提交按钮保持灰色，并保留人话原因。现句「暂时不能提交检查材料（执行服务尚未接通）」可继续用。禁假提交、禁假结果。下面的 fail-closed 提示词不要再开跑去接 API。
+
+状态：总单封存为灰钮 · 实现走 A/B · 架构已裁可跑 · 待 docs 入库后交老板 Mac Codex　｜　**正式岗** id=`ec838a2d-d838-48cd-a789-e1af1424a7f3`（勿派重复岗）　｜　分支：`codex/ct-043-workspace-quality-check-min-submit`　｜　**审查人（实现 PR 后）：发布验收 + 质量性能 + 架构逻辑 + 安全审查**　｜　基准：切单时最新 `origin/main`（须含 tip `ea6e827` / [#38](https://github.com/luofanghao9784/mengine-app/pull/38) CT-040 实现；其前含 CT-042 执行单 `23da838` / [#37](https://github.com/luofanghao9784/mengine-app/pull/37)、CT-041 执行单 `a514be5` / [#36](https://github.com/luofanghao9784/mengine-app/pull/36)、#35 接真 `7fa4946`、CT-039 实现 `701c3ca` / [#31](https://github.com/luofanghao9784/mengine-app/pull/31)、CT-034-A 实现 `75ab17a` / #30、空态壳 `#25` / `7e21bc0`）
 
 > **日切片：D6～D8 / 可演示点**：员工打开 `/workspace/#tenant=<企业ID>&view=quality-check`。三步都在：进入（#35 已接）→ 提交检查材料 → 处理结果。提交口是【待补-提交口】，本单 **fail closed**：未开通则人话拒绝，不落材料；读口里已有「质量检查」时，按钮仍不可点，结果区仍是诚实空态。禁止「检查通过」，禁止假 Live。  
 > **挂靠**：两周日切片·轨 B。验收句 **E2**（[两周主路径验收句](https://www.notion.so/40966c386fbf81ad97cff544bc2906ff)）。不是开通写（[CT-040](CT-040-agent-admin-grant-tenant-opened.md)，实现已合），不是开通按钮（[CT-042](CT-042-agent-admin-grant-tenant-button.md)），不是读口换源（[CT-041](CT-041-catalog-read-from-tenant-grants.md)），不是现网冒烟（CT-037）。`docs/codex-tasks/两周日切片-三轨并行-20261031.md`。  
@@ -11,16 +17,16 @@
 
 - 现页已钉：`src/identity/QualityCheck.tsx`。hash `qualityCheckHref` = `#tenant=<企业ID>&view=quality-check`。工作台入口在 `src/identity/AccessApp.tsx`（`view=quality-check`）。样式 `src/identity/quality-check.css`。三步标题：「① 进入说明」「② 提交检查材料」「③ 处理结果」。按钮文案「提交检查材料」，今日 `disabled`
 - 进入已接：#35 / `7fa4946`。读函数 `src/admin/openedCapabilities.ts` 的 `readOpenedCapabilities`，只 `GET /api/tenant-admin/v1/opened-capabilities`。空态壳 [#25](https://github.com/luofanghao9784/mengine-app/pull/25) / `7e21bc0`。专项 `tests/e2e/ct036-empty-shell.spec.ts`
-- 前门闸：[`CT-039-tenant-opened-capabilities-readonly.md`](CT-039-tenant-opened-capabilities-readonly.md)（实现 `701c3ca` / #31）。path `GET /api/tenant-admin/v1/opened-capabilities`，operationId `listOpenedCapabilities`。控制器 `com.dreamcore.workspace.qualityops.OpenedCapabilitiesController`，只调用 `com.dreamcore.workspace.capability.registry.CapabilityCatalogPort#listOpenedCapabilities(UUID)`。生产类今日仍是 `com.dreamcore.workspace.capability.adapter.EmptyCapabilityCatalogAdapter`（恒空）
+- 前门闸：[`CT-039-tenant-opened-capabilities-readonly.md`](CT-039-tenant-opened-capabilities-readonly.md)（实现 `701c3ca` / #31）。path `GET /api/tenant-admin/v1/opened-capabilities`，operationId `listOpenedCapabilities`。控制器 `com.dreamcore.workspace.qualityops.OpenedCapabilitiesController`，只调用 `com.dreamcore.workspace.capability.registry.CapabilityCatalogPort#listOpenedCapabilities(UUID)`。#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。第四端开通后，工作台读口会列出「质量检查」并显示三步
 - 开通写已合，本单不调用：[`CT-040-agent-admin-grant-tenant-opened.md`](CT-040-agent-admin-grant-tenant-opened.md)。**实现已合** `ea6e827` / #38。`POST /api/agent-admin/v1/tenants/{tenantId}/grants` 在 `agentadmin.CapabilityTenantGrantController`。表 `qo_capability_tenant_grant`，迁移 `V193__qo_capability_tenant_grant.sql`。GET list 仍无控制器
-- 读口换源未合：[`CT-041-catalog-read-from-tenant-grants.md`](CT-041-catalog-read-from-tenant-grants.md)（执行单 `a514be5` / #36）。`GrantCatalogAdapter` **尚未**替换 Empty adapter。授权行还不会出现在企业读口上
+- 读口换源已合：[`CT-041-catalog-read-from-tenant-grants.md`](CT-041-catalog-read-from-tenant-grants.md)。#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删
 - 开通按钮不是本单：[`CT-042-agent-admin-grant-tenant-button.md`](CT-042-agent-admin-grant-tenant-button.md)（执行单 `23da838` / #37）。第四端 `#view=capability-registry&tab=grants`
 - ADR-B8 **R-B8-2**：`docs/architecture/backend-v0/ADR-B8-第四端边界-统一agent管理平台.md`。`qualityops` 只经 `CapabilityCatalogPort`，不得依赖 `agentregistry` / `agentadmin`，不得 SQL 授权表或登记表
 - 文案：[《全端文案规范》](https://www.notion.so/40966c386fbf8120aaefc0290f9dedb8)、[去黑话对照](https://app.notion.com/p/40966c386fbf81f3a2e3e1822ae6a9b9)、[体验落部 · UX](https://app.notion.com/p/40966c386fbf8142b0bbcb16d1876e8f)。QUEUE「编制·前端开发」硬性第 6 条：可见文案禁止裸用 `seed` / `capability` / `Capability` / `Grant` / `admission`
 
 > **脚注（CT-040 实现已合）**：开通写实现已合 main `ea6e827` / [#38](https://github.com/luofanghao9784/mengine-app/pull/38)。表与 POST 都在 `agentadmin`。本单不调用该 POST，不改该控制器，不改 V193，不把开通写当成质量检查提交。  
 > **脚注（【待补-提交口】）**：2026-10-30 对照 `ea6e827` 查仓。能钉的只有现页 path（见下「页 path」）。下列都**不能**当成本单提交口：`contracts/public-api/check-flow-config.openapi.json` 是流程配置骨架；`quality-check-run.openapi.json` 是 tenant 侧 `CheckDebugRun` 骨架（`createCheckDebugRun`）；`check-run-log.openapi.json` 的 `POST /api/tenant-admin/v1/quality-ops/check-tasks`（`createCheckTask`）描述为「骨架占位 · 未实现」，必填是 `inputVersionId`、`configVersionId`、`executionMode`，没有材料字段。三份契约 `info.description` 均写「骨架 · 后端未实现 · 勿当 Live」。`apps/api/src/main` 无这些 operation 的 Java 控制器。`data-version-readonly` 是员工只读，不得当提交。因此提交口标 **【待补-提交口】**，**fail closed**。禁止新造返回「检查通过」、201 成功或假 Live 的 API。  
-> **脚注（前门闸）**：放行只认 `GET /api/tenant-admin/v1/opened-capabilities` 的 `items` 里有 `enterpriseFunction=quality-check`。该读口经 `CapabilityCatalogPort`。CT-041 实现未合，生产 adapter 仍恒为空：即使库里已有授权行，读口仍是 200 且 `items` 为 `[]`。这时必须当未开通，人话拒绝，不落材料。禁止前端或 `qualityops` 直读 `qo_capability_tenant_grant` / `qo_capability` 来放行。
+> **脚注（前门闸）**：放行只认 `GET /api/tenant-admin/v1/opened-capabilities` 的 `items` 里有 `enterpriseFunction=quality-check`。该读口经 `CapabilityCatalogPort`。#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。第四端开通后工作台会显示三步。禁止前端或 `qualityops` 直读 `qo_capability_tenant_grant` / `qo_capability` 来放行。A/B 合入前按钮保持灰色。
 
 ### 架构已裁
 
@@ -33,7 +39,7 @@
    - `POST /api/agent-admin/v1/capabilities`
    - 任何新的 `/api/v1/**`、`/api/tenant-admin/**`、`/api/workspace/**` 质量检查提交
    不新增文件选择，不 `FormData`，不把材料写入 `localStorage` / 内存名单。按钮保持 `disabled`。已开通时可见句保持：「暂时不能提交检查材料（执行服务尚未接通）」「暂时不能查看处理结果（执行服务尚未接通）」。说明句保持：「材料提交与结果读取尚未接通。」
-3. **前门闸只走读口。** 未登录沿用现登录墙。读口失败沿用 `openedCapabilitiesFailureTitle`。`items` 不含 `quality-check`（含 `[]`、只有别的功能）→ 现句「本企业尚未开通此 AI 功能」与「请联系企业管理员确认，开通后再进入。」不渲染提交按钮，不落材料。`items` 含 `quality-check` 只表示可以**看见**这三步，不表示可以提交成功。真名单要等 CT-041 换掉 Empty adapter；未换之前空列表就是诚实失败，不要改成已开通。
+3. **前门闸只走读口。** 未登录沿用现登录墙。读口失败沿用 `openedCapabilitiesFailureTitle`。`items` 不含 `quality-check`（含 `[]`、只有别的功能）→ 现句「本企业尚未开通此 AI 功能」与「请联系企业管理员确认，开通后再进入。」不渲染提交按钮，不落材料。`items` 含 `quality-check` 只表示可以**看见**这三步。#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。第四端开通后工作台会显示三步。A/B 合入前按钮保持灰色，禁假提交、禁假结果。
 4. **R-B8-2。** 本单不新增 `qualityops` 类。若 diff 碰到该包：只许经已有 `CapabilityCatalogPort`，禁止 `import` `agentadmin` / `agentregistry`，禁止 SQL `qo_capability`、`qo_capability_tenant_grant`、`qo_module_version`、`qo_admission_test_record`。禁止把授权表读进工作台。
 5. **禁假成功。** 界面不得出现「检查通过」「已提交」「处理完成」「Live」。不得把骨架 501、空列表、开通 POST 的 201 说成检查完成。不得 toast。结果区保持诚实空态，不插入结果行。
 6. **非范围。** 开通写（CT-040，已合，勿改）、开通按钮（CT-042）、CT-041 换 adapter、grants GET、登记 POST、parser / engine 大改、模块版本、假演示包上传、精致结果页。
@@ -76,7 +82,8 @@ git merge-base --is-ancestor ea6e827 HEAD || { echo 'ERROR: main 不含 CT-040 �
 git merge-base --is-ancestor 23da838 HEAD || { echo 'ERROR: main 不含 CT-042 执行单，停'; exit 1; }
 git merge-base --is-ancestor 7fa4946 HEAD || { echo 'ERROR: main 不含 #35 接真，停'; exit 1; }
 test -f src/identity/QualityCheck.tsx || { echo 'ERROR: 找不到质量检查现页，停'; exit 1; }
-test -f apps/api/src/main/java/com/dreamcore/workspace/capability/adapter/EmptyCapabilityCatalogAdapter.java || { echo 'ERROR: Empty adapter 不在，停，问 DQ（不要改去直读授权表）'; exit 1; }
+test -f apps/api/src/main/java/com/dreamcore/workspace/capability/adapter/GrantCatalogAdapter.java || { echo 'ERROR: GrantCatalogAdapter 不在，停'; exit 1; }
+echo 'OK: #41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删'
 git grep -n "createCheckTask\|createCheckDebugRun" -- apps/api/src/main '*.java' && { echo 'ERROR: 骨架已被实现，停，问 DQ。禁止把该 path 接成检查通过'; exit 1; }
 echo 'OK: 无检查任务/调试 Java 控制器，提交口维持【待补-提交口】'
 git switch -c codex/ct-043-workspace-quality-check-min-submit
@@ -97,8 +104,8 @@ git switch -c codex/ct-043-workspace-quality-check-min-submit
 【已裁】
 1. 页 path 只许 /workspace/#tenant=<企业ID>&view=quality-check。三步标题保持「① 进入说明」「② 提交检查材料」「③ 处理结果」。不新页面，不换肤，不复用 admin/governance。
 2. 提交口是【待补-提交口】，fail closed。不要实现或调用 POST /api/tenant-admin/v1/quality-ops/check-tasks、check-debug-runs、config-versions，不要调用 POST /api/agent-admin/v1/tenants/{tenantId}/grants，不要新造提交 API。这些骨架的 200/201/501 都不是提交成功。不要文件选择，不要 FormData，不要 localStorage。按钮保持 disabled。
-3. 前门闸只认 GET /api/tenant-admin/v1/opened-capabilities（CapabilityCatalogPort）。items 不含 quality-check：显示「本企业尚未开通此 AI 功能」，不渲染「提交检查材料」按钮，不落材料。items 含 quality-check：只显示三步，按钮仍禁用，旁句整句「暂时不能提交检查材料（执行服务尚未接通）」，结果整句「暂时不能查看处理结果（执行服务尚未接通）」。生产 EmptyCapabilityCatalogAdapter 仍会给出空列表；空列表就是未开通。不要直读 qo_capability_tenant_grant 或 qo_capability。
-4. 不要新增 qualityops 类。不要 import agentadmin 或 agentregistry。不要 SQL 授权表或登记表。不要改 OpenedCapabilitiesController、CapabilityCatalogPort、EmptyCapabilityCatalogAdapter。
+3. 前门闸只认 GET /api/tenant-admin/v1/opened-capabilities（CapabilityCatalogPort）。items 不含 quality-check：显示「本企业尚未开通此 AI 功能」，不渲染「提交检查材料」按钮，不落材料。items 含 quality-check：只显示三步，按钮仍禁用，旁句整句「暂时不能提交检查材料（执行服务尚未接通）」，结果整句「暂时不能查看处理结果（执行服务尚未接通）」。#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。第四端开通后才会出现三步。不要直读 qo_capability_tenant_grant 或 qo_capability。A/B 合入前按钮保持灰色，人话继续用「暂时不能提交检查材料（执行服务尚未接通）」。禁假提交、禁假结果。
+4. 本总单不要新增 qualityops 类。后端部分由 CT-043-A 子单放开，范围见 A。不要 import agentadmin 或 agentregistry。不要 SQL 授权表或登记表。不要改 OpenedCapabilitiesController、CapabilityCatalogPort、GrantCatalogAdapter。
 5. 禁止「检查通过」「已提交」「处理完成」「Live」和 toast。不要插入结果行。
 6. 非范围：开通写、开通按钮、CT-041、grants GET、登记 POST、parser、engine、契约、迁移。
 
@@ -143,7 +150,7 @@ test(workspace): CT-043 质量检查提交保持诚实空态
 读口已含质量检查时按钮仍不可用，不显示检查通过。
 EOM
 )"
-git push -u origin codex/ct-043-workspace-quality-check-min-submit
+git -c http.proxy= -c https.proxy= push origin codex/ct-043-workspace-quality-check-min-submit
 gh pr create -R luofanghao9784/mengine-app --base main --head codex/ct-043-workspace-quality-check-min-submit \
   --title "test(workspace): CT-043 质量检查最小提交诚实空态" \
   --body "## 摘要
@@ -190,7 +197,7 @@ E2 的提交与结果。不是 CT-040 开通写，不是 CT-042 开通按钮，�
 | 有暂停令 | 不开 Codex；问 DQ |
 | main 不含 `ea6e827` | 停；先拉含 CT-040 实现的 main。拉到之后仍然不要调用开通 POST |
 | Java 里出现 `createCheckTask` 或 `createCheckDebugRun` | 停，问 DQ。不要接成检查通过 |
-| Empty adapter 文件不在 | 停，问 DQ。不要改成直读 `qo_capability_tenant_grant` |
+| 看不到 GrantCatalogAdapter | 停。#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。不要改成直读 `qo_capability_tenant_grant` |
 | 界面出现「检查通过」或按钮可点并发出 POST | **打回** |
 | 未开通仍上传或写入材料 | **打回** |
 | 用开通 201 或骨架 501 当检查完成 | **打回** |
@@ -201,7 +208,7 @@ E2 的提交与结果。不是 CT-040 开通写，不是 CT-042 开通按钮，�
 
 **硬禁止**：
 
-- 新造或接通一个会返回成功的质量检查提交 API
+- 本总单新造提交 API。后端 `createCheckTask` 只由 CT-043-A 放开。A/B 合入前按钮保持灰色，人话继续用「暂时不能提交检查材料（执行服务尚未接通）」。禁假提交、禁假结果
 - 未开通时落材料；已开通时显示「检查通过」或假 Live
 - 直读 `qo_capability_tenant_grant` / `qo_capability` 绕过 `opened-capabilities` 与 `CapabilityCatalogPort`
 - 把本单做成 CT-040 开通写、CT-042 开通按钮或 CT-041 换 adapter
