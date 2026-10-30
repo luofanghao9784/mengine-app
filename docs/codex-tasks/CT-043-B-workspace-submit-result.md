@@ -14,7 +14,7 @@
 2. **材料传法。** 纯文本 JSON。文本框要计字，超长或空白则禁提交、不发请求。不做文件上传、multipart、进度条、取消。文件约束本片 = 无文件。
 3. **成功判定。** 只认 HTTP 201，且同时有 `taskId`（uuid 字符串）、`status==="COMPLETED"`、`result.verdict` 为 `NO_ISSUES` 或 `ISSUES_FOUND`、`result.issues` 为数组且每项有非空 `message`。`ISSUES_FOUND` 必须 `issues.length>0`；`NO_ISSUES` 必须 `issues.length===0`。缺任一按失败处理，不显示结论。人话：`NO_ISSUES`「没有发现需要注意的地方」；`ISSUES_FOUND`「发现 N 处需要注意」，其下按 `issues` 原文顺序逐条列出 `message`，不改写、不截断。N 等于 `issues.length`，用阿拉伯数字。禁用「检查通过」。
 4. **结果读法。** 只使用这一次 201。不 GET，不轮询，不听事件流。不写入 `localStorage`。刷新后结果区回到未提交，不保留历史。
-5. **失败态（均不显示任何结论）。** 400 →「内容不符合要求」。401 →「请重新登录后再试」。403 且 `code===CAPABILITY_NOT_OPENED` →「贵企业还没开通「质量检查」，请联系平台管理员开通」。403 且 `code===ACCESS_DENIED` →「请刷新页面后再试」。404 → 不显示结论（多企业沿用读口失败的现有人话，不新造「检查通过」）。503、超时或网络失败 →「质量检查暂时不可用，请稍后再试」。
+5. **失败态（均不显示任何结论）。** 400 →「内容不符合要求」。401，以及没有客户会话时的 403：都引导重新登录或刷新（「请重新登录后再试」或「请刷新页面后再试」）。403 且 `code===CAPABILITY_NOT_OPENED` →「贵企业还没开通「质量检查」，请联系平台管理员开通」。已登录但 CSRF 失败的 403 `ACCESS_DENIED` →「请刷新页面后再试」。404 → 不显示结论（多企业沿用读口失败的现有人话，不新造「检查通过」）。503、超时或网络错误 →「质量检查暂时不可用，请稍后再试」。第四端登录链的既有文案不在本单。
 6. **会话。** 只认 `DREAMCORE_SESSION`。前端不传 `tenantId`。CSRF 由 `createIdentityRequest` 自己带。超时把 `withTimeout(signal, 10_000)` 传进 `createIdentityRequest` 的 signal（#46，`src/shared/abort-timeout.ts`）。不要 `FormData`。
 7. **门闸。** 页面按读口决定出不出表单，这只是体验。安全边界在后端每次提交重验 `CapabilityCatalogPort`。前端不得自己判断已开通后假装 201。
 
@@ -78,7 +78,7 @@ git switch -c codex/ct-043-b-workspace-submit-result
 3. AccessApp.tsx 只把已有 tenant 或 opened 透传给 QualityCheck。不改 hash 路由，不改 view 分支。
 4. 201 缺 taskId、status!==COMPLETED、verdict 不是那两个、issues 形状不对、或 ISSUES_FOUND 但 issues 为空：当失败，不显示结论。
 5. NO_ISSUES 显示「没有发现需要注意的地方」。ISSUES_FOUND 显示「发现 N 处需要注意」，下面按 issues 原文顺序逐条列出 message，不改写、不截断。N 为条数，阿拉伯数字。
-6. 400「内容不符合要求」。401「请重新登录后再试」。403 CAPABILITY_NOT_OPENED 用未开通那句。403 ACCESS_DENIED「请刷新页面后再试」。503 或超时「质量检查暂时不可用，请稍后再试」。这些都不显示结论。
+6. 400「内容不符合要求」。401，以及没有客户会话时的 403，都引导重新登录或刷新（「请重新登录后再试」或「请刷新页面后再试」），不显示结论。403 CAPABILITY_NOT_OPENED 用未开通那句。已登录但 CSRF 失败的 403 ACCESS_DENIED 仍是「请刷新页面后再试」。503 或超时「质量检查暂时不可用，请稍后再试」。这些都不显示结论。不要改第四端登录链的文案。
 7. 不 localStorage。刷新后不留上一次结论。
 8. e2e：tests/e2e/ct043-quality-check-submit.spec.ts，可复用 ct036 夹具。覆盖未开通无按钮、成功只认合同字段、失败人话、全文无「检查通过」。拦截若把某字段拿掉，页面不得显示结论。发现问题一例：输入「问题：尺寸超差」，201 为 ISSUES_FOUND 且 message 为「尺寸超差」，页面显示「发现 1 处需要注意」，其下原文「尺寸超差」。没有问题一例：输入「本批记录完整。」，201 为 NO_ISSUES 且 issues 为空，页面显示「没有发现需要注意的地方」，不出现「发现 1 处需要注意」。同一 PR 只按执行单「ct036 只改这两类断言」改 tests/e2e/ct036-empty-shell.spec.ts。
 
@@ -129,7 +129,7 @@ git -c http.proxy= -c https.proxy= push origin codex/ct-043-b-workspace-submit-r
 | B3 | 201 合同齐全且 `ISSUES_FOUND` →「发现 N 处需要注意」，其下按原文顺序逐条列出 `message`，不改写、不截断 |
 | B4 | `NO_ISSUES` →「没有发现需要注意的地方」 |
 | B5 | 缺任一合同字段 → 失败，无结论 |
-| B6 | 400/401/403/404/503 各自人话，无结论 |
+| B6 | 400、401、未开通 403、已登录 CSRF 403、404、503 各自人话且无结论。401 与没有客户会话时的 403 都引导重新登录或刷新 |
 | B7 | 全文无「检查通过」，无裸 `capability` / `Grant` / `seed` / `admission` |
 | B8 | 刷新不留历史。AccessApp 路由未改 |
 | B9 | 客户端用了 `createIdentityRequest` 与 `withTimeout` |
@@ -138,7 +138,7 @@ git -c http.proxy= -c https.proxy= push origin codex/ct-043-b-workspace-submit-r
 
 ## ⑦ 禁止操作
 
-**硬禁止**：前端闸不是安全边界；未开通必须是指定人话且无按钮；禁 import `agentadmin`；禁读写登记/授权表；禁第四端 grants；禁传 `tenantId`；禁企业自助开通；禁 StubSecurity；401 显示「请重新登录后再试」而不是已提交；CSRF 403 显示「请刷新页面后再试」，不得画成成功；失败与缺字段都不显示结论；禁「检查通过」；文案守《全端文案规范》https://www.notion.so/40966c386fbf8120aaefc0290f9dedb8 、去黑话 https://app.notion.com/p/40966c386fbf81f3a2e3e1822ae6a9b9 、QUEUE 硬性第 6 条；禁改 `apps/api`、契约、迁移；禁在 A 合入前把本单并进 main；推送只用 `git -c http.proxy= -c https.proxy= push origin <branch>`；禁 force push、直推 main、口令入库。
+**硬禁止**：前端闸不是安全边界；未开通必须是指定人话且无按钮；禁 import `agentadmin`；禁读写登记/授权表；禁第四端 grants；禁传 `tenantId`；禁企业自助开通；禁 StubSecurity；401 和没有客户会话时的 403 都引导重新登录或刷新，不得画成已提交；已登录的 CSRF 403 仍显示「请刷新页面后再试」，不得画成成功；失败与缺字段都不显示结论；禁「检查通过」；文案守《全端文案规范》https://www.notion.so/40966c386fbf8120aaefc0290f9dedb8 、去黑话 https://app.notion.com/p/40966c386fbf81f3a2e3e1822ae6a9b9 、QUEUE 硬性第 6 条；禁改 `apps/api`、契约、迁移；禁在 A 合入前把本单并进 main；推送只用 `git -c http.proxy= -c https.proxy= push origin <branch>`；禁 force push、直推 main、口令入库。
 
 ### 依赖与并行
 

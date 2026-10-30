@@ -171,5 +171,6 @@
 | CT-043-A | E2 后端 createCheckTask | **子号，不占新主号** → [`CT-043-A-quality-check-submit-api.md`](CT-043-A-quality-check-submit-api.md)。`POST /api/tenant-admin/v1/quality-ops/check-tasks`。201 含 `taskId`、`status=COMPLETED`、`result.verdict`。开通只问 `CapabilityCatalogPort`。白名单外禁改。与 B 可并行开发，**先合 A** |
 | CT-043-B | E2 前端接线 | **子号，不占新主号** → [`CT-043-B-workspace-submit-result.md`](CT-043-B-workspace-submit-result.md)。`QualityCheck.tsx` + `quality-check-client.ts`。`createIdentityRequest` + #46 `withTimeout`。文案引《全端文案规范》、去黑话页、硬性第 6 条。**A 先合再合 B**。不单列 C |
 | 记债 | CT-043 后移 | 版本化材料/配置（inputVersionId/configVersionId）后移。文件上传、进度条、取消后移。刷新后保留历史后移（本片无 GET）。文件约束本片=无文件 |
+| 记债 | 客户链会话先于 CSRF | 客户链先查会话再查 CSRF——安全小单，排在 #49 之后，不挡 #49 |
 | CT-044 | 第四端列出已登记平台目录（只读） | **执行单本 PR** → [`CT-044-agent-admin-list-capabilities-readonly.md`](CT-044-agent-admin-list-capabilities-readonly.md)。**CT-044 = 目录只读**。`GET /api/agent-admin/v1/capabilities` · `listCapabilities`。只读 `qo_capability`（无 `tenant_id`）。空目录 200，body 为 `[]`。不是开通写，不是 grants GET，不是企业读口 CT-039。**CT-040 实现已合** `ea6e827` / #38。**CT-041 执行单已合** `a514be5` / #36；#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。`qualityops` 不得读目录表 |
 

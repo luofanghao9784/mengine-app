@@ -2,7 +2,7 @@
 
 状态：架构已裁可跑 · 待 docs 入库后交老板 Mac Codex　｜　分支：`codex/ct-043-a-quality-check-submit-api`　｜　**审查人：架构逻辑 + 安全审查 + 质量性能**　｜　基准：`b5c3ab8329b5826735e080b62d1ddff0a097b939`（[#46](https://github.com/luofanghao9784/mengine-app/pull/46)，含已知 `127efe6` / #45、#44 `0f02e83b`、#42 `f8908cdc`、#41 `348cafc4`、#39 `bbd0c605`）
 
-> **日切片：D6～D8 / 可演示点**：企业会话已开通「质量检查」时，`POST /api/tenant-admin/v1/quality-ops/check-tasks` 返回 **201**，`status=COMPLETED`，`result.verdict` 为 `NO_ISSUES` 或 `ISSUES_FOUND`。材料「问题：尺寸超差」得到 `ISSUES_FOUND` 且 `issues` 非空。未开通 **403** 不写库。端口或引擎失败 **503** 不写库、不返回结论。无会话 **401** 先于 CSRF **403**。  
+> **日切片：D6～D8 / 可演示点**：企业会话已开通「质量检查」时，`POST /api/tenant-admin/v1/quality-ops/check-tasks` 返回 **201**，`status=COMPLETED`，`result.verdict` 为 `NO_ISSUES` 或 `ISSUES_FOUND`。材料「问题：尺寸超差」得到 `ISSUES_FOUND` 且 `issues` 非空。未开通 **403** 不写库。端口或引擎失败 **503** 不写库、不返回结论。匿名且不带 CSRF 的写返回 **401 或 403**，不写库、不返回结论。匿名但带有效 CSRF 的写必须 **401**。  
 > **挂靠**：两周日切片·轨 A。父单 [`CT-043-workspace-quality-check-min-submit.md`](CT-043-workspace-quality-check-min-submit.md) 仍禁碰后端。**后端由本子单放开，只许白名单。** 前端 [`CT-043-B-workspace-submit-result.md`](CT-043-B-workspace-submit-result.md) 可按下面「契约钉死」并行开发，**本单先合，B 再合**。两单在同一个文档 PR 里。不单列 C。  
 > 模型 `gpt-6.1-sol`，思考强度 **high**（本机 `gpt-5.1-codex` 亦可）。仓 `luofanghao9784/mengine-app`。
 
@@ -14,7 +14,7 @@
 2. **材料传法。** 只收纯文本 JSON。不做文件上传，不做 multipart，不复用 material 上传。**文件约束本片 = 无文件。** 文件上传、进度条、取消记债后移。
 3. **成功判定。** HTTP **201**。必须字段：`taskId`（uuid）、`status` 等于 `"COMPLETED"`、`result.verdict` 为 `"NO_ISSUES"` 或 `"ISSUES_FOUND"`、`result.issues` 为 `[{message}]`。`ISSUES_FOUND` 时 `issues` 非空；`NO_ISSUES` 时 `issues` 为 `[]`。缺任一字段不是成功。人话由前端映射：`NO_ISSUES`「没有发现需要注意的地方」；`ISSUES_FOUND`「发现 N 处需要注意」，其下按 `issues` 原文顺序逐条列出 `message`，不改写、不截断。N 为 `issues.length` 的阿拉伯数字。禁用词样「检查通过」。
 4. **结果读法。** 结论只在这一次 201 响应体里。本片无 GET、无轮询、无事件流。刷新页面后不保留历史（记债）。
-5. **失败态（都不写库，响应与页面都不带结论）。** 400 校验 →「内容不符合要求」。401 → 页面「请重新登录后再试」（接口体仍是客户域现文案「请求未获授权。」，`code=AUTHENTICATION_REQUIRED`）。403 `CAPABILITY_NOT_OPENED` →「贵企业还没开通「质量检查」，请联系平台管理员开通」。403 CSRF（`ACCESS_DENIED`）→ 页面「请刷新页面后再试」。404 多企业或定不出唯一 ACTIVE 企业：沿用 `OpenedCapabilitiesController` 今日 404。503 或超时 →「质量检查暂时不可用，请稍后再试」。未开通不得用 501、409 或 503。
+5. **失败态（都不写库，响应与页面都不带结论）。** 400 校验 →「内容不符合要求」。匿名且不带 CSRF 的写：状态码 **401 或 403** 均可，响应体无 `result`、无 `verdict`。匿名但带有效 CSRF（先 `GET /api/v1/auth/csrf` 拿到 token 和对应 cookie，再 POST 本接口）：必须严格 **401**，响应体无 `result`、无 `verdict`；实测不是 401 就停下来报，不得改 `IdentitySecurity`。401 的接口体仍是客户域现文案「请求未获授权。」，`code=AUTHENTICATION_REQUIRED`。页面上，401 和这种匿名 403 都引导重新登录或刷新。403 `CAPABILITY_NOT_OPENED` →「贵企业还没开通「质量检查」，请联系平台管理员开通」。已登录但 CSRF 不对 → 403 `ACCESS_DENIED`，页面「请刷新页面后再试」。404 多企业或定不出唯一 ACTIVE 企业：沿用 `OpenedCapabilitiesController` 今日 404。503 或超时 →「质量检查暂时不可用，请稍后再试」。未开通不得用 501、409 或 503。第四端 `AgentAdminSecurity` 的既有 401/403 口径不在本单，不要改。
 6. **会话。** 只认 `DREAMCORE_SESSION`。租户由会话 membership 决定，算法照 `OpenedCapabilitiesController`。前端不传 `tenantId`。提交带 CSRF。前端走 `createIdentityRequest`（`src/identity/client.ts`），超时用 #46 `withTimeout`（`src/shared/abort-timeout.ts`）。
 7. **门闸。** 后端每次提交都再调 `CapabilityCatalogPort.listOpenedCapabilities(tenantId)`。不含 `QUALITY_CHECK` 则 403，不写库。前端读口只是体验，不是安全边界。禁止直读 `qo_capability` / `qo_capability_tenant_grant`。禁止 import `agentadmin`。
 
@@ -41,7 +41,7 @@
 1. **规则。** 必须阅读 `materialText`。逐行 trim 后，以全角「问题：」或半角「问题:」开头，且冒号后再 trim 仍有非空白文字 → 一条 `message`（冒号后文字再 trim）。冒号后为空或只剩空白，不算问题。有至少一条 → `verdict=ISSUES_FOUND`。没有 → `verdict=NO_ISSUES` 且 `issues=[]`。禁止不读材料就返回 `NO_ISSUES`。禁止结论或 `message` 使用「检查通过」。
 2. **fail closed。** 端口抛错或超时、引擎抛错 → 503，不写库，body 无 `verdict`。先引擎成功再 INSERT。
 3. **表列。** `id`、`tenant_id`（会话）、`created_by`（会话账号）、`title`、`material_text`、`status`、`result_json`、`created_at`。成功时 `status=COMPLETED`。`result_json` 存 `result`。无登记表外键。
-4. **401 先于 CSRF。** 无会话 POST（无 CSRF 或乱 CSRF）→ 401。有会话无 CSRF → 403 `ACCESS_DENIED`。禁止 StubSecurity、`permitAll`、`csrf.disable()`。`IdentitySecurity` 不在白名单。匿名 POST 若现有链先 403，停，问 DQ，不要改 `IdentitySecurity`。
+4. **匿名写。** 客户链是 `IdentitySecurity` / `DREAMCORE_SESSION`。匿名且不带 CSRF：返回 401 或 403 均可，不写库，响应体无 `result`、无 `verdict`。匿名但带有效 CSRF：先 `GET /api/v1/auth/csrf` 取 token 与对应 cookie，再 POST `check-tasks`，必须严格 401，不写库，无结论；实测不是 401 就停下来报，不得改 `IdentitySecurity`。已登录但无 CSRF 仍是 403 `ACCESS_DENIED`。禁止 StubSecurity、`permitAll`、`csrf.disable()`。`IdentitySecurity` 仍不在白名单。不要把「匿名不带 CSRF 却先 403」当成停止条件。
 5. **非范围。** GET、轮询、文件、parser、外部模型、开通写、企业自助开通、第四端 grants。
 
 成功体：
@@ -89,11 +89,11 @@ git diff --name-only origin/main 只能落在白名单 9 个路径。
 端口或引擎异常 → 503「质量检查暂时不可用，请稍后再试」，不写库，body 无 verdict。
 400 一律「内容不符合要求」，含未知字段和 body 里的 tenantId。
 租户只从会话来，照 OpenedCapabilitiesController。多企业 404 沿用现控制器，不写库。
-无会话 POST → 401，先于 CSRF 403。有会话无 CSRF → 403 ACCESS_DENIED。禁止改 IdentitySecurity。做不到就停问 DQ。
+匿名且不带 CSRF 的 POST：状态码是 401 或 403，qo_check_task 无新增行，响应体无 result、无 verdict。匿名但带有效 CSRF（先 GET /api/v1/auth/csrf，再带 token 和对应 cookie POST）：必须 401，不写库，无结论；不是 401 就停下来报，禁止改 IdentitySecurity。已登录无 CSRF 仍是 403 ACCESS_DENIED。不要因为匿名不带 CSRF 先返回 403 而停。
 RuleQualityCheckEngine 必须读 materialText。全角「问题：尺寸超差」与半角「问题:尺寸超差」都是 ISSUES_FOUND，message 为「尺寸超差」。冒号后为空或只有空白（「问题：」「问题:   」）不算问题，verdict 为 NO_ISSUES 且 issues 为空。无问题行的「本批记录完整。」同样是 NO_ISSUES。禁止不读材料就 NO_ISSUES。禁止「检查通过」。
 表 qo_check_task 只列 id, tenant_id, created_by, title, material_text, status, result_json, created_at。迁移 V194（若 main 最大号已大于 193，用最大号+1，禁止 V192，禁止改 V190–V193）。
 QualityOpsBoundaryArchTest：qualityops 主源码无 agentadmin import，无 qo_capability 与 qo_capability_tenant_grant 字面量。
-CheckTaskIntegrationTest 覆盖：401、CSRF 403、未开通 403 且无行、已开通 201 且 tenant_id=会话租户、「问题：尺寸超差」与「问题:尺寸超差」都是 ISSUES_FOUND 且 message 为「尺寸超差」、「问题：」与「问题:   」以及「本批记录完整。」都是 NO_ISSUES 且 issues 为空、A 开通 B 未开通则 B 403、多企业 404、未知字段 400、body tenantId 400、端口抛错 503 无行、引擎抛错 503 无行。
+CheckTaskIntegrationTest 各加一个匿名用例：不带 CSRF 的 POST，状态码属于 {401,403}，qo_check_task 无新增行，响应体无 result、无 verdict；先 GET /api/v1/auth/csrf 再带该 token 与对应 cookie、仍不登录地 POST，状态码必须是 401，无新增行，无 result、无 verdict，不是 401 就停下来报且不得改 IdentitySecurity。另覆盖：已登录无 CSRF 为 403 ACCESS_DENIED 且无行、未开通 403 且无行、已开通 201 且 tenant_id=会话租户、「问题：尺寸超差」与「问题:尺寸超差」都是 ISSUES_FOUND 且 message 为「尺寸超差」、「问题：」与「问题:   」以及「本批记录完整。」都是 NO_ISSUES 且 issues 为空、A 开通 B 未开通则 B 403、多企业 404、未知字段 400、body tenantId 400、端口抛错 503 无行、引擎抛错 503 无行。
 命令：python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml test -Dtest=CheckTaskIntegrationTest,QualityOpsBoundaryArchTest,OpenedCapabilitiesIntegrationTest
 禁止 -DskipTests。禁止 StubSecurity。禁止第四端 grants。禁止企业自助开通。禁止改 src/**。
 
@@ -143,7 +143,7 @@ git -c http.proxy= -c https.proxy= push origin codex/ct-043-a-quality-check-subm
 | A3 | 「问题：尺寸超差」与「问题:尺寸超差」都 → `ISSUES_FOUND`，`message` 为「尺寸超差」 |
 | A4 | 「本批记录完整。」「问题：」「问题:   」都 → `NO_ISSUES` 且 `issues=[]`。与 A3 的 verdict 不同。源码不是不读材料就返回 |
 | A5 | 端口抛错、引擎抛错各自 503，无行，无 verdict |
-| A6 | 无会话 401 先于 CSRF 403。`IdentitySecurity` 无 diff |
+| A6 | 匿名不带 CSRF：状态码 ∈ {401,403}，`qo_check_task` 无新增行，响应体无 `result`、无 `verdict`。匿名带有效 CSRF：必须 401，同样不写库、无结论；不是 401 就停下来报。`IdentitySecurity` 无 diff |
 | A7 | 未知字段与 body `tenantId` 均为 400「内容不符合要求」，不写库 |
 | A8 | 多企业 404 不写库。B 未开通则 403，无 B 的行 |
 | A9 | 架构测试：无 agentadmin import，无授权/登记表 SQL |
@@ -159,10 +159,10 @@ git -c http.proxy= -c https.proxy= push origin codex/ct-043-a-quality-check-subm
 | 未开通仍插入，或用 501/409/503 表示未开通 | 打回 |
 | 故障仍 201 或带 verdict | 打回 |
 | 不读材料就 `NO_ISSUES` | 打回 |
-| 匿名 POST 先 403 | 停，问 DQ。禁止改 IdentitySecurity |
+| 匿名带有效 CSRF 的 POST 不是 401 | 停下来报。禁止改 IdentitySecurity |
 | 出现「检查通过」 | 打回 |
 
-**硬禁止**：门闸只经 `CapabilityCatalogPort`；禁直读 `qo_capability` / `qo_capability_tenant_grant`；禁 import `agentadmin`；禁 body `tenantId`；禁 StubSecurity；未登录写必须 401 先于 CSRF 403；禁第四端 grants；禁企业自助开通；禁改 `IdentitySecurity`、`AgentAdminSecurity`、`OpenedCapabilitiesController`、`CapabilityTenantGrant*`、`src/**`、V190–V193；禁恒通过；禁故障写库或返回结论；禁白名单外 `apps/api`；迁移以 main 实际最大号 + 1 为准（本基准 V194，V192 不用）；推送只用 `git -c http.proxy= -c https.proxy= push origin <branch>`；禁 force push、直推 main、口令入库。
+**硬禁止**：门闸只经 `CapabilityCatalogPort`；禁直读 `qo_capability` / `qo_capability_tenant_grant`；禁 import `agentadmin`；禁 body `tenantId`；禁 StubSecurity；匿名不带 CSRF 的写只要求 401 或 403 且不写库、无结论；匿名带有效 CSRF 的写必须 401，不是 401 就停下来报；禁第四端 grants；禁企业自助开通；禁改 `IdentitySecurity`、`AgentAdminSecurity`、`OpenedCapabilitiesController`、`CapabilityTenantGrant*`、`src/**`、V190–V193；禁恒通过；禁故障写库或返回结论；禁白名单外 `apps/api`；迁移以 main 实际最大号 + 1 为准（本基准 V194，V192 不用）；推送只用 `git -c http.proxy= -c https.proxy= push origin <branch>`；禁 force push、直推 main、口令入库。
 
 ### 依赖与并行
 
