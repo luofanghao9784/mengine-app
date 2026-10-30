@@ -11,7 +11,7 @@
 ### 契约钉死（A/B 共用）
 
 1. **提交口。** `POST /api/tenant-admin/v1/quality-ops/check-tasks`，operationId `createCheckTask`。body 只有 `materialText`（必填，1～20000）和可选 `title`（≤200）。`additionalProperties: false`。不传 `inputVersionId` / `configVersionId`。不传 `tenantId`。
-2. **材料传法。** 纯文本 JSON。文本框要计字，超长或空白则禁提交、不发请求。不做文件上传、multipart、进度条、取消。文件约束本片 = 无文件。
+2. **材料传法。** 纯文本 JSON。文本框要计字。文本框为空（含只有空白）就禁用「提交检查材料」，不发请求。超过 20000 字同样禁用、不发请求。输入非空白文字且未超长后，按钮才可用。不做文件上传、multipart、进度条、取消。文件约束本片 = 无文件。
 3. **成功判定。** 只认 HTTP 201，且同时有 `taskId`（uuid 字符串）、`status==="COMPLETED"`、`result.verdict` 为 `NO_ISSUES` 或 `ISSUES_FOUND`、`result.issues` 为数组且每项有非空 `message`。`ISSUES_FOUND` 必须 `issues.length>0`；`NO_ISSUES` 必须 `issues.length===0`。缺任一按失败处理，不显示结论。人话：`NO_ISSUES`「没有发现需要注意的地方」；`ISSUES_FOUND`「发现 N 处需要注意」，其下按 `issues` 原文顺序逐条列出 `message`，不改写、不截断。N 等于 `issues.length`，用阿拉伯数字。禁用「检查通过」。
 4. **结果读法。** 只使用这一次 201。不 GET，不轮询，不听事件流。不写入 `localStorage`。刷新后结果区回到未提交，不保留历史。
 5. **失败态（均不显示任何结论）。** 400 →「内容不符合要求」。401，以及没有客户会话时的 403：都引导重新登录或刷新（「请重新登录后再试」或「请刷新页面后再试」）。403 且 `code===CAPABILITY_NOT_OPENED` →「贵企业还没开通「质量检查」，请联系平台管理员开通」。已登录但 CSRF 失败的 403 `ACCESS_DENIED` →「请刷新页面后再试」。404 → 不显示结论（多企业沿用读口失败的现有人话，不新造「检查通过」）。503、超时或网络错误 →「质量检查暂时不可用，请稍后再试」。第四端登录链的既有文案不在本单。
@@ -34,7 +34,7 @@
 
 文件：`tests/e2e/ct036-empty-shell.spec.ts`。
 
-(a) 已开通时按钮禁用，以及「执行服务尚未接通」。只动第 83–85、92、121、193、230 行。读口含 `quality-check` 时，`toBeDisabled()` 改为 `toBeEnabled()`。第 84–85 行不再要求「暂时不能提交检查材料（执行服务尚未接通）」和「暂时不能查看处理结果（执行服务尚未接通）」可见，改为这两句 `toHaveCount(0)`。第 86 行「检查通过」数量为 0 不在此列，不得改。
+(a) 已开通时的按钮，以及「执行服务尚未接通」。只动第 83–85、92、121、193、230 行。读口含 `quality-check` 时，按钮断言改成两条：刚加载时文本框为空，按钮 `toBeDisabled()`；在文本框输入非空白文字后，按钮 `toBeEnabled()`。第 84–85 行不再要求「暂时不能提交检查材料（执行服务尚未接通）」和「暂时不能查看处理结果（执行服务尚未接通）」可见，改为这两句 `toHaveCount(0)`。第 86 行「检查通过」数量为 0 不在此列，不得改。
 
 (b) 未开通标题。只动第 169、201、234 行里的「本企业尚未开通此 AI 功能」，改为「贵企业还没开通「质量检查」，请联系平台管理员开通」。第 169 行三元表达式里 404/500 的标题不要改。
 
@@ -73,7 +73,7 @@ git switch -c codex/ct-043-b-workspace-submit-result
 禁止裸用 seed、capability、Capability、Grant、admission。禁止出现「检查通过」。
 
 【已裁】
-1. QualityCheck.tsx：读口不含 quality-check 时没有提交按钮，标题「贵企业还没开通「质量检查」，请联系平台管理员开通」。含 quality-check 时按钮可点。文本框计字。空白或超过 20000 字不发请求。可选标题超过 200 字不发请求。三态：提交中、成功、失败。结果区只显示当前这一条。
+1. QualityCheck.tsx：读口不含 quality-check 时没有提交按钮，标题「贵企业还没开通「质量检查」，请联系平台管理员开通」。含 quality-check 时显示文本框并计字。文本框为空（含只有空白）时「提交检查材料」禁用，不发请求；输入非空白文字且未超过 20000 字后按钮可用。可选标题超过 200 字不发请求。三态：提交中、成功、失败。结果区只显示当前这一条。
 2. 新文件 src/identity/quality-check-client.ts。用 createIdentityRequest 发 POST /api/tenant-admin/v1/quality-ops/check-tasks。signal 用 withTimeout(signal, 10_000)。body 只有 materialText 与可选 title。禁止 tenantId，禁止 FormData。
 3. AccessApp.tsx 只把已有 tenant 或 opened 透传给 QualityCheck。不改 hash 路由，不改 view 分支。
 4. 201 缺 taskId、status!==COMPLETED、verdict 不是那两个、issues 形状不对、或 ISSUES_FOUND 但 issues 为空：当失败，不显示结论。
@@ -125,7 +125,7 @@ git -c http.proxy= -c https.proxy= push origin codex/ct-043-b-workspace-submit-r
 | # | 标准 |
 |---|---|
 | B1 | 未开通无按钮，人话为指定未开通句，无 POST |
-| B2 | 已开通按钮可点。超长禁提交。body 无 `tenantId`，无文件 |
+| B2 | 已开通且文本框为空（含只有空白）时按钮禁用。输入非空白文字后按钮可用。超长禁提交。body 无 `tenantId`，无文件 |
 | B3 | 201 合同齐全且 `ISSUES_FOUND` →「发现 N 处需要注意」，其下按原文顺序逐条列出 `message`，不改写、不截断 |
 | B4 | `NO_ISSUES` →「没有发现需要注意的地方」 |
 | B5 | 缺任一合同字段 → 失败，无结论 |
