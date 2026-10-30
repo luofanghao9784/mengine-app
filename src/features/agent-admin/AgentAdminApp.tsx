@@ -5,6 +5,7 @@ import '../../admin/admin.css';
 import './agent-admin.css';
 import { agentRoute } from './routes';
 import { probeCapabilities } from './client';
+import { RegisterDialog } from './RegisterDialog';
 
 const functions = [
   ['document-parse', '文档解析', '将文档转为可用的结构化内容', '只读种子'],
@@ -19,6 +20,7 @@ export function AgentAdminApp() {
   const [collapsed, setCollapsed] = useState(false);
   const [connected, setConnected] = useState<boolean | null>(null);
   const route = agentRoute(hash);
+  const [registerOpen, setRegisterOpen] = useState(false);
   useEffect(() => {
     const changed = () => setHash(location.hash);
     window.addEventListener('hashchange', changed);
@@ -134,23 +136,63 @@ export function AgentAdminApp() {
                   </a>
                 ))}
               </nav>
-              <section className="admin-panel agent-empty">
-                <Boxes size={40} aria-hidden="true" />
-                <h2>{route.tab === 'catalog' ? '尚无可展示的能力实现' : '即将提供'}</h2>
-                <p>
-                  {route.tab === 'catalog'
-                    ? '连接独立管理后端后，可在这里查看模型能力与 Agent 实现。当前未加载登记列表。'
-                    : '版本与授权管理将在后续切片开放。'}
-                </p>
-                {route.tab === 'catalog' && (
-                  <>
-                    <button className="button primary" disabled aria-describedby="agent-write-note">
-                      登记第一个实现
-                    </button>
-                    <p id="agent-write-note">写入 API 待 CT-018 / PR 5b</p>
-                  </>
-                )}
-              </section>
+              {route.tab === 'catalog' ? (
+                <>
+                  <section aria-labelledby="agent-seeds-title" className="agent-catalog-section">
+                    <h2 id="agent-seeds-title">登记种子</h2>
+                    <p className="agent-intro">
+                      前端闭集说明卡，不代表 Live 已登记实现。首版仅开放质量检查的登记面板。
+                    </p>
+                    <div className="agent-functions">
+                      {[functions[2], functions[0], functions[1]].map(([id, title, description]) => (
+                        <section className="admin-panel agent-function" key={id}>
+                          <Puzzle size={22} aria-hidden="true" />
+                          <span
+                            className={`agent-badge ${id === 'quality-check' ? '' : 'agent-badge-readonly'}`}
+                          >
+                            {id === 'quality-check' ? '登记种子 · 可登记' : '只读种子'}
+                          </span>
+                          <h3>{title}</h3>
+                          <code>{id}</code>
+                          <p>{description}</p>
+                          {id === 'quality-check' ? (
+                            <button className="button primary" onClick={() => setRegisterOpen(true)}>
+                              从本种子登记
+                            </button>
+                          ) : (
+                            <small>仅供查看，暂不开放登记与编辑</small>
+                          )}
+                        </section>
+                      ))}
+                    </div>
+                  </section>
+                  <section className="agent-catalog-section" aria-labelledby="agent-live-title">
+                    <h2 id="agent-live-title">Live 已登记实现</h2>
+                    <div className="admin-panel agent-empty">
+                      <Boxes size={40} aria-hidden="true" />
+                      <h3>尚无 Live 已登记实现</h3>
+                      <p>
+                        {connected === null
+                          ? '正在探测后端连接，尚未加载登记列表。'
+                          : connected
+                            ? '只读接口已连接；列表契约待对接，当前无可安全展示的实现。'
+                            : '尚未连接后端或未登录，当前未加载登记列表。'}
+                      </p>
+                      <button className="button primary" onClick={() => setRegisterOpen(true)}>
+                        登记第一个实现
+                      </button>
+                      <p>仅打开登记面板；写 API 未就绪（CT-018）</p>
+                    </div>
+                  </section>
+                  <RegisterDialog open={registerOpen} onClose={() => setRegisterOpen(false)} />
+                </>
+              ) : (
+                <section className="admin-panel agent-empty">
+                  <Boxes size={40} aria-hidden="true" />
+                  <h2>即将提供</h2>
+                  <p>版本与授权管理将在后续切片开放。</p>
+                </section>
+              )}
             </>
           )}
         </main>
