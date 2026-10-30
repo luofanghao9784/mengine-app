@@ -146,5 +146,5 @@
 | CT-020-F2 | agent-admin 能力注册→主流程（F1 壳上 catalog 种子/空态+登记面板） | 执行单已合；**实现 #5/`fd99aba` 已合 main** |
 | CT-020-F3 | versions/grants 只读子视图 | **执行单本 PR**；#5 已合后可派实现 |
 | CT-031 | CT-013 五分片 OpenAPI 骨架落盘（并行轨②） | **执行单本 PR** |
-| CT-032 | CI spending 限额/告警（并行轨③） | **执行单本 PR** |
+| CT-032 | CI spending 限额/告警（并行轨③） | **落地文档本 PR** → [`ci-spending-limits-20261030.md`](ci-spending-limits-20261030.md)；Billing 待老板点按；自托管→CT-033 |
 
