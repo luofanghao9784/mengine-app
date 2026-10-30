@@ -2,6 +2,8 @@
 
 基线：origin/main `bbd0c60`（随 main 滚动）。已有 CT-000～005、007、008（执行单）；CT-006 为 Mac 预览落地。一单一 PR。实施计划：`/workspace/agent-tools/dreamcore-backend-impl-plan-v0/实施计划.md`；main 同步见 `docs/architecture/backend-v0/实施计划同步要点.md`。
 
+- **仅预览技术债（2026-10-31）**：预览 `AGENT_ADMIN` 由 `--bootstrap-agent-admin` 人工建号（[用法](../../scripts/preview/README.md)）；生产需正式发号流程。本开关不授企业成员或功能权限。`preview-seed-accounts.py` 的 #16/#17 仍为待办，不代表已创建或核验第四端账号；后续 #16 只做登录核验，口令只读私有 0600 文件且不得打印。审查：质量 + 安全。
+
 ## 日节奏（老板定 · 2026-10-30）
 
 > **两周完整主路径（三轨 · 2026-10-31～11-13）；D1 号钉：CT-003 + **CT-038**（人话）+ CT-034；**CT-020-F4 保留只读 API****：老板接受两周倒排；必须保写通/登录隔离/企业侧已开通/现网冒烟 → [`两周日切片-三轨并行-20261031.md`](两周日切片-三轨并行-20261031.md) · [Notion](https://app.notion.com/p/40966c386fbf81359ac9db4536479da8)
