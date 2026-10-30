@@ -14,7 +14,8 @@
 - 已合薄片：CT-034 `#14` / `c88699d` 仅 `POST /api/agent-admin/v1/capabilities` → **501**（`CapabilityRegistryController`）。这不是「本租户已开通」列表。
 
 > **脚注（补裁）**：下面凡标 **【待补】** 的路径、字段、cookie、hash、演示包文件名，在 CT-035 与 CT-034-P1 合入后改成钉死句再跑最稳。未合入时允许按本骨架开跑，但不得把【待补】填成臆造接口或假已开通。  
-> **脚注（包名现状）**：登记 stub 今日在 `com.dreamcore.workspace.agentadmin`；ADR 目标包名是 `agentregistry`。`qualityops` 与 `CapabilityCatalogPort` 都尚未落盘。R-B8-2 按意图执行：消费侧不 import `agentregistry`，也不 import `agentadmin`。
+> **脚注（包名现状）**：登记 stub 今日在 `com.dreamcore.workspace.agentadmin`；ADR 目标包名是 `agentregistry`。`qualityops` 与 `CapabilityCatalogPort` 都尚未落盘。R-B8-2 按意图执行：消费侧不 import `agentregistry`，也不 import `agentadmin`。  
+> **脚注（读口执行单 CT-039）**：企业侧「本租户已开通」只读另见 [`CT-039-tenant-opened-capabilities-readonly.md`](CT-039-tenant-opened-capabilities-readonly.md)。本文件仍是消费骨架，不是读口实现单。
 
 ### 架构已裁（骨架 · 2026-10-30；DQ 可覆。实现细节待补裁）
 
