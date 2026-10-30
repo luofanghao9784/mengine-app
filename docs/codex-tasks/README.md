@@ -32,7 +32,7 @@
 3. **CT-001、CT-002**：各自从 main 切分支、开 PR、审查后合入 main（历史：当时单审；现行合入条件见第 3 节）。验收用「老板 Mac 本地绿 + 附 surefire 报告」，因为 main 上还没有 API CI。
 4. **#7 同步 main**：首选 PR #7 页面底部的 **Update branch** 按钮，点旁边下拉箭头选 **Update with merge commit**，**不要选 Update with rebase**（rebase 会改写分支历史）。命令行备选：
    ```bash
-   cd ~/mengine && git status
+   cd ~/mengine-app && git status
    git fetch origin && git switch cursor/api-postgres-gate-1c11 && git pull
    git merge origin/main
    git push
@@ -84,7 +84,7 @@ CT-030：门禁单一 paths，已取代 CT-008 同事件 ignore。
 
 ### 3.5 每日偏离检查（日偏离）
 - 架构逻辑**每个工作日**对照计划 / ADR / 路线图 / QUEUE，写偏差与纠偏，落入 Notion「日偏离检查」（部门=梦擎）；可先让 Codex 标候选，**结论由架构逻辑签字**后经 DQ 报总负责人。原周偏离废止。
-- 正式仓 **`luofanghao9784/mengine`**（旧 URL 跳转）。
+- 正式仓 **`luofanghao9784/mengine-app`**（旧 URL 跳转）。
 
 ### 3.6 暂停令优先级最高
 - 任何人在老板 Mac 开 Codex 前，先确认当前**没有暂停令**；暂停期间**禁止任何 Codex 启动**。拿不准就当作有暂停令，先问 DQ。
@@ -108,7 +108,7 @@ CT-030：门禁单一 paths，已取代 CT-008 同事件 ignore。
 ```bash
 # ⓪ 暂停令自查（优先级最高）：确认 DQ/总负责人当前没有暂停令；有或拿不准 → 不开 Codex，停下问 DQ
 # ① 进仓库
-cd ~/mengine
+cd ~/mengine-app
 # ② 确认干净：应看到 "nothing to commit, working tree clean"
 git status
 # ③ 回到 main 并更新
@@ -121,7 +121,7 @@ git add apps/api
 git commit -m "<确切 commit 信息>"
 # ⑦ 推送
 git push -u origin <分支名>
-# ⑧ 开 PR（或网页：https://github.com/luofanghao9784/mengine/compare/main...<分支名>）
+# ⑧ 开 PR（或网页：https://github.com/luofanghao9784/mengine-app/compare/main...<分支名>）
 gh pr create --base main --head <分支名> --title "<标题>" --body-file /tmp/<编号>-pr.md
 ```
 ⑨ 常见出错：
@@ -157,8 +157,8 @@ codex                  # 首次运行选 "Sign in with ChatGPT"，登录后输�
 
 ### 6.3 克隆仓库
 ```bash
-cd ~ && git clone https://github.com/luofanghao9784/mengine.git
-cd ~/mengine && git status
+cd ~ && git clone https://github.com/luofanghao9784/mengine-app.git
+cd ~/mengine-app && git status
 ```
 
 ### 6.4 测试环境变量（每次开新终端都要执行，或写入 ~/.zshrc）
@@ -170,7 +170,7 @@ java -version          # 应显示 openjdk version "21...
 ```
 验证测试环境（随便跑一个小测试类，约 1–2 分钟）：
 ```bash
-cd ~/mengine
+cd ~/mengine-app
 python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml -Dtest=FoundationModelReviewProjectionTest test
 ```
 最后应看到 `Tests run: 8, Failures: 0, Errors: 0, Skipped: 0` 和 `BUILD SUCCESS`。

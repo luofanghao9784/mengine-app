@@ -15,7 +15,7 @@
 ## 编制·架构例行
 
 - **日偏离**（2026-10-30 老板）：每个工作日对照计划写偏差与纠偏 → Notion「日偏离检查」。
-- **仓名**：正式 **`luofanghao9784/mengine`**（旧 dreamcore-workspace URL 跳转）。
+- **仓名**：正式 **`luofanghao9784/mengine-app`**（旧 dreamcore-workspace URL 跳转）。
 
 ## 编制·前端开发（老板加岗 · 2026-10-30）
 
