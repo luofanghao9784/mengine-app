@@ -150,4 +150,5 @@
 | CT-020-F3 | versions/grants 只读子视图 | **执行单本 PR**；#5 已合后可派实现 |
 | CT-031 | CT-013 五分片 OpenAPI 骨架落盘（并行轨②） | **执行单本 PR** |
 | CT-032 | CI spending 限额/告警（并行轨③） | **落地文档本 PR** → [`ci-spending-limits-20261030.md`](ci-spending-limits-20261030.md)；Billing 待老板点按；自托管→CT-033 |
+| CT-020-F4、CT-034～037 | D1 人话替换 + 写接口/登录/企业侧/现网号 | **已占用**（F4、CT-034 执行单本 PR） |
 
