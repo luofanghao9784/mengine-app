@@ -155,10 +155,10 @@ export function PlatformEngineDashboard({ hash }: { hash: string }) {
   const value = telemetry.value;
   const items = value ? attention(value, operations.value) : [];
   return (
-    <section className="engine-dash" aria-label="引擎仪表盘">
+    <section className="engine-dash" aria-label="运行看板">
       {telemetry.error ? (
         <div className="engine-dash-failure">
-          <h1>引擎仪表盘</h1>
+          <h1>运行看板</h1>
           <Failure error={telemetry.error} retry={telemetry.retry} />
         </div>
       ) : !value ? (

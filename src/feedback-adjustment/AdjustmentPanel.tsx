@@ -11,7 +11,7 @@ import './adjustment.css';
 const states: Record<string, string> = {
   QUEUED: '已排队',
   RUNNING: '正在调整',
-  WAITING_CAPABILITY: '等待模型能力',
+  WAITING_CAPABILITY: '等待模型服务',
   WAITING_INPUT: '等待补充',
   PARTIAL: '部分完成',
   RESULT_UNKNOWN: '执行结果待核对',

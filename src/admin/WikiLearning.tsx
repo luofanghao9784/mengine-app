@@ -10,7 +10,7 @@ import { wikiLearning as api } from './wiki-learning-client';
 const labels: Record<WikiDraft['status'], string> = {
   QUEUED: '等待学习',
   RUNNING: '正在学习',
-  WAITING_CAPABILITY: '等待模型能力',
+  WAITING_CAPABILITY: '等待模型服务',
   WAITING_INPUT: '等待补充',
   PAUSED: '已暂停',
   SUCCEEDED: '草稿待核对',

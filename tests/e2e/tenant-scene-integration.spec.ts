@@ -297,7 +297,7 @@ test('隔离检查权限撤回后清除正文，即使内容与权限版本未�
     await route.fulfill({ json: { content: '仅用于隔离检查的合成正文' } });
   });
   // Remount to load changed fixture immediately; subsequent revocation uses real polling.
-  await page.locator('.shell-switch button').filter({ hasText: /^数据基座$/ }).click();
+  await page.locator('.shell-switch button').filter({ hasText: /^数据底座$/ }).click();
   await page.locator('.shell-switch button').filter({ hasText: /^成员与权限$/ }).click();
   await page.getByRole('button', { name: /^数据访问/, exact: true }).click();
   await page.getByLabel('变更原因').fill('授权质量检查');
@@ -328,7 +328,7 @@ test('新版背景来源、知识与方法状态衔接，维护留在新版且�
   await page.route('**/company-information/source', route => route.fulfill({status:revoked?403:200,json:revoked?{code:'TENANT_ACCESS_DENIED'}:{tenantId:tenant,sourceId:`company-background:${tenant}`,type:'COMPANY_BACKGROUND',state:'AVAILABLE',version:'a'.repeat(64),knowledgeIntegration:'REFERENCE_READY',entries:[entry()]}}));
   await page.route('**/company-information/source/knowledge', route => route.fulfill({status:revoked?403:200,json:revoked?{code:'TENANT_ACCESS_DENIED'}:{tenantId:tenant,mode:'STRUCTURED_REFERENCE',items:[{id:`background:${actor}`,sourceEntryId:actor,sourceVersionId:actor,revision:changed?2:1,field:'BUSINESS',title:'合成租赁业务',content:'只读合成背景',origin:'HUMAN',status:'REFERENCE_READY',methods:[{id:tenant,version:1,name:'合成收款汇总',status:changed?'REVIEW_REQUIRED':'REFERENCE_CURRENT'}]}]}}));
   await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
-  await page.locator('.shell-switch button').filter({hasText:/^数据基座$/}).click();
+  await page.locator('.shell-switch button').filter({hasText:/^数据底座$/}).click();
   await expect(page.getByRole('button',{name:'企业背景 · 内部来源 →'})).toHaveCount(0);
   await page.locator('.src-pick').filter({hasText:/^内部资料库/}).click();
   await expect(page.getByRole('button',{name:'企业背景来源'})).toContainText('1 项背景');
@@ -373,7 +373,7 @@ test('四项背景作为来源参考，不计入已发布知识', async ({page})
   await page.locator('.shell-switch button').filter({hasText:/^知识星链$/}).click();
   await expect(page.getByRole('tab',{name:'全部 0',exact:true})).toBeVisible();
   await expect(page.locator('.card.list .row')).toHaveCount(0);
-  await page.locator('.shell-switch button').filter({hasText:/^数据基座$/}).click();
+  await page.locator('.shell-switch button').filter({hasText:/^数据底座$/}).click();
   await page.locator('.src-pick').filter({hasText:/^内部资料库/}).click();
   await page.getByRole('button',{name:'企业背景来源'}).click();
   await page.mouse.move(1400, 300);
@@ -398,7 +398,7 @@ test('知识星链标题等待镜头到位，快速往返后仍重新等待', as
   const processed={id:'processed-knowledge',name:'合成已处理知识',group:'资料知识',why:'完整处理后发布',side:'共享空间上传',sourceCategory:'SHARED_UPLOAD',tone:'plain',verdict:'合成已发布内容',kvHead:[],kv:[],actions:[]};
   await page.route('**/scene/dispatch?path=%2Fscene-knowledge', r=>r.fulfill({json:{items:[processed],relations:[],sourceKind:{'processed-knowledge':1},tabs:[{label:'全部 1',items:[processed]}],stats:{title:'知识构成',rows:[]},aside:{title:'最近入库',rows:[]},pending:0,failed:0,busy:false,available:true,needsGraph:false,scopeRevision:'processed',status:'1 条已发布知识'}}));
   await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
-  const data = page.locator('.shell-switch button').filter({hasText:/^数据基座$/});
+  const data = page.locator('.shell-switch button').filter({hasText:/^数据底座$/});
   const knowledge = page.locator('.shell-switch button').filter({hasText:/^知识星链$/});
   const label = page.locator('.world-label.node').first();
   await data.click();
@@ -442,12 +442,12 @@ test('知识列表按真实来源折叠，待处理来源不混入知识总数',
   await expect(page.locator('.card.list .row')).toHaveCount(3);
 });
 
-test('动画核心串联数据基座、引擎概览和知识星链，拖动不触发导航', async ({page}) => {
+test('动画核心串联数据底座、引擎概览和知识星链，拖动不触发导航', async ({page}) => {
   await fixture(page);
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.goto(`/tenant-admin/prototype/?tenant=${tenant}`);
   const nav = page.locator('.shell-switch');
-  await nav.getByRole('button',{name:'数据基座',exact:true}).click();
+  await nav.getByRole('button',{name:'数据底座',exact:true}).click();
   const corePoint = async () => page.locator('.eng3d-halowrap').evaluate(el => {
     const r = el.parentElement!.getBoundingClientRect();
     const matrix = new DOMMatrix((el as HTMLElement).style.transform);
@@ -459,7 +459,7 @@ test('动画核心串联数据基座、引擎概览和知识星链，拖动不�
   await page.mouse.down();
   await page.mouse.move(p.x + 45,p.y + 20,{steps:5});
   await page.mouse.up();
-  await expect(nav.getByRole('button',{name:'数据基座',exact:true})).toHaveAttribute('aria-current','page');
+  await expect(nav.getByRole('button',{name:'数据底座',exact:true})).toHaveAttribute('aria-current','page');
   p = await corePoint();
   await page.mouse.click(p.x,p.y);
   await expect(nav.getByRole('button',{name:'引擎概览',exact:true})).toHaveAttribute('aria-current','page');

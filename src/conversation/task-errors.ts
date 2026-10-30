@@ -9,7 +9,7 @@ const messages: Record<string, string> = {
   TASK_STATE_CHANGED: '任务状态已变化，已刷新最新状态，请核对后操作。',
   CONVERSATION_BUSY: '本会话已有正在执行的任务，请先停止当前执行，再处理此卡片。',
 
-  MODEL_NOT_CONFIGURED: '模型能力当前关闭，任务已保存。',
+  MODEL_NOT_CONFIGURED: '模型服务当前关闭，任务已保存。',
   TASK_INPUT_REQUIRED: '请补充本任务需要的信息后继续。',
   TASK_INPUT_LIMIT: '本任务补充信息已达到上限，请另行发起任务。',
   TASK_RESULT_UNKNOWN: '本次执行没有收到完整结果，需要先核对执行影响。',

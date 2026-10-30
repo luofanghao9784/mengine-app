@@ -609,11 +609,11 @@ function GuardedAccessShell({
                     href={surfaceHref('workspace')}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label="在新标签页打开客户端"
-                    title="在新标签页打开客户端"
+                    aria-label="在新标签页打开工作台"
+                    title="在新标签页打开工作台"
                   >
                     <ExternalLink size={16} aria-hidden="true" />
-                    新标签页打开客户端
+                    新标签页打开工作台
                   </a>
                 </div>
               )}
@@ -675,7 +675,7 @@ function GuardedAccessShell({
                 <Empty
                   icon={FolderOpen}
                   title="此功能暂未开放"
-                  text="首版客户端暂不提供经验库展示与维护。你可以继续会话或查看智能画报。"
+                  text="首版工作台暂不提供经验库展示与维护。你可以继续会话或查看智能画报。"
                 >
                   <a className="button primary" href={briefingHref(tenant)}>
                     返回智能画报

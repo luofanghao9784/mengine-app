@@ -56,7 +56,7 @@ const reasons: Record<string, string> = {
   TENANT_DAILY_LIMIT: '企业当日执行额度已用完，等待额度恢复；重试不会绕过额度限制。',
   TENANT_CONCURRENCY_LIMIT: '企业当前执行名额已占满，等待运行中的任务结束。',
   OWNER_CONCURRENCY_LIMIT: '该用户当前执行名额已占满，等待运行中的任务结束。',
-  MODEL_NOT_CONFIGURED: '模型能力尚未配置或未启用，请先恢复模型服务。',
+  MODEL_NOT_CONFIGURED: '模型服务尚未配置或未启用，请先恢复模型服务。',
   NO_MATERIALS: '没有当前可读取的数据，请先接入数据并确认权限。',
   TASK_LIMIT: '达到单次任务执行限制，未完成交付。',
   TASK_RESULT_UNKNOWN: '尚未确认最终执行结果，需要核对执行回执；不能视为成功或直接认定数据错误。',
@@ -418,7 +418,7 @@ function Governance({ tenant }: { tenant: string }) {
         治理提示按数据表或资料列出。一对多关联、未发生对应业务等情况需要结合业务核对，不能直接视为脏数据。
       </p>
       {error ? (
-        <p role="alert">暂时无法读取该企业的数据治理记录，请确认数据基座已接入并稍后刷新。</p>
+        <p role="alert">暂时无法读取该企业的数据治理记录，请确认数据底座已接入并稍后刷新。</p>
       ) : !assets ? (
         <Loading />
       ) : assets.length === 0 ? (
@@ -506,7 +506,7 @@ function GovernanceAsset({ tenant, asset }: { tenant: string; asset: Asset }) {
       <summary>
         {asset.title} · V{asset.version} · {asset.label}
       </summary>
-      <small>数据基座对象：{asset.id}</small>
+      <small>数据底座对象：{asset.id}</small>
       {asset.id.startsWith('file-') ? (
         <RetryAction
           item={{

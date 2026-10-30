@@ -10,7 +10,7 @@ import { ArticleReader } from './WikiArticles';
 const labels: Record<WikiGraph['status'], string> = {
   QUEUED: '等待分析',
   RUNNING: '正在分析',
-  WAITING_CAPABILITY: '等待模型能力',
+  WAITING_CAPABILITY: '等待模型服务',
   WAITING_INPUT: '等待补充',
   PAUSED: '已暂停',
   SUCCEEDED: '关系分析完成',

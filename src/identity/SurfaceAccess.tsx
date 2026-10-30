@@ -10,7 +10,7 @@ import type { Identity, Membership } from '../../contracts/public-api/identity';
 
 type Surface = 'workspace' | 'tenant-admin' | 'platform-admin';
 const labels: Record<Surface, string> = {
-  workspace: '客户端',
+  workspace: '工作台',
   'tenant-admin': '企业管理端',
   'platform-admin': '总台端',
 };

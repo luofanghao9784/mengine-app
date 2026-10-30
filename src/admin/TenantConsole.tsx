@@ -103,20 +103,20 @@ export function TenantConsole({
         ) : (
           <>
             <SurfaceLinks surface="tenant-admin" tenant={tenant} />
-            <a className="button ghost" href={back} aria-label="返回客户端" title="返回客户端">
+            <a className="button ghost" href={back} aria-label="返回工作台" title="返回工作台">
               <ArrowLeft size={16} />
-              <span>返回客户端</span>
+              <span>返回工作台</span>
             </a>
             <a
               className="button ghost"
               href={back}
-              aria-label="新标签页打开客户端"
-              title="新标签页打开客户端"
+              aria-label="新标签页打开工作台"
+              title="新标签页打开工作台"
               target="_blank"
               rel="noopener noreferrer"
             >
               <ExternalLink size={16} />
-              <span>新标签页打开客户端</span>
+              <span>新标签页打开工作台</span>
             </a>
           </>
         )
@@ -149,10 +149,10 @@ export function TenantConsole({
           <Empty
             icon={ShieldX}
             title="没有企业管理权限"
-            text="当前账号没有其他企业管理职责，可以返回客户端继续工作。"
+            text="当前账号没有其他企业管理职责，可以返回工作台继续工作。"
           >
-            <a className="button" href={back} aria-label="返回客户端" title="返回客户端">
-              <span>返回客户端</span>
+            <a className="button" href={back} aria-label="返回工作台" title="返回工作台">
+              <span>返回工作台</span>
             </a>
             <Button onClick={refresh}>重新检查权限</Button>
           </Empty>

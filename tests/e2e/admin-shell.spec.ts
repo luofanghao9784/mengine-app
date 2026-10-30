@@ -329,12 +329,12 @@ for (const realm of ['platform', 'tenant'] as const) {
     const path = realm === 'platform' ? '/platform-admin/' : `/tenant-admin/#tenant=${tenant}`;
     await page.goto(path);
     const stats = page.locator('.admin-stat');
-    await expect(stats.filter({ hasText: '登记执行中' }).locator('strong')).toHaveText('11');
-    await expect(stats.filter({ hasText: '登记排队' }).locator('strong')).toHaveText('4');
+    await expect(stats.filter({ hasText: '执行中' }).locator('strong')).toHaveText('11');
+    await expect(stats.filter({ hasText: '排队中' }).locator('strong')).toHaveText('4');
     await expect(page.getByText('1 项运行记录的结果尚未确认，可在运行页核对。')).toBeVisible();
     const monthly = page.getByRole('region', { name: '本月用量摘要' });
     await expect(
-      monthly.locator('.admin-stat').filter({ hasText: '日常模型登记请求' }).locator('strong'),
+      monthly.locator('.admin-stat').filter({ hasText: '今日模型请求' }).locator('strong'),
     ).toHaveText('53');
     await expect(monthly.getByText('回执调用数未知')).toBeVisible();
     await expect(monthly.getByText(/2 次维护运行的调用数尚未知/)).toBeVisible();
@@ -370,7 +370,7 @@ for (const realm of ['platform', 'tenant'] as const) {
     control.mode = 'revoked';
     await page.getByRole('button', { name: '刷新', exact: true }).click();
     await expect(page.getByText('没有访问权限', { exact: true })).toHaveCount(2);
-    await expect(stats.filter({ hasText: '登记执行中' }).locator('strong')).toHaveText('—');
+    await expect(stats.filter({ hasText: '执行中' }).locator('strong')).toHaveText('—');
     await expect(page.getByText('53', { exact: true })).toHaveCount(0);
     await expect(page.getByText(/暂无结果待确认/)).toHaveCount(0);
   });

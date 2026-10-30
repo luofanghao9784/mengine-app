@@ -50,7 +50,7 @@ export function NativePluginsAdmin({ tenant }: { tenant: string }) {
     <section className="admin-section native-plugins">
       <div className="admin-section-heading">
         <div>
-          <h2>AI 能力</h2>
+          <h2>智能服务</h2>
           <p className="admin-note">
             这些模块由部署方审核后随运行环境预装，这里只能开关，不能安装新的。切换后，正在运行的 AI
             会按新设置重启，进行中的那一轮会被中断，会话记录保留。
