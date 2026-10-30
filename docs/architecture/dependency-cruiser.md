@@ -10,7 +10,7 @@
 npm run depcruise
 ```
 
-失败时进程退出码非零。仓库 `.github` 下没有 Actions workflow，因此没有单独的前端 job 可挂。门禁跟现有的 `npm test` 走。以后若有前端 CI，把 `npm run depcruise` 加进那个 job 即可。
+失败时进程退出码非零。门禁跟 `npm test` 走。仓库已有 `.github/workflows/frontend-gate.yml`（指向 main 的 PR 触发，其中「B · npm test」步骤）与 `.github/workflows/contracts-engine-gate.yml`；depcruise 随 frontend-gate 的 `npm test` 在 CI 中执行，无需单独挂 job。
 
 不要把不带参数的 `npx depcruise src` 当作门禁。它只应用 `.dependency-cruiser.cjs` 里的禁止规则，不读允许清单，干净工作区也会把存量边报成错误。dependency-cruiser 自带的 baseline 还会比较导入种类和原始说明符，和「只认 from → to」不是同一条边，所以允许清单没有塞进 `knownViolations`。
 

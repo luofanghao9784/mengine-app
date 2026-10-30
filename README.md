@@ -36,7 +36,7 @@
 环境要求：Node.js **24.20.0**（以 [.node-version](.node-version) 为准）、JDK **21**、Python **3.9+**、PostgreSQL **18**。资料解析依赖按解析器说明安装；不同主机的环境路径自行配置。
 
 ```bash
-git clone https://github.com/dimmm1125-coder/dreamcore-workspace.git
+git clone https://github.com/luofanghao9784/dreamcore-workspace.git
 cd dreamcore-workspace
 npm run setup:git
 npm ci
@@ -48,7 +48,7 @@ npm run trial:build
 
 ## 本地启动
 
-确保 JDK、Node、PostgreSQL 工具在当前终端可用；按[本地启动指南](docs/交接/本地启动指南.md)配置 `JAVA_HOME`、`PATH` 和 `POSTGRES_BIN`。
+首次启动前须已完成上方 `npm ci`、`npm --prefix engine ci`、`npm run trial:build`（未构建会报「缺少构建产物」）。确保 JDK 21、Node、PostgreSQL 18 服务端工具（`initdb`/`pg_ctl`/`psql`）在当前终端可用；Linux 环境见指南中「Linux 环境说明」；按[本地启动指南](docs/交接/本地启动指南.md)配置 `JAVA_HOME`、`PATH` 和 `POSTGRES_BIN`。
 
 ```bash
 # 无云模型：初始化并运行本地三端
