@@ -375,5 +375,12 @@ jobs:
           test -d engine/node_modules
           test -d engine/node_modules/@deepseek-ai/dsh-schedule
 
+      # 供 NativeSchedules / Presentation / BriefingFaceAlignment 等测试使用本地引擎产物（engine/dist）；只构建，不连 live 模型。
+      - name: Build engine
+        run: |
+          set -euo pipefail
+          npm run build:engine
+          test -f engine/dist/runtime/agent-task.js || { echo "::error::engine/dist/runtime/agent-task.js missing after build:engine"; exit 1; }
+
       - name: test:api
         run: python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml test package
