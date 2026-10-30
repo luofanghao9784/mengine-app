@@ -93,7 +93,7 @@ git diff --name-only origin/main 只能落在白名单 9 个路径。
 RuleQualityCheckEngine 必须读 materialText。全角「问题：尺寸超差」与半角「问题:尺寸超差」都是 ISSUES_FOUND，message 为「尺寸超差」。冒号后为空或只有空白（「问题：」「问题:   」）不算问题，verdict 为 NO_ISSUES 且 issues 为空。无问题行的「本批记录完整。」同样是 NO_ISSUES。禁止不读材料就 NO_ISSUES。禁止「检查通过」。
 表 qo_check_task 只列 id, tenant_id, created_by, title, material_text, status, result_json, created_at。迁移 V194（若 main 最大号已大于 193，用最大号+1，禁止 V192，禁止改 V190–V193）。
 QualityOpsBoundaryArchTest：qualityops 主源码无 agentadmin import，无 qo_capability 与 qo_capability_tenant_grant 字面量。
-CheckTaskIntegrationTest 覆盖三种匿名 POST，每种都不写库、响应体无 result、无 verdict：不带 CSRF，状态码属于 {401,403}；带着乱 CSRF，状态码属于 {401,403}；先 GET /api/v1/auth/csrf 再带该 token 与对应 cookie、仍不登录地 POST，状态码必须是 401，不是 401 就停下来报且不得改 IdentitySecurity。另覆盖：已登录无 CSRF 为 403 ACCESS_DENIED 且无行、未开通 403 且无行、已开通 201 且 tenant_id=会话租户、「问题：尺寸超差」与「问题:尺寸超差」都是 ISSUES_FOUND 且 message 为「尺寸超差」、「问题：」与「问题:   」以及「本批记录完整。」都是 NO_ISSUES 且 issues 为空、A 开通 B 未开通则 B 403、多企业 404、未知字段 400、body tenantId 400、端口抛错 503 无行、引擎抛错 503 无行。
+CheckTaskIntegrationTest 里下面三条必须各自是独立用例，不得并成一条。匿名无 CSRF：状态码 ∈ {401,403}，qo_check_task 无新增行，响应体无 result、无 verdict。匿名 + 乱 CSRF：单独一条用例，状态码 ∈ {401,403}，qo_check_task 无新增行，响应体无 result、无 verdict。匿名带有效 CSRF：先 GET /api/v1/auth/csrf 再带该 token 与对应 cookie、仍不登录地 POST，状态码必须是 401，qo_check_task 无新增行，响应体无 result、无 verdict；不是 401 就停下来报且不得改 IdentitySecurity。另覆盖：已登录无 CSRF 为 403 ACCESS_DENIED 且无行、未开通 403 且无行、已开通 201 且 tenant_id=会话租户、「问题：尺寸超差」与「问题:尺寸超差」都是 ISSUES_FOUND 且 message 为「尺寸超差」、「问题：」与「问题:   」以及「本批记录完整。」都是 NO_ISSUES 且 issues 为空、A 开通 B 未开通则 B 403、多企业 404、未知字段 400、body tenantId 400、端口抛错 503 无行、引擎抛错 503 无行。
 命令：python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml test -Dtest=CheckTaskIntegrationTest,QualityOpsBoundaryArchTest,OpenedCapabilitiesIntegrationTest
 禁止 -DskipTests。禁止 StubSecurity。禁止第四端 grants。禁止企业自助开通。禁止改 src/**。
 
@@ -143,7 +143,7 @@ git -c http.proxy= -c https.proxy= push origin codex/ct-043-a-quality-check-subm
 | A3 | 「问题：尺寸超差」与「问题:尺寸超差」都 → `ISSUES_FOUND`，`message` 为「尺寸超差」 |
 | A4 | 「本批记录完整。」「问题：」「问题:   」都 → `NO_ISSUES` 且 `issues=[]`。与 A3 的 verdict 不同。源码不是不读材料就返回 |
 | A5 | 端口抛错、引擎抛错各自 503，无行，无 verdict |
-| A6 | 三种匿名 POST 都不写库、响应体无 `result`、无 `verdict`。不带 CSRF 或乱 CSRF：状态码 ∈ {401,403}。从 `/api/v1/auth/csrf` 拿到的有效 CSRF：必须 401，不是 401 就停下来报。`IdentitySecurity` 无 diff |
+| A6 | 三条独立用例。匿名无 CSRF：状态码 ∈ {401,403}，`qo_check_task` 无新增行，响应体无 `result`、无 `verdict`。匿名 + 乱 CSRF：单独一条，断言相同（状态码 ∈ {401,403}，无新增行，无 `result`、无 `verdict`）。匿名带从 `/api/v1/auth/csrf` 拿到的有效 CSRF：必须 401，无新增行，无结论；不是 401 就停下来报。`IdentitySecurity` 无 diff |
 | A7 | 未知字段与 body `tenantId` 均为 400「内容不符合要求」，不写库 |
 | A8 | 多企业 404 不写库。B 未开通则 403，无 B 的行 |
 | A9 | 架构测试：无 agentadmin import，无授权/登记表 SQL |
