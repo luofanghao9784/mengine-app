@@ -92,6 +92,37 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         assertEquals("1.2",db.queryForObject("SELECT package->>'contractVersion' FROM native_governance_releases WHERE id=?",String.class,id));
         return id;
     }
+    /** Same dispatch/publication path as publish(), with a cited current-snapshot semantic review. */
+    @SuppressWarnings("unchecked") private UUID publishCurrentModelReview() {
+        var job=governance.execute(owner,tenant,new GovernanceModelService.Execute(UUID.randomUUID(),"DATASET",dataset,"SYSTEM_MODEL"));
+        UUID id=(UUID)job.get("id");var request=(Map<String,Object>)job.get("request");
+        var context=(Map<String,Object>)request.get("context");
+        assertEquals(snapshot.toString(),context.get("snapshotId").toString());
+        var proofs=(List<Map<String,Object>>)context.get("sourceEvidence");
+        var fields=new ArrayList<Map<String,Object>>();
+        for(var raw:declaredFields) {
+            var proof=proofs.stream().filter(p->raw.get("column").equals(p.get("column"))).findFirst().orElseThrow();
+            String quote=((Map<String,Object>)proof.get("sourceMetadata")).get("definition").toString();
+            fields.add(Map.of("column",raw.get("column"),"decision","REVISE","meaning",raw.get("meaning"),"unit",raw.get("unit"),"evidence",quote));
+        }
+        var citation=Map.of("locator",fields.getFirst().get("column"),"quote",fields.getFirst().get("evidence"));
+        var output=Map.<String,Object>of("title","合成稳定口径","summary","仅核验当前快照已声明规则。",
+            "limitations",List.of("不代表未声明的其他业务规则已核验"),"fields",fields,"evidence",List.of(),"knowledge",List.of(),
+            "qualityReview",Map.of("state","USABLE","summary","当前快照语义与已声明规则及程序检查一致。","citations",List.of(citation)));
+        assertEquals("DRAFT_READY",governance.engineAnswer(owner,tenant,id,new GovernanceModelService.Answer(UUID.randomUUID(),1,request.get("inputHash").toString(),"SYSTEM_MODEL",output)).get("state"));
+        db.update("UPDATE governance_model_dispatch SET state='SUCCEEDED' WHERE job_id=?",id);
+        governance.publish(owner,tenant,id,new GovernanceModelService.Publish(2,request.get("inputHash").toString()));
+        assertEquals("1.2",db.queryForObject("SELECT package->>'contractVersion' FROM native_governance_releases WHERE id=?",String.class,id));
+        return id;
+    }
+    private int modelJobsForSnapshot(UUID selected) {
+        return db.queryForObject("SELECT count(*) FROM governance_model_jobs WHERE tenant_id=? AND kind='DATASET' AND source_id=? AND input->'context'->>'snapshotId'=?",Integer.class,tenant,dataset,selected.toString());
+    }
+    private void assertWaitingForCurrentModelReview() {
+        var asset=foundation.detail(owner,tenant,"dataset-"+dataset).path("asset");
+        assertFalse(asset.path("checksPassed").asBoolean());
+        assertEquals("WAITING",asset.path("modelReviewState").asText());
+    }
     UUID policy(UUID workspace) {
         for(int i=0;i<100;i++){generation.discover();var values=generation.state(owner,tenant).policies().stream().filter(p->p.workspaceId().equals(workspace)).toList();if(!values.isEmpty())return values.getFirst().id();}
         throw new AssertionError("Fixture policy not discovered");
@@ -99,7 +130,8 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
     int dispatched(){return db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE tenant_id=? AND task_id IS NOT NULL AND coalesce(business_type,'AUTO')<>'INFO'",Integer.class,tenant);}
 
     @Test void confirmedDefinitionsAutomaticallyPublishKnowledgeAndRepeatWithoutDuplicates() {
-        UUID release=publish();
+        assertWaitingForCurrentModelReview();
+        UUID release=publishCurrentModelReview();
         new com.dreamcore.workspace.knowledge.DatasetKnowledgeWorker(db,datasetKnowledge,tenant.toString()).tick();
         datasetKnowledge.reconcile(owner,tenant,dataset);
         var items=datasetKnowledge.current(owner,tenant);
@@ -110,8 +142,15 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         assertEquals(1,db.queryForObject("SELECT count(*) FROM dataset_knowledge_publications WHERE tenant_id=?",Integer.class,tenant));
         assertTrue(knowledgeScene.snapshot(owner,tenant).path("items").toString().contains("数据口径知识"));
         snapshot=version(2,List.of(List.of("新店","12.50")));receipt(snapshot,"a".repeat(64));
+        assertWaitingForCurrentModelReview();
+        UUID currentRelease=publishCurrentModelReview();
         datasetKnowledge.reconcile(owner,tenant,dataset);
-        assertEquals(items.getFirst().id(),datasetKnowledge.current(owner,tenant).getFirst().id());
+        var current=datasetKnowledge.current(owner,tenant);
+        assertEquals(currentRelease,current.getFirst().releaseId());
+        assertEquals(1,current.size());
+        UUID article=current.getFirst().id();
+        datasetKnowledge.reconcile(owner,tenant,dataset);
+        assertEquals(article,datasetKnowledge.current(owner,tenant).getFirst().id());
     }
 
     @Test void knowledgeRechecksNewBatchesBeforeWorkerAndResumesSameVersion() {
@@ -136,7 +175,8 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
     }
 
     @Test void unavailableHistoricalReleaseDoesNotRollbackCurrentKnowledgePage() {
-        UUID release=publish();
+        assertWaitingForCurrentModelReview();
+        UUID release=publishCurrentModelReview();
         datasetKnowledge.reconcile(owner,tenant,dataset);
         var historical=json.readTree(db.queryForObject("SELECT package::text FROM native_governance_releases WHERE id=?",String.class,release));
         UUID oldRelease=UUID.randomUUID();
@@ -248,23 +288,27 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         assertTrue(datasetKnowledge.current(reader,tenant).isEmpty());
     }
 
-    @Test void refreshedRowsKeepDefinitionsButRecheckEverySnapshotAndDoNotCallModel() {
-        UUID release=publish();String key=governance.analysisReadiness(owner,tenant,dataset).key();
+    @Test void refreshedRowsKeepDefinitionsButRequireCurrentSnapshotModelReview() {
+        UUID release=publishCurrentModelReview();String key=governance.analysisReadiness(owner,tenant,dataset).key();
         snapshot=version(2,List.of(List.of("合成新店","12.50")));receipt(snapshot,"a".repeat(64));
         assertEquals(release,releases.currentFor(owner,tenant,dataset).getFirst().releaseId());
-        assertEquals(key,governance.analysisReadiness(owner,tenant,dataset).key());
         assertEquals("PUBLISHED",governance.datasetStatus(owner,tenant,dataset).get("state"));
+        // Version 1 review cannot approve version 2, even though its definitions remain reusable.
+        assertWaitingForCurrentModelReview();
+        UUID currentRelease=publishCurrentModelReview();
+        assertEquals(currentRelease,releases.currentFor(owner,tenant,dataset).getFirst().releaseId());
+        assertEquals(key.replace(release.toString(),currentRelease.toString()),governance.analysisReadiness(owner,tenant,dataset).key());
         var asset=foundation.detail(owner,tenant,"dataset-"+dataset).path("asset");
         assertEquals(1,asset.path("queryableRecords").asInt());assertTrue(asset.path("checksPassed").asBoolean());
-        assertEquals(1,db.queryForObject("SELECT count(*) FROM governance_model_jobs WHERE tenant_id=?",Integer.class,tenant));
+        assertEquals(1,modelJobsForSnapshot(snapshot));
         snapshot=version(3,List.of(List.of("合成新店","not-a-number")));receipt(snapshot,"a".repeat(64));
         assertFalse(governance.analysisReadiness(owner,tenant,dataset).ready());
         assertEquals("SOURCE_VALIDATION_FAILED",governance.analysisReadiness(owner,tenant,dataset).reason());
-        assertEquals(release,releases.currentFor(owner,tenant,dataset).getFirst().releaseId());
+        assertEquals(currentRelease,releases.currentFor(owner,tenant,dataset).getFirst().releaseId());
         assertFalse(foundation.detail(owner,tenant,"dataset-"+dataset).path("asset").path("checksPassed").asBoolean());
     }
-    @Test void modelContractWithoutEvidenceAutomaticallyPublishesAndReusesDefinitionsWithoutModelJobs() throws Exception {
-        var entries=declaredFields.stream().map(f -> Map.of("datasetId",dataset.toString(),"column",f.get("column"),"declaredUnit",f.get("unit"),"definitionScope","BUSINESS_DEFINITION","sourceMetadata",Map.of("definition",f.get("meaning")),"status","MODEL_DETERMINED")).toList();
+    @Test void modelContractWithoutEvidencePublishesAfterCurrentModelReviewAndReusesDefinitions() throws Exception {
+        var entries=declaredFields.stream().map(f -> Map.of("datasetId",dataset.toString(),"column",f.get("column"),"declaredUnit",f.get("unit"),"definitionScope","BUSINESS_DEFINITION","sourceMetadata",Map.of("definition","合成来源业务定义："+f.get("meaning")),"status","MODEL_DETERMINED")).toList();
         schema=schema.stream().map(r -> {var copy=new HashMap<String,Object>(r);copy.remove("evidence");return (Map<String,Object>)copy;}).toList();
         String body=json.writeValueAsString(Map.of("columns",columns(),"scopeHash","a".repeat(64),"entries",entries,"schema",schema));
         var contract=new com.dreamcore.workspace.collection.CollectionAdapter.SourceContract("1.0",tenant,dataset,1,IdentityService.hash(body),body);
@@ -276,7 +320,9 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         assertTrue(sourcePublication.reconcile(owner,tenant,dataset));
         assertTrue(sourcePublication.reconcile(owner,tenant,dataset));
         assertEquals(1,db.queryForObject("SELECT count(*) FROM source_contract_publications WHERE tenant_id=?",Integer.class,tenant));
-        assertEquals(0,db.queryForObject("SELECT count(*) FROM governance_model_jobs WHERE tenant_id=?",Integer.class,tenant));
+        assertWaitingForCurrentModelReview();
+        publishCurrentModelReview();
+        assertEquals(1,modelJobsForSnapshot(snapshot));
         var asset=foundation.detail(owner,tenant,"dataset-"+dataset).path("asset");
         assertTrue(asset.path("checksPassed").asBoolean(),asset.toString());
         assertTrue(asset.path("automaticAnalysisReady").asBoolean());
@@ -306,20 +352,29 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         writeEvidence(approved);
         // Opting into delivery does not invalidate an unchanged published definition; it does require a fresh receipt.
         assertEquals(release,releases.currentFor(owner,tenant,dataset).getFirst().releaseId());
+        assertWaitingForCurrentModelReview();
+        int baseline=modelJobsForSnapshot(snapshot);
+        publishCurrentModelReview();
+        assertEquals(baseline+1,modelJobsForSnapshot(snapshot));
         var missing=foundation.detail(owner,tenant,"dataset-"+dataset).path("asset");
         assertTrue(missing.path("automaticAnalysisReady").asBoolean(),"legacy local pins no longer impose an approval gate");
         snapshot=version(2,List.of(List.of("合成门店","12.50")));receipt(snapshot,"a".repeat(64));
         db.update("UPDATE collection_snapshot_receipts SET source_contract=?::jsonb WHERE snapshot_id=?",json.writeValueAsString(contract),snapshot);
-        assertTrue(governance.analysisReadiness(owner,tenant,dataset).ready());
-        assertEquals(release,releases.currentFor(owner,tenant,dataset).getFirst().releaseId());
+        assertWaitingForCurrentModelReview();
+        // The selected old snapshot still has its own review while version 2 waits.
         assertTrue(governance.analysisReadiness(owner,tenant,dataset,oldSnapshot).ready());
+        UUID currentRelease=publishCurrentModelReview();
+        assertEquals(1,modelJobsForSnapshot(snapshot));
+        assertTrue(governance.analysisReadiness(owner,tenant,dataset).ready());
+        assertEquals(currentRelease,releases.currentFor(owner,tenant,dataset).getFirst().releaseId());
+        UUID reviewedSnapshot=snapshot;
         snapshot=version(3,List.of(List.of("合成门店","invalid-decimal")));receipt(snapshot,"a".repeat(64));
         db.update("UPDATE collection_snapshot_receipts SET source_contract=?::jsonb WHERE snapshot_id=?",json.writeValueAsString(contract),snapshot);
         assertEquals("SOURCE_VALIDATION_FAILED",governance.analysisReadiness(owner,tenant,dataset).reason());
         var failed=foundation.detail(owner,tenant,"dataset-"+dataset).path("asset");
         assertTrue(failed.toString().contains("已声明字段规则存在异常"));
         assertFalse(failed.toString().contains("尚无已确认业务规则"));
-        assertEquals(1,db.queryForObject("SELECT count(*) FROM governance_model_jobs WHERE tenant_id=?",Integer.class,tenant));
+        assertEquals(1,modelJobsForSnapshot(reviewedSnapshot));
     }
     @Test void displayedSummaryUsesFrozenCountsRatherThanModelArithmetic() {
         UUID release=publish();
