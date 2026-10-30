@@ -8,7 +8,7 @@
 >
 > **并行日切片（旧三轨 · 2026-10-30，契约/CI 仍可对照）**：四端演示 \| 能力契约 \| CI → [`并行日切片计划-20261030.md`](并行日切片计划-20261030.md) · [Notion](https://app.notion.com/p/40966c386fbf8198989ec102a22ae8b0)
 >
-> **两周指针（补）**：D4～D5 正式登录 + 租户隔离 = **CT-035** → [`CT-035-agent-admin-login-tenant-isolation.md`](CT-035-agent-admin-login-tenant-isolation.md)。**CT-034-P1** → [`CT-034-P1-stub-security-replace-auth-csrf.md`](CT-034-P1-stub-security-replace-auth-csrf.md) 替换登记 POST 的 StubSecurity 开放链，**挡住 CT-034 A 档落库 / 返回 201**。开跑顺序：先 034-P1（或与 035 并行）→ 再 A 档落库。后端四裁：写口 `/api/agent-admin`；`DREAMCORE_AGENT` 独立链；未登录写 401 人话非 501；Capability OpenAPI 补 `enterpriseFunction`（`additionalProperties:false`，未知字段 400）。
+> **两周指针（补）**：**CT-034-P1 已合** main `022768b`（#22），**CT-035 已合** `bd06caf`（#21）。**A 档可开跑** = **CT-034-A** → [`CT-034-A-register-persist-201.md`](CT-034-A-register-persist-201.md)（平台全局目录落库并 201；企业读归 CT-039；迁移 V191+）。D4～D5 登录隔离执行单仍是 [`CT-035-agent-admin-login-tenant-isolation.md`](CT-035-agent-admin-login-tenant-isolation.md)。后端四裁仍有效：写口 `/api/agent-admin`；`DREAMCORE_AGENT` 独立链；未登录写 401 人话；不得恢复 permitAll。OpenAPI `enterpriseFunction` 闭集、`additionalProperties:false`，未知字段 400。
 
 
 **每日目标**：当天结束时，老板 Mac 上须有**可运行、可点开**的预览增量（本机 `127.0.0.1` 可访问的新能力或修复），而不是只合文档/只绿 CI。
@@ -40,7 +40,7 @@
 
 与上方前端硬性 1–6 分列，编号从 1 起，不并入、不改写那六条。
 
-1. **CT-034 类 stub：`CapabilityRegistryStubSecurity`（或等价）permitAll+csrf disable 仅允许无副作用 stub；任何落库/A 档前必须删除并换正式鉴权+CSRF，否则架构/安全 P0 打回。** 执行单是 **CT-034-P1**（[`CT-034-P1-stub-security-replace-auth-csrf.md`](CT-034-P1-stub-security-replace-auth-csrf.md)）：未登录写 **401 人话，禁止 501**；501 仅已登录未落库。口径同时见 [`CT-034-register-save-write-api-thin.md`](CT-034-register-save-write-api-thin.md)「架构已裁」第 5 条。**034-P1 挡住 A 档落库 / 201。**
+1. **CT-034 类 stub：`CapabilityRegistryStubSecurity`（或等价）permitAll+csrf disable 仅允许无副作用 stub；任何落库/A 档前必须删除并换正式鉴权+CSRF，否则架构/安全 P0 打回。** **CT-034-P1 已合** main `022768b`（#22）：开放链已删；未登录写 **401 人话**；有会话无 CSRF **403**；已登录未落库时曾是 501。口径仍见 [`CT-034-register-save-write-api-thin.md`](CT-034-register-save-write-api-thin.md)「架构已裁」第 5 条与 [`CT-034-P1-stub-security-replace-auth-csrf.md`](CT-034-P1-stub-security-replace-auth-csrf.md)。**A 档现可开跑**：[`CT-034-A-register-persist-201.md`](CT-034-A-register-persist-201.md)。落库后禁止恢复 `permitAll`。
 
 审查配人（前端可见改动）：**发布验收 + 质量性能**；触及 agent-admin 边界/五维登记时加 **架构逻辑**；登录/会话/cookie 加 **安全审查**。
 
@@ -158,7 +158,8 @@
 | CT-020-F3 | versions/grants 只读子视图 | **执行单本 PR**；#5 已合后可派实现 |
 | CT-031 | CT-013 五分片 OpenAPI 骨架落盘（并行轨②） | **执行单本 PR** |
 | CT-032 | CI spending 限额/告警（并行轨③） | **落地文档本 PR** → [`ci-spending-limits-20261030.md`](ci-spending-limits-20261030.md)；Billing 待老板点按；自托管→CT-033 |
-| CT-035 | 第四端正式登录 + 租户隔离（D4～D5 · L1–L4） | **执行单本 PR** → [`CT-035-agent-admin-login-tenant-isolation.md`](CT-035-agent-admin-login-tenant-isolation.md) |
-| CT-034-P1 | 替换登记 Stub 开放链（鉴权+CSRF）；**挡住 A 档落库 / 201** | **执行单本 PR** → [`CT-034-P1-stub-security-replace-auth-csrf.md`](CT-034-P1-stub-security-replace-auth-csrf.md)；宜与 CT-035 并行，先于 A 档 |
+| CT-035 | 第四端正式登录 + 租户隔离（D4～D5 · L1–L4） | **已合** main `bd06caf` / #21 → [`CT-035-agent-admin-login-tenant-isolation.md`](CT-035-agent-admin-login-tenant-isolation.md) |
+| CT-034-P1 | 替换登记 Stub 开放链（鉴权+CSRF） | **已合** main `022768b` / #22 → [`CT-034-P1-stub-security-replace-auth-csrf.md`](CT-034-P1-stub-security-replace-auth-csrf.md)；不再挡住 A 档 |
+| CT-034-A | 登记目录落库并 201（平台全局；验收句 W1 起步） | **执行单本 PR** → [`CT-034-A-register-persist-201.md`](CT-034-A-register-persist-201.md)；P1 已合，**可开跑**。企业读归 CT-039；迁移 V191+ |
 | CT-036 | 企业侧/工作台消费已开通（两周 D6～D8 · 验收句 E1–E4） | **骨架已出** → [`CT-036-enterprise-consume-opened-capability.md`](CT-036-enterprise-consume-opened-capability.md)；实现细节随 CT-035 / CT-034-P1 合入后补裁 |
 
