@@ -17,6 +17,7 @@
 | CT-002 | [生命周期时间戳对齐 Postgres 微秒精度](CT-002-api-lifecycle-micros-truncation.md) | ProfileMethodLifecycle 3 例 + FeedbackAdjustment 1 例 | 架构逻辑 + 质量性能 | 已合入（#21） | 第 3（与 CT-001 可并行） |
 | CT-007 | [审批流程整改（合入硬闸门/两人审/体验验收/周偏离检查/暂停令优先）](CT-007-review-process-hardening.md) | 老板经 DQ 批准（2026-10-30） | 质量性能 + 发布验收 | 已合入（#25） | 纯文档 |
 | CT-008 | [纯 docs paths-ignore 免跑重门禁](CT-008-docs-path-filter.md) | 三 workflow paths-ignore | 质量性能 + 架构逻辑 | 待执行（workflow 老板推） | 无；见 QUEUE |
+| CT-028 | [预览 vite `/mengine-api` → 动态 scene 口](CT-028-preview-mengine-api-url.md) | trial web_env 缺 MENGINE_API_URL；bounce 手改债 | 质量性能 + 发布验收 | 待执行（纯文档） | CT-006 落地后 |
 | CT-024 | TaskContext 慢测/lease（#7 ④/⑥） | #7 遗留质量债 | 质量性能 + 架构逻辑 | 待写执行单 | 见 [QUEUE](QUEUE.md) |
 | CT-025 | Mac 实测（交付） | 编号冻结 | 发布验收 + 质量性能 | 待写 | 见 QUEUE |
 | CT-026 | 后端 wiki 基线红 backlog | 编号冻结 | 质量性能 + 架构逻辑 | 待写 | 见 QUEUE |
