@@ -6,7 +6,6 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: [
-        'index.html',
         'workspace/index.html',
         'tenant-admin/index.html',
         'tenant-admin/prototype/index.html',
