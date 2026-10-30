@@ -35,9 +35,9 @@
 
 ## 仓库与成员
 
-- 私有远端：[dimmm1125-coder/dreamcore-workspace](https://github.com/dimmm1125-coder/dreamcore-workspace)。
+- 私有远端：[luofanghao9784/dreamcore-workspace](https://github.com/luofanghao9784/dreamcore-workspace)。
 - 唯一长期主线：`main`。两组均可访问源码，按职责分工；没有长期 `system`、`engine` 或个人分支。
-- 当前维护账号为 `dimmm1125-coder`。其他成员和双方负责人尚未提供，未发送邀请；`CODEOWNERS` 先登记维护账号，成员到位后替换为实际责任人。
+- 当前维护账号为 `luofanghao9784`。其他成员和双方负责人尚未提供，未发送邀请；`CODEOWNERS` 先登记维护账号，成员到位后替换为实际责任人。
 - 主线保护实际结果见 [初始化记录](docs/交接/Git初始化与验证-2026-09-21.md)。本地钩子不等于服务器端强制保护。
 
 ## 首次克隆
@@ -47,7 +47,7 @@
 使用 `.node-version` 指定的 Node.js，执行：
 
 ```bash
-git clone https://github.com/dimmm1125-coder/dreamcore-workspace.git
+git clone https://github.com/luofanghao9784/dreamcore-workspace.git
 cd dreamcore-workspace
 npm run setup:git
 npm ci

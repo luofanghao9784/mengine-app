@@ -4,7 +4,7 @@
 
 ```text
 你正在参与梦擎企业 AI 工作空间的节点协作开发。
-仓库：https://github.com/dimmm1125-coder/dreamcore-workspace.git
+仓库：https://github.com/luofanghao9784/dreamcore-workspace.git
 我的协作署名：[填写真实姓名或稳定代号]
 本次任务：[填写 ONB-xx-xx-FE / BE；未定则先列出可认领任务，不自行认领全部任务]
 

@@ -2,7 +2,7 @@ package com.dreamcore.workspace.objectlifecycle;
 import com.dreamcore.workspace.identity.IdentityException;
 import com.dreamcore.workspace.conversation.ConversationService;
 import com.dreamcore.workspace.retention.RetentionClock;
-import java.time.*;import java.util.*;
+import java.time.*;import java.time.temporal.ChronoUnit;import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,7 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
  private long remaining(Map<String,Object> s){return db.queryForObject("SELECT count(*) FROM lifecycle_object_sources source LEFT JOIN object_lifecycle l ON l.kind=source.kind AND l.object_id=source.object_id WHERE source.tenant_id=? AND (?::uuid IS NULL OR source.owner_id=?) AND (l.id IS NULL OR NOT EXISTS(SELECT 1 FROM object_lifecycle_scope_items si WHERE si.execution_id=? AND si.object_record=l.id))",Long.class,s.get("tenant_id"),s.get("owner_id"),s.get("owner_id"),s.get("execution_id"));}
  private Progress progress(Map<String,Object> s){UUID id=(UUID)s.get("execution_id");var counts=db.queryForMap("SELECT count(*) discovered,count(*) FILTER(WHERE state='PURGE_PENDING') queued,count(*) FILTER(WHERE state='PURGED') purged,count(*) FILTER(WHERE state='PURGE_FAILED') failed,count(*) FILTER(WHERE state NOT IN('PURGED')) unfinished FROM object_lifecycle l JOIN object_lifecycle_scope_items si ON si.object_record=l.id WHERE si.execution_id=?",id);long remaining=remaining(s);boolean discovery=remaining==0;boolean complete=discovery&&((Number)counts.get("unfinished")).longValue()==0;String state=(String)s.get("state");if(state.equals("PURGING")&&complete){db.update("UPDATE object_lifecycle_scopes SET state='COMPLETE',discovery_complete=true WHERE execution_id=?",id);state="COMPLETE";}return new Progress(id,state,((Number)counts.get("discovered")).longValue(),((Number)counts.get("queued")).longValue(),((Number)counts.get("purged")).longValue(),((Number)counts.get("failed")).longValue(),remaining,discovery,state.equals("COMPLETE")&&complete);}
  @Transactional public Progress isolateScope(UUID tenant,UUID owner,UUID execution,Instant effectiveAt,Instant deadline,int batchSize){
-  size(batchSize);if(tenant==null||execution==null||effectiveAt==null||deadline==null||deadline.isBefore(effectiveAt))throw IdentityException.invalid();db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",tenant);
+  size(batchSize);if(tenant==null||execution==null||effectiveAt==null||deadline==null||deadline.isBefore(effectiveAt))throw IdentityException.invalid();
+  // 与 Postgres timestamptz 微秒精度对齐
+  effectiveAt=effectiveAt.truncatedTo(ChronoUnit.MICROS);deadline=deadline.truncatedTo(ChronoUnit.MICROS);db.queryForList("SELECT id FROM tenants WHERE id=? FOR UPDATE",tenant);
   db.update("INSERT INTO object_lifecycle_scopes(execution_id,tenant_id,owner_id,effective_at,deadline,state) VALUES (?,?,?,?,?,'ISOLATING') ON CONFLICT(execution_id) DO NOTHING",execution,tenant,owner,ts(effectiveAt),ts(deadline));var s=locked(tenant,execution);
   if(!Objects.equals(owner,s.get("owner_id"))||!effectiveAt.equals(((java.sql.Timestamp)s.get("effective_at")).toInstant())||!deadline.equals(((java.sql.Timestamp)s.get("deadline")).toInstant()))throw new IdentityException(409,"LIFECYCLE_SCOPE_BOUNDARY_CHANGED");if(Set.of("RESTORING","RESTORED").contains(s.get("state")))throw new IdentityException(409,"LIFECYCLE_SCOPE_ALREADY_RESTORED");
   var sources=db.queryForList("SELECT source.* FROM lifecycle_object_sources source LEFT JOIN object_lifecycle l ON l.kind=source.kind AND l.object_id=source.object_id WHERE source.tenant_id=? AND (?::uuid IS NULL OR source.owner_id=?) AND (l.id IS NULL OR NOT EXISTS(SELECT 1 FROM object_lifecycle_scope_items si WHERE si.execution_id=? AND si.object_record=l.id)) ORDER BY source.kind,source.object_id LIMIT ?",tenant,owner,owner,execution,batchSize);
@@ -43,6 +45,8 @@ import org.springframework.transaction.annotation.Transactional;
  }
  /** Only the still-effective departure execution may call this after a cancellation failed to finish. */
  @Transactional public Progress resumeExpiredScope(UUID tenant,UUID owner,UUID execution,Instant effectiveAt,Instant deadline,int batchSize){
+  // 与 Postgres timestamptz 微秒精度对齐
+  effectiveAt=effectiveAt.truncatedTo(ChronoUnit.MICROS);deadline=deadline.truncatedTo(ChronoUnit.MICROS);
   size(batchSize);var s=locked(tenant,execution);if(clock.now().isBefore(deadline))throw new IdentityException(409,"LIFECYCLE_SCOPE_NOT_DUE");
   if(!Objects.equals(owner,s.get("owner_id"))||!effectiveAt.equals(((java.sql.Timestamp)s.get("effective_at")).toInstant())||!deadline.equals(((java.sql.Timestamp)s.get("deadline")).toInstant()))throw new IdentityException(409,"LIFECYCLE_SCOPE_BOUNDARY_CHANGED");
   if(Set.of("RESTORING","RESTORED").contains(s.get("state"))){

@@ -341,6 +341,85 @@ class NativeAutomaticContinuityIntegrationTest extends TaskDatasetFixture {
         receipt(snapshot,"a".repeat(64));generation.tick(p);assertEquals(1,dispatched());
         generation.tick(p);generation.tick(p);assertEquals(1,dispatched());
     }
+    private UUID additionalMissingReceiptSource() throws Exception {
+        UUID originalDataset=dataset,originalSnapshot=snapshot;
+        // Opposite UUID sign bits make Java's final tie-break differ from PostgreSQL's natural UUID order.
+        UUID other=new UUID(dataset.getMostSignificantBits()^Long.MIN_VALUE,dataset.getLeastSignificantBits());
+        db.update("INSERT INTO business_datasets(id,tenant_id,connection_id,workspace_id,dataset_key,name,column_names) VALUES (?,?,?,?,'other-sales','销售数据',?::jsonb)",other,tenant,connection,space,json.writeValueAsString(columns()));
+        var items=new ArrayList<>(schema);
+        for(var item:schema){var copy=new LinkedHashMap<>(item);copy.put("datasetId",other.toString());items.add(copy);}
+        var entries=new ArrayList<Map<String,Object>>();
+        for(UUID source:List.of(originalDataset,other))for(var field:declaredFields)
+            entries.add(Map.of("datasetId",source.toString(),"column",field.get("column"),"sourceMetadata",Map.of("definition",field.get("evidence"))));
+        Files.writeString(evidence,json.writeValueAsString(Map.of("tenantId",tenant.toString(),"entries",entries,"schema",items)));
+        try {
+            dataset=other;snapshot=version(1,List.of(List.of("合成另一门店","4")));receipt(snapshot,"a".repeat(64));publish();
+            snapshot=version(2,List.of(List.of("合成另一门店","5")));
+        } finally {dataset=originalDataset;snapshot=originalSnapshot;}
+        assertEquals("SOURCE_RECEIPT_REQUIRED",governance.analysisReadiness(owner,tenant,other).reason());
+        return other;
+    }
+    @Test void readySourceDispatchesOnceWhileAnotherSourceWaitsForReceipt() throws Exception {
+        publish();UUID other=additionalMissingReceiptSource();
+        assertTrue(governance.analysisReadiness(owner,tenant,dataset).ready());
+        UUID p=policy(space);generation.tick(p);generation.tick(p);
+        assertEquals(1,dispatched());
+        assertNull(db.queryForObject("SELECT reason FROM briefing_generation_policies WHERE id=?",String.class,p));
+        assertEquals(List.of(dataset),db.queryForList("SELECT dataset_id FROM briefing_dataset_selections WHERE task_id IN (SELECT task_id FROM briefing_generation_batches WHERE policy_id=?)",UUID.class,p));
+        assertEquals("SOURCE_RECEIPT_REQUIRED",governance.analysisReadiness(owner,tenant,other).reason());
+    }
+    @Test void allUnreadySourcesPersistSameSpecificBatchAndPolicyReason() throws Exception {
+        publish();snapshot=version(2,List.of(List.of("合成新店","12.50")));additionalMissingReceiptSource();
+        assertEquals("SOURCE_RECEIPT_REQUIRED",governance.analysisReadiness(owner,tenant,dataset).reason());
+        UUID p=policy(space);generation.tick(p);
+        assertEquals(0,dispatched());
+        assertEquals("WAITING_DATA",db.queryForObject("SELECT status FROM briefing_generation_batches WHERE policy_id=?",String.class,p));
+        assertEquals("SOURCE_RECEIPT_REQUIRED",db.queryForObject("SELECT reason FROM briefing_generation_batches WHERE policy_id=?",String.class,p));
+        assertEquals("SOURCE_RECEIPT_REQUIRED",db.queryForObject("SELECT reason FROM briefing_generation_policies WHERE id=?",String.class,p));
+    }
+    @Test void repeatedReceiptHoldKeepsBatchAndResumesOnceWithClearedPolicyReason() {
+        publish();snapshot=version(2,List.of(List.of("合成新店","12.50")));
+        UUID p=policy(space);generation.tick(p);
+        UUID batch=db.queryForObject("SELECT id FROM briefing_generation_batches WHERE policy_id=?",UUID.class,p);
+        int count=db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=?",Integer.class,p);
+        assertEquals(1,count);
+        for(int i=0;i<2;i++){
+            generation.tick(p);
+            assertEquals(count,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=?",Integer.class,p));
+            assertEquals("SOURCE_RECEIPT_REQUIRED",db.queryForObject("SELECT reason FROM briefing_generation_batches WHERE id=?",String.class,batch));
+            assertEquals("SOURCE_RECEIPT_REQUIRED",db.queryForObject("SELECT reason FROM briefing_generation_policies WHERE id=?",String.class,p));
+            assertEquals(0,dispatched());
+        }
+        receipt(snapshot,"a".repeat(64));generation.tick(p);
+        assertEquals(1,dispatched());
+        assertNull(db.queryForObject("SELECT reason FROM briefing_generation_policies WHERE id=?",String.class,p));
+        assertNull(db.queryForObject("SELECT reason FROM briefing_generation_batches WHERE id=?",String.class,batch));
+        generation.tick(p);generation.tick(p);assertEquals(1,dispatched());
+        assertEquals(count,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=?",Integer.class,p));
+    }
+    @Test void differentUnreadyReasonsUseStableSourceOrderAndMaterialIdTieBreak() throws Exception {
+        publish();snapshot=version(2,List.of(List.of("合成新店","not-a-number")));receipt(snapshot,"a".repeat(64));
+        UUID other=additionalMissingReceiptSource();
+        assertEquals("SOURCE_VALIDATION_FAILED",governance.analysisReadiness(owner,tenant,dataset).reason());
+        // Equal relevance, timestamp and filename force the final materialId comparison.
+        for(UUID source:List.of(dataset,other)){
+            UUID run=UUID.randomUUID(),next=UUID.randomUUID();
+            db.update("INSERT INTO collection_runs(id,tenant_id,connection_id,execution_epoch,trigger_kind,status) VALUES (?,?,?,1,'SCHEDULED','SUCCEEDED')",run,tenant,connection);
+            db.update("INSERT INTO dataset_snapshots(id,tenant_id,connection_id,dataset_id,run_id,version,data_rows,row_count,collected_at) SELECT ?,tenant_id,connection_id,dataset_id,?,version+1,data_rows,row_count,'2026-10-01T00:00:00Z' FROM dataset_snapshots WHERE id=(SELECT current_snapshot FROM business_datasets WHERE id=?)",next,run,source);
+            db.update("UPDATE business_datasets SET current_snapshot=? WHERE id=?",next,source);
+            if(source.equals(dataset)){snapshot=next;receipt(snapshot,"a".repeat(64));}
+        }
+        String expected=dataset.compareTo(other)<0?"SOURCE_VALIDATION_FAILED":"SOURCE_RECEIPT_REQUIRED";
+        UUID p=policy(space);generation.tick(p);
+        UUID batch=db.queryForObject("SELECT id FROM briefing_generation_batches WHERE policy_id=?",UUID.class,p);
+        for(int i=0;i<3;i++){
+            generation.tick(p);
+            assertEquals(expected,db.queryForObject("SELECT reason FROM briefing_generation_policies WHERE id=?",String.class,p));
+            assertEquals(expected,db.queryForObject("SELECT reason FROM briefing_generation_batches WHERE id=?",String.class,batch));
+            assertEquals(1,db.queryForObject("SELECT count(*) FROM briefing_generation_batches WHERE policy_id=?",Integer.class,p));
+            assertEquals(0,dispatched());
+        }
+    }
     @Test void queuedAutomaticTaskKeepsCheckedSnapshotAndPlansWhenCollectionAdvances() throws Exception {
         var items=new ArrayList<>(schema);
         var plan=Map.of("name","门店登记数量","meaning","来源登记数量","unit","件","grain","来源记录","scope","固定快照","exclusions","无","evidence","合成负责人已核对","aggregation","SUM","valueField","数量","execution",Map.of("groupColumns",List.of("门店"),"dateColumn","","dateFrom","","dateTo","","timeZone","Asia/Shanghai","reviewed",true));
