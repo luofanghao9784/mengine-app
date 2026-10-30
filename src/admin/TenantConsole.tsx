@@ -168,7 +168,7 @@ export function TenantConsole({
         <WikiSources key={tenant} tenant={tenant} />
       ) : page === 'abilities' ? (
         <>
-          <OpenedFunctions />
+          <OpenedFunctions key={tenant} tenant={tenant} />
           <NativePluginsAdmin key={tenant} tenant={tenant} />
         </>
       ) : page === 'audit' ? (

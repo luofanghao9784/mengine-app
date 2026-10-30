@@ -1,3 +1,4 @@
+import { useOpenedCapabilities } from '../admin/openedCapabilities';
 import { TenantConsole } from '../admin/TenantConsole';
 import { SkillCenter, skillsHref } from '../skills/SkillCenter';
 import { SuspendedEnterprise } from './SuspendedEnterprise';
@@ -361,6 +362,11 @@ function GuardedAccessShell({
     if (selected) rememberTenant(identity.account.id, selected.tenantId, surface);
   }, [identity.account.id, selected?.tenantId, surface]);
   const allowed = surface === 'platform-admin' ? identity.platformAdmin : !!selected;
+  const opened = useOpenedCapabilities(
+    tenant,
+    surface === 'workspace' && !!selected && selected.service?.status !== 'SUSPENDED',
+  );
+  const openedQualityCheck = opened.items?.find((item) => item.enterpriseFunction === 'quality-check');
   const notifications = useWorkspaceNotifications(
     tenant,
     surface === 'workspace' && allowed,
@@ -515,12 +521,16 @@ function GuardedAccessShell({
                       href: libraryHref(tenant),
                     },
                     { label: '技能中心', icon: Puzzle, active: skills, href: skillsHref(tenant) },
-                    {
-                      label: '质量检查',
-                      icon: ClipboardCheck,
-                      active: qualityCheck,
-                      href: qualityCheckHref(tenant),
-                    },
+                    ...(openedQualityCheck
+                      ? [
+                          {
+                            label: openedQualityCheck.displayName,
+                            icon: ClipboardCheck,
+                            active: qualityCheck,
+                            href: qualityCheckHref(tenant),
+                          },
+                        ]
+                      : []),
                   ]}
                 />
               ) : (
@@ -579,7 +589,7 @@ function GuardedAccessShell({
                                     : skills
                                       ? '技能中心'
                                       : qualityCheck
-                                        ? '质量检查'
+                                        ? (openedQualityCheck?.displayName ?? 'AI 功能')
                                         : labels[surface]}
                   </h1>
                   {surface === 'workspace' && briefing && (
@@ -704,7 +714,7 @@ function GuardedAccessShell({
               ) : skills ? (
                 <SkillCenter key={tenant} tenant={tenant} />
               ) : qualityCheck ? (
-                <QualityCheck />
+                <QualityCheck opened={opened} />
               ) : documents ? (
                 <Documents key={tenant} tenant={tenant} />
               ) : briefing || conversations ? (
