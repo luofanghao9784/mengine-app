@@ -1,0 +1,61 @@
+# 草稿：未进仓库。进仓库须按 docs/codex-tasks/ 执行单交老板用 Codex 落地，且需 DQ 批准新增 workflow。
+# 目的：在 GitHub macOS runner 上跑 安装→启动→健康检查→停止→卸载，降低老板 Mac 首装失败风险。
+name: macos-preview-smoke
+on:
+  workflow_dispatch: {}          # 仅手动触发；不挂 push/PR
+permissions:
+  contents: read
+concurrency: { group: macos-preview-smoke, cancel-in-progress: true }
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15]  # 均为 Apple Silicon（/opt/homebrew）；DQ 裁定不为 Intel 另开一套
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      PREVIEW_HOME: ${{ runner.temp }}/dreamcore-preview
+      DREAMCORE_REPO: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .node-version, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21', cache: maven }
+      - name: PostgreSQL 18 服务端（不启动 brew services）
+        run: brew install postgresql@18 && echo "POSTGRES_BIN=$(brew --prefix)/opt/postgresql@18/bin" >> "$GITHUB_ENV"
+      - name: doctor
+        run: bash scripts/preview/preview-doctor.sh
+      - name: install（dry-run 后真跑；不装 parser venv → fail closed）
+        run: |
+          bash scripts/preview/preview-install.sh --dry-run
+          bash scripts/preview/preview-install.sh
+      - name: install 幂等（第二次应跳过构建）
+        run: bash scripts/preview/preview-install.sh | tee /dev/stderr | grep -q '跳过构建'
+      - name: start
+        run: bash scripts/preview/preview-start.sh
+      - name: health
+        run: bash scripts/preview/preview-health.sh
+      - name: stop
+        if: always()
+        run: bash scripts/preview/preview-stop.sh
+      - name: 卸载前保存日志
+        if: always()
+        run: cp -R "$PREVIEW_HOME/logs" "$RUNNER_TEMP/preview-logs" || true
+      - name: uninstall（含 pg_dump 备份）
+        if: always()
+        run: bash scripts/preview/preview-uninstall.sh --yes
+      - name: 残留检查
+        if: always()
+        run: |
+          ! pgrep -fl "workspace-api|engine/dist/main.js|vite.js preview|$PREVIEW_HOME" || { echo "有残留进程"; exit 1; }
+      - name: 上传日志（不含密钥目录）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-logs-${{ matrix.os }}
+          path: ${{ runner.temp }}/preview-logs/
+          if-no-files-found: ignore
+          retention-days: 7

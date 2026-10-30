@@ -454,7 +454,16 @@ def instance_platform_capabilities(root):
     return {name: str(value[key]).lower() for key, names in fields.items() for name in names}
 
 
-def start(root, model_config=None, reconnect_live=False, phone_local=False, collection_config=None, enable_live=False, automatic_work=False, scene_tenant=None):
+def knowledge_enabled(parser_mode):
+    installed = (WORKSPACE / 'workers/parser/.venv/bin/python').exists()
+    if parser_mode == 'on' and not installed:
+        raise TrialError('parser 未安装：workers/parser/.venv/bin/python 不存在，无法 --parser on。')
+    if parser_mode == 'off':
+        return False
+    return installed
+
+
+def start(root, model_config=None, reconnect_live=False, phone_local=False, collection_config=None, enable_live=False, automatic_work=False, scene_tenant=None, parser_mode='auto'):
     os.umask(0o077)
     collection_env = instance_collection_environment(root, collection_config)
     weknora_env = instance_weknora_environment(root)
@@ -564,7 +573,7 @@ def start(root, model_config=None, reconnect_live=False, phone_local=False, coll
         engine_env.update(presentation_env)
         engine_env.update(extra_engine_env)
         env = {**clean_environment(), 'TASK_ENABLED':'true', 'TASK_ENGINE_TOKEN':engine_token, 'ENGINE_BASE_URL':f'http://127.0.0.1:{engine_port}', 'DATABASE_URL': f"jdbc:postgresql://127.0.0.1:{settings['ports']['database']}/dreamcore_trial", 'DATABASE_USER': 'dreamcore_trial', 'DATABASE_PASSWORD': secret,
-               'KNOWLEDGE_ENABLED': str((WORKSPACE / 'workers/parser/.venv/bin/python').exists()).lower(), 'KNOWLEDGE_PARSER_ROOT': str(WORKSPACE / 'workers/parser'), 'MATERIAL_STORAGE_ROOT': str(root / 'objects'), 'SPRING_PROFILES_ACTIVE': 'local', 'INVITATION_DELIVERY': 'local', 'INVITATION_OUTBOX': str(root / 'invitations'), 'API_HOST': '127.0.0.1', 'API_PORT': str(settings['ports']['api']), 'SERVER_SERVLET_SESSION_COOKIE_NAME': 'DREAMCORE_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]}
+               'KNOWLEDGE_ENABLED': str(knowledge_enabled(parser_mode)).lower(), 'KNOWLEDGE_PARSER_ROOT': str(WORKSPACE / 'workers/parser'), 'MATERIAL_STORAGE_ROOT': str(root / 'objects'), 'SPRING_PROFILES_ACTIVE': 'local', 'INVITATION_DELIVERY': 'local', 'INVITATION_OUTBOX': str(root / 'invitations'), 'API_HOST': '127.0.0.1', 'API_PORT': str(settings['ports']['api']), 'SERVER_SERVLET_SESSION_COOKIE_NAME': 'DREAMCORE_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]}
         env.update({'PHONE_DELIVERY': 'local' if phone_local else 'disabled', 'PHONE_LOCAL_PREVIEW': str(phone_local).lower(), 'PHONE_OUTBOX': str(root / 'phone-sms')})
         env['PLATFORM_COOKIE_NAME'] = 'DREAMCORE_PLATFORM_TRIAL_' + hashlib.sha256(str(root).encode()).hexdigest()[:12]
         env.update(collection_env)
@@ -717,6 +726,7 @@ def main():
     parser.add_argument('--enable-live', action='store_true', help='明确授权已有非恢复实例接入真实模型，保留数据；关闭自动分析/画报与定时计划，只供手动验收。')
     parser.add_argument('--automatic-work', action='store_true', help='显式启用并保存真实模型自动工作循环：企业分析、经验和已配置的计划。')
     parser.add_argument('--collection-config', type=Path, help='部署维护的 0600 采集器配置；不从继承环境读取。')
+    parser.add_argument('--parser', choices=['auto', 'on', 'off'], default='auto', help='知识解析器：auto 跟随本机 .venv；on 强制开启（未装则失败）；off 强制关闭。')
     args = parser.parse_args()
     if args.scene_tenant and args.command != 'start':
         raise TrialError('--scene-tenant 仅用于 start。')
@@ -736,9 +746,9 @@ def main():
     if args.command == 'start':
         if args.live:
             from live_model import DEFAULT_CONFIG
-            start(root, args.model_config or DEFAULT_CONFIG, args.reconnect_live, phone_local=args.phone_local, collection_config=args.collection_config, enable_live=args.enable_live, automatic_work=args.automatic_work, scene_tenant=args.scene_tenant)
+            start(root, args.model_config or DEFAULT_CONFIG, args.reconnect_live, phone_local=args.phone_local, collection_config=args.collection_config, enable_live=args.enable_live, automatic_work=args.automatic_work, scene_tenant=args.scene_tenant, parser_mode=args.parser)
         else:
-            start(root, phone_local=args.phone_local, collection_config=args.collection_config, scene_tenant=args.scene_tenant)
+            start(root, phone_local=args.phone_local, collection_config=args.collection_config, scene_tenant=args.scene_tenant, parser_mode=args.parser)
     elif args.command == 'invitation':
         if not args.invitation_id:
             raise TrialError('请提供邀请 ID；可在本地 invitations 目录按手机号或旧邮箱查找对应 JSON 文件。')
