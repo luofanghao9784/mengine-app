@@ -1,4 +1,5 @@
 import { createIdentityRequest, IdentityError } from './client.ts';
+import { qualityCheckInputState } from './quality-check-input.ts';
 import { withTimeout } from '../shared/abort-timeout.ts';
 
 export type QualityCheckResult = {
@@ -46,7 +47,7 @@ export async function submitQualityCheck(
   title?: string,
   signal?: AbortSignal,
 ): Promise<QualityCheckResult> {
-  if (!materialText.trim() || materialText.length > 20_000 || (title?.length ?? 0) > 200)
+  if (!qualityCheckInputState(materialText, title).valid)
     return Promise.reject(new IdentityError('INVALID_REQUEST', 400));
   const requestSignal = withTimeout(signal, 10_000);
   try {

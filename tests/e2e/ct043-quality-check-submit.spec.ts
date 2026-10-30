@@ -213,7 +213,10 @@ test('未提取问题行仅表示规则范围内结果；刷新不留结果且�
     '仅识别以“问题：”或“问题:”开头且冒号后有非空内容的行',
   );
   await expect(page.locator('#quality-check-scope')).toContainText('例如：问题：尺寸超差');
-  await expect(material(page)).toHaveAttribute('aria-describedby', 'quality-check-scope quality-check-count');
+  await expect(material(page)).toHaveAttribute(
+    'aria-describedby',
+    'quality-check-scope quality-check-count quality-check-count-rule',
+  );
   expect(posts[0].body).toEqual({ materialText: '本批记录完整。' });
   await page.reload();
   await expect(submitButton(page)).toBeDisabled();
@@ -395,4 +398,43 @@ test('切企业丢弃旧结果和输入，在途响应也不能写入新企业�
   await expect(material(page)).toHaveValue('');
   release();
   await noConclusion(page);
+});
+
+for (const [name, text, heading, count] of [
+  ['首尾空白不占材料上限', ' \n' + '文'.repeat(20_000) + '\n ', '  ' + '题'.repeat(200) + '  ', 20_000],
+  ['补充字符按码点计数', '😀'.repeat(20_000), '😀'.repeat(200), 20_000],
+  ['Java额外控制空白为空', '\u001c\u001d\u001e\u001f', '', 0],
+  ['不换行空格不是空材料', '\u00a0', '', 1],
+] as const) {
+  test(`材料和标题计数规则：${name}`, async ({ page }) => {
+    const { posts } = await fixture(page);
+    await page.goto(href());
+    await material(page).fill(text);
+    await page.getByRole('textbox', { name: '标题（选填）' }).fill(heading);
+    await expect(page.locator('#quality-check-count')).toHaveText(`${count} / 20000 字`);
+    if (count === 0) {
+      await expect(submitButton(page)).toBeDisabled();
+      expect(posts).toHaveLength(0);
+    } else {
+      await expect(submitButton(page)).toBeEnabled();
+      await submitButton(page).click();
+      await expect(results(page)).toContainText('本次未提取到符合约定规则的问题行');
+      expect(posts[0].body).toEqual({ materialText: text, ...(heading ? { title: heading } : {}) });
+    }
+  });
+}
+
+test('补充字符材料和标题超限仍禁用，修正到边界后恢复', async ({ page }) => {
+  const { posts } = await fixture(page);
+  await page.goto(href());
+  const title = page.getByRole('textbox', { name: '标题（选填）' });
+  await material(page).fill('😀'.repeat(20_001));
+  await expect(page.locator('#quality-check-count')).toHaveText('20001 / 20000 字');
+  await expect(submitButton(page)).toBeDisabled();
+  await material(page).fill('😀'.repeat(20_000));
+  await title.fill('😀'.repeat(201));
+  await expect(submitButton(page)).toBeDisabled();
+  expect(posts).toHaveLength(0);
+  await title.fill('😀'.repeat(200));
+  await expect(submitButton(page)).toBeEnabled();
 });

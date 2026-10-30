@@ -9,6 +9,7 @@ import {
   submitQualityCheck,
   type QualityCheckResult,
 } from './quality-check-client.ts';
+import { qualityCheckInputState } from './quality-check-input.ts';
 import './quality-check.css';
 
 export const qualityCheckHref = (tenant: string) =>
@@ -26,7 +27,7 @@ export function QualityCheck({ opened }: { opened: OpenedCapabilitiesState }) {
   const pending = useRef<AbortController | null>(null);
   useEffect(() => () => pending.current?.abort(), []);
   const enabled = !opened.error && opened.items?.some((item) => item.enterpriseFunction === 'quality-check');
-  const valid = materialText.trim().length > 0 && materialText.length <= 20_000 && title.length <= 200;
+  const { materialLength, titleLength, valid } = qualityCheckInputState(materialText, title);
   const submitting = submission.state === 'submitting';
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -73,7 +74,7 @@ export function QualityCheck({ opened }: { opened: OpenedCapabilitiesState }) {
       <section className="access-panel" aria-labelledby="quality-check-submit">
         <h2 id="quality-check-submit">② 提交检查材料</h2>
         <form onSubmit={submit} aria-busy={submitting}>
-          <Field label="标题（选填）" hint={`${title.length} / 200 字`}>
+          <Field label="标题（选填）" hint={`${titleLength} / 200 字`}>
             <input value={title} onChange={(event) => setTitle(event.target.value)} disabled={submitting} />
           </Field>
           <Field label="检查材料">
@@ -82,13 +83,17 @@ export function QualityCheck({ opened }: { opened: OpenedCapabilitiesState }) {
               onChange={(event) => setMaterialText(event.target.value)}
               rows={8}
               disabled={submitting}
-              aria-describedby="quality-check-scope quality-check-count"
-              aria-invalid={materialText.length > 20_000}
+              aria-describedby="quality-check-scope quality-check-count quality-check-count-rule"
+              aria-invalid={materialLength > 20_000}
             />
           </Field>
-          <p id="quality-check-count">{materialText.length} / 20000 字</p>
-          {materialText.length > 20_000 && <p role="alert">检查材料不能超过 20000 字</p>}
-          {title.length > 200 && <p role="alert">标题不能超过 200 字</p>}
+          <p id="quality-check-count-rule">
+            首尾普通空格、换行不计，文中空白及不换行空格计入。单个补充字符计 1
+            字，组合表情可能计多字；标题使用相同规则。
+          </p>
+          <p id="quality-check-count">{materialLength} / 20000 字</p>
+          {materialLength > 20_000 && <p role="alert">检查材料不能超过 20000 字</p>}
+          {titleLength > 200 && <p role="alert">标题不能超过 200 字</p>}
           <Button type="submit" disabled={!valid || submitting}>
             {submitting ? '提交中…' : '提交检查材料'}
           </Button>
