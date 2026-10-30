@@ -44,7 +44,7 @@
 | 日序 | 焦点 | 可演示 URL（Mac 预览，端口以 `preview-health` / start 输出为准，下称 `{P}`） |
 |---|---|---|
 | **D0 今晚 / D+1** | **前端·F1** agent-admin 能力注册壳：现 Demo「空谷无界」占位 → 可点开 **模型能力 / Agent 登记** 列表空态+「登记第一个实现」按钮（对齐 ADR-B8 §验页；挂 **CT-020** 前端片 / 衔接 **CT-018**） | `http://127.0.0.1:{P}/agent-admin/` → `#view=functions`；`#view=capability-registry`（`&tab=catalog`） |
-| D+1 | **前端·F2** 能力目录 tab：catalog 列表（种子/空态分明），禁止假数据冒充 Live | `http://127.0.0.1:{P}/agent-admin/#view=capability-registry&tab=catalog` |
+| D+1 | **前端·F2** / **CT-020-F2** 能力注册→主流程（catalog 种子/空态 + 登记面板骨架）；禁止假数据冒充 Live；执行单 `CT-020-F2-capability-registry-main-path.md` | `http://127.0.0.1:{P}/agent-admin/#view=functions` → `#view=capability-registry&tab=catalog`（点「登记第一个实现」开面板） |
 | D+2 | **前端·F3** versions / grants 子视图可切换（只读 UI；写接口未就绪则按钮 disabled + 文案） | `…&tab=versions`；`…&tab=grants` |
 | D+2～3 | CT-012 起步 或 CT-013 契约五分片骨架（后端） | 契约/ArchUnit 绿（非页面则写命令验收） |
 | D+3 | CT-014 迁移空表可查 | DB 只读确认 `qo_*` |
@@ -140,4 +140,5 @@
 | CT-027-B | Mac 正式预览合成包（`scripts/preview/**`） | **须保留**；与 A 对仗，勿删 |
 | CT-029 | 废止同账号方案 A / 流程 v1.3.5 | 勿与 CT-028（mengine preview）撞号 |
 | CT-030 | CI 省钱 paths 分流 + 缩 macos 矩阵 | 防下月额度烧光；执行单已写 |
+| CT-020-F2 | agent-admin 能力注册→主流程（F1 壳上 catalog 种子/空态+登记面板） | 待执行；执行单已写；勿撞 CT-031+ |
 
