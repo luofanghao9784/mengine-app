@@ -1,5 +1,7 @@
 # CT-042 第四端「开通给企业」按钮接线
 
+> **现状**：#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。下文若仍写 #41 未合或 Empty 仍在，以本句为准。
+
 状态：架构已裁可跑 · 待 docs 入库后交老板 Mac Codex　｜　**正式岗** id=`ec838a2d-d838-48cd-a789-e1af1424a7f3`（勿派重复岗）　｜　分支：`codex/ct-042-agent-admin-grant-tenant-button`　｜　**审查人（实现 PR 后）：发布验收 + 质量性能 + 架构逻辑 + 安全审查**　｜　基准：本执行单 docs 对照 `a514be5` / [#36](https://github.com/luofanghao9784/mengine-app/pull/36)（CT-041 执行单）。其前已在 main 的还有：CT-040 执行单 `727063f` / [#33](https://github.com/luofanghao9784/mengine-app/pull/33)、#35 接真 `7fa4946`、CT-037 `1d847e6` / #32、CT-039 实现 `701c3ca` / [#31](https://github.com/luofanghao9784/mengine-app/pull/31)、CT-034-A 实现 `75ab17a` / [#30](https://github.com/luofanghao9784/mengine-app/pull/30)、人话 `e339056` / #15（CT-038）。**开通写实现尚未合入**，见脚注【待合-CT-040-实现】。
 
 > **日切片：D6 前端写侧 / 可演示点**：已登录第四端后，打开现页 `#view=capability-registry&tab=grants`。原灰钮「开通给企业」可点。填入真实或演示企业编号，功能为已登记的质量检查。点击后网络面板出现 `POST /api/agent-admin/v1/tenants/{tenantId}/grants`。**201** 才显示开通成功；再点一次见到 **200** 或「已开通」，页面不长出假名单。未登录点下去被人话挡住，不显示开通成功。  
