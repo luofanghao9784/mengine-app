@@ -1,5 +1,6 @@
 import { defineConfig } from '@playwright/test';
 const port = Number(process.env.PLAYWRIGHT_PORT || 5173);
+const isCi = !!process.env.CI;
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
@@ -13,9 +14,16 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: `npm run dev -- --port ${port}`,
+    // CI: gate job already ran `npm run build`; preview is faster/more stable than cold `vite` dev.
+    // Local: keep `npm run dev` for HMR.
+    command: isCi
+      ? `npm run preview -- --port ${port}`
+      : `npm run dev -- --port ${port}`,
     url: `http://127.0.0.1:${port}`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !isCi,
+    timeout: 180_000,
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
   reporter: 'list',
 });
