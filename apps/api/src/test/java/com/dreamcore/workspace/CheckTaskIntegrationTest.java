@@ -120,6 +120,14 @@ class CheckTaskIntegrationTest {
         verifyNoInteractions(tasks, catalog, engine);
     }
 
+    @Test void anonymousWithBadCsrfIs401Or403AndNeverWrites() throws Exception {
+        var response = new Client().post(material("问题：尺寸超差"), "not-a-real-token");
+        assertTrue(response.statusCode() == 401 || response.statusCode() == 403, response.body());
+        System.out.println("CT-043-A anonymous bad CSRF: status=" + response.statusCode() + " body=" + response.body());
+        error(response, response.statusCode(), response.statusCode() == 401 ? "AUTHENTICATION_REQUIRED" : "ACCESS_DENIED", "请求未获授权。");
+        verifyNoInteractions(tasks, catalog, engine);
+    }
+
     @Test void authenticatedWithoutCsrfIsForbidden() throws Exception {
         grant(tenantA);
         error(customer.post(material("问题：尺寸超差"), null), 403, "ACCESS_DENIED", "请求未获授权。");
