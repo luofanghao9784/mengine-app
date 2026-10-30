@@ -81,8 +81,8 @@ for (const width of [1440, 390]) {
     for (const name of ['① 进入说明', '② 提交检查材料', '③ 处理结果'])
       await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '提交检查材料', exact: true })).toBeDisabled();
-    await expect(page.getByText('暂时不能提交检查材料（执行服务尚未接通）', { exact: true })).toBeVisible();
-    await expect(page.getByText('暂时不能查看处理结果（执行服务尚未接通）', { exact: true })).toBeVisible();
+    await expect(page.getByText('暂时不能提交检查材料（执行服务尚未接通）', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('暂时不能查看处理结果（执行服务尚未接通）', { exact: true })).toHaveCount(0);
     await expect(page.getByText('检查通过', { exact: true })).toHaveCount(0);
     if (width === 390) await page.getByRole('button', { name: '打开导航' }).click();
     const link = page.getByRole('link', { name: '质量检查', exact: true });
@@ -166,7 +166,7 @@ for (const [name, reply, title] of [
     await page.goto(href());
     await expect(
       page.getByRole('heading', {
-        name: name === '200 空列表' ? '本企业尚未开通此 AI 功能' : title,
+        name: name === '200 空列表' ? '本企业还没有开通质量检查' : title,
         exact: true,
       }),
     ).toBeVisible();
@@ -198,7 +198,7 @@ test('其他已开通项不能放行质量检查', async ({ page }) => {
     items: [{ enterpriseFunction: 'document-parse', displayName: '文档解析' }],
   });
   await page.goto(href());
-  await expect(page.getByRole('heading', { name: '本企业尚未开通此 AI 功能', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '本企业还没有开通质量检查', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: '质量检查', exact: true })).toHaveCount(0);
 });
 
@@ -231,7 +231,7 @@ test('读取中不提前显示入口，切企业不复用旧开通状态', async
   await page.evaluate((id) => {
     location.hash = `tenant=${id}&view=quality-check`;
   }, other);
-  await expect(page.getByRole('heading', { name: '本企业尚未开通此 AI 功能', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '本企业还没有开通质量检查', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: '质量检查', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '提交检查材料', exact: true })).toHaveCount(0);
 });

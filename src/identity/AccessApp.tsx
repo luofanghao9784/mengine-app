@@ -714,7 +714,7 @@ function GuardedAccessShell({
               ) : skills ? (
                 <SkillCenter key={tenant} tenant={tenant} />
               ) : qualityCheck ? (
-                <QualityCheck opened={opened} />
+                <QualityCheck key={tenant} opened={opened} />
               ) : documents ? (
                 <Documents key={tenant} tenant={tenant} />
               ) : briefing || conversations ? (
