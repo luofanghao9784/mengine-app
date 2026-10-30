@@ -1,6 +1,6 @@
 # CT-040 第四端「开通给企业」写口
 
-状态：架构已裁可跑 · 待 docs 入库后交老板 Mac Codex　｜　分支：`codex/ct-040-agent-admin-grant-tenant-opened`　｜　**审查人（PR 后两人审）：架构逻辑 + 安全审查 + 质量性能**　｜　基准：切单时最新 `origin/main`（须含 tip `75ab17a` / CT-034-A 实现 [#30](https://github.com/luofanghao9784/mengine-app/pull/30)；其前含 CT-039 执行单 `e2415b8` / [#29](https://github.com/luofanghao9784/mengine-app/pull/29)、CT-034-A 执行单 `fdc22fe` / #28、空态壳 `#25`/`7e21bc0`、登记鉴权 `#22`/`022768b`、第四端登录 `#21`/`bd06caf`）
+状态：架构已裁可跑 · 待 docs 入库后交老板 Mac Codex　｜　分支：`codex/ct-040-agent-admin-grant-tenant-opened`　｜　**审查人（PR 后两人审）：架构逻辑 + 安全审查 + 质量性能**　｜　基准：切单时最新 `origin/main`（须含 tip `7fa4946` / #35 接真；其前含 CT-037 `1d847e6` / #32、CT-039 实现 `701c3ca` / [#31](https://github.com/luofanghao9784/mengine-app/pull/31)、CT-034-A 实现 `75ab17a` / [#30](https://github.com/luofanghao9784/mengine-app/pull/30)、CT-039 执行单 `e2415b8` / [#29](https://github.com/luofanghao9784/mengine-app/pull/29)、CT-034-A 执行单 `fdc22fe` / #28、空态壳 `#25`/`7e21bc0`、登记鉴权 `#22`/`022768b`、第四端登录 `#21`/`bd06caf`）
 
 > **日切片：D6 写侧 / 可演示点**：已登录且 CSRF 有效时，`POST /api/agent-admin/v1/tenants/{tenantId}/grants` 把一条**已登记**的企业功能授权给路径上的那个企业，返回 **201**，同一测试库能读到带 `tenant_id` 的行。无会话仍 **401**。有会话无 CSRF 仍 **403**。重复开通同一项 → **200**，不插第二行，不改已有审计列。禁止无落库的 201，禁止把登记目录 POST 再做成开通。  
 > **挂靠**：两周日切片·轨 A。验收句 **W1** 里的「开通给企业」写口，不是登记目录（CT-034-A 已合），不是企业读口（CT-039），不是消费页（CT-036），不是现网冒烟（CT-037）。`docs/codex-tasks/两周日切片-三轨并行-20261031.md`。  
@@ -10,7 +10,7 @@
 规格依据：
 
 - 登记目录已合：[`CT-034-A-register-persist-201.md`](CT-034-A-register-persist-201.md)（实现 `75ab17a` / #30）。表 `qo_capability` **无** `tenant_id`。迁移 `V191__platform_capability_registry.sql`。写口仍只是 `POST /api/agent-admin/v1/capabilities`
-- 企业读口执行单：[`CT-039-tenant-opened-capabilities-readonly.md`](CT-039-tenant-opened-capabilities-readonly.md)（`e2415b8` / #29，**实现未合**）。读路径是 `GET /api/tenant-admin/v1/opened-capabilities`，不是第四端 grants
+- 企业读口：[`CT-039-tenant-opened-capabilities-readonly.md`](CT-039-tenant-opened-capabilities-readonly.md)（执行单 `e2415b8` / #29，**实现已合** `701c3ca` / [#31](https://github.com/luofanghao9784/mengine-app/pull/31)）。读路径是 `GET /api/tenant-admin/v1/opened-capabilities`，不是第四端 grants。生产 `EmptyCapabilityCatalogAdapter` 仍空。**#35 接真已合** `7fa4946`（前端已消费读口，未改生产 adapter）。**CT-037 已合** `1d847e6`。开通真源仍靠本单写口，合入后由读口接。测试可对照授权表
 - 消费骨架：[`CT-036-enterprise-consume-opened-capability.md`](CT-036-enterprise-consume-opened-capability.md)。本单不改它的前端
 - ADR-B8 D8-1 / D8-5：`docs/architecture/backend-v0/ADR-B8-第四端边界-统一agent管理平台.md`。授权唯一写入口在第四端；租户不得自授；`tenantId` 只作被授权对象出现在路径上。本单**不做**模块版本、默认版本、`CAPABILITY_DEFAULT_NOT_CONFIGURED`
 - 今日契约：`contracts/public-api/capability-registry.openapi.json`  
@@ -20,7 +20,8 @@
 - 错误形状：`contracts/public-api/error.schema.json`（`contractVersion`、`code`、`message`、`retryable`）。人话引 [`QUEUE.md`](QUEUE.md)「编制·前端开发」硬性第 6 条：`message` 禁止裸用 `seed` / `capability` / `Capability` / `Grant` / `admission`
 - 迁移：`V190__agent_admin_identity_sessions.sql`、`V191__platform_capability_registry.sql` 已占用。**V192 留给 CT-039 投影**（文件可以还不存在，本单也不许占）。本单新文件 **≥ V193**
 
-> **脚注（今日实测口径）**：登记 POST 在 `75ab17a` 已是「未登录 401、无 CSRF 403、合法 201、重复 capabilityId 409」。开通 POST 在代码里还没有控制器；契约仍写骨架/501。本单新增开通写，不改登记 POST 的状态码和文案。
+> **脚注（今日实测口径）**：登记 POST 在 `75ab17a` 已是「未登录 401、无 CSRF 403、合法 201、重复 capabilityId 409」。开通 POST 在代码里还没有控制器；契约仍写骨架/501。本单新增开通写，不改登记 POST 的状态码和文案。  
+> **脚注（CT-039 #31）**：CT-039 **实现已合** main `701c3ca` / [#31](https://github.com/luofanghao9784/mengine-app/pull/31)。生产 `EmptyCapabilityCatalogAdapter` 仍恒为空，不把登记行当成开通。**#35 接真已合** `7fa4946`。**CT-037 已合** `1d847e6`。开通真源仍靠本单写口，合入后由读口接。测试可对照授权表。本单不改那条读口。
 
 ### 架构已裁
 
@@ -84,7 +85,7 @@ CREATE TABLE qo_capability_tenant_grant (
 
 1. 第四端会话没有租户。路径上的 `tenantId` 是被开通的企业，不是调用者的租户。不要从 `DREAMCORE_AGENT` 会话里读 tenant，也不要造 `ExecutionScope`。
 2. 企业读口归 **CT-039**。本单禁止实现 `GET /api/tenant-admin/v1/opened-capabilities`，禁止实现 `listCapabilityTenantGrants`，禁止让企业会话调用本 POST。
-3. CT-039 **实现未合**时：本单测试用同一 `JdbcTemplate` 直读 `qo_capability_tenant_grant`。不要为了验收去实现 CT-039。若开跑时 CT-039 实现已经合入，允许把它的测试种子改成对照本表，但本 PR 默认不改 CT-039 生产读空行为，也不要另造第二张开通真源表。
+3. CT-039 **实现已合** `701c3ca` / #31。生产 `EmptyCapabilityCatalogAdapter` 仍空。开通真源仍靠本单写口，合入后由读口接。本单测试用同一 `JdbcTemplate` 直读 `qo_capability_tenant_grant`（可对照授权表）。不要为了验收去改 CT-039 读口，也不要另造第二张开通真源表。
 4. 写者放在现有 `com.dreamcore.workspace.agentadmin`（新控制器即可，例如 `CapabilityTenantGrantController`）。不要借机拆 `agentregistry.*`，不要做 ArchUnit R-B8。`qualityops` 不得在本单里 SQL 这张表。
 
 ## ① 目标与范围
@@ -111,13 +112,13 @@ CREATE TABLE qo_capability_tenant_grant (
 | 改指向 | 同企业同功能、另一 `capabilityId` → 409，不覆盖 |
 | 会话 | `DREAMCORE_AGENT` + CSRF；未登录 401；无 CSRF 403 |
 | 目录 | 必须先有 `qo_capability` 行，且 `enterprise_function` 与 body 一致 |
-| 回读 | 测试直读 `qo_capability_tenant_grant`；不依赖未实现的 GET，也不依赖未合入的 CT-039 |
+| 回读 | 测试直读 `qo_capability_tenant_grant`（可对照授权表）；不依赖未实现的 grants GET。CT-039 实现已合，生产 Empty adapter 仍空，本单不改读口 |
 | 错误 | JSON 四字段；`message` 中文白话；无堆栈、无裸术语 |
 
 ## ② 前置条件与分支名
 
 - **⓪ 暂停令自查**：有或拿不准 → 立刻停，问 DQ。
-- **依赖**：CT-034-A 实现已在 main（`75ab17a`）。本单不再登记目录。CT-039 实现未合也不阻塞；测试直读授权表。
+- **依赖**：CT-034-A 实现已在 main（`75ab17a`）。CT-039 **实现已合**（`701c3ca` / #31），生产 Empty adapter 仍空，不阻塞本单。测试可对照授权表。本单不再登记目录。
 - 正确仓：`~/Desktop/mengine-app-luofanghao9784`（origin=`luofanghao9784/mengine-app`）。
 
 ```bash
@@ -128,6 +129,9 @@ git remote get-url origin | grep -q 'luofanghao9784/mengine-app' || { echo 'ERRO
 git status
 git switch main && git pull
 git merge-base --is-ancestor 75ab17a HEAD || { echo 'ERROR: main 不含 CT-034-A 实现，停'; exit 1; }
+git merge-base --is-ancestor 701c3ca HEAD || { echo 'ERROR: main 不含 CT-039 实现，停'; exit 1; }
+git merge-base --is-ancestor 1d847e6 HEAD || { echo 'ERROR: main 不含 CT-037，停'; exit 1; }
+git merge-base --is-ancestor 7fa4946 HEAD || { echo 'ERROR: main 不含 #35 接真，停'; exit 1; }
 test ! -e apps/api/src/main/java/com/dreamcore/workspace/agentadmin/CapabilityRegistryStubSecurity.java || { echo 'ERROR: StubSecurity 还在，停'; exit 1; }
 test -f apps/api/src/main/resources/db/migration-common/V191__platform_capability_registry.sql || { echo 'ERROR: 找不到 V191，停'; exit 1; }
 export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
@@ -146,7 +150,8 @@ git grep -n "listCapabilityTenantGrants" -- apps/api/src/main '*.java' || echo '
 把下面整段交给 Codex（`$CODEX`，模型 `gpt-6.1-sol`，思考强度 **high**；本机模型若是 `gpt-5.1-codex` 亦可）：
 
 ```
-你在梦擎仓库分支 codex/ct-040-agent-admin-grant-tenant-opened 上工作。基准 origin/main，须含 75ab17a（CT-034-A 实现 #30）。只做本单范围。执行单：docs/codex-tasks/CT-040-agent-admin-grant-tenant-opened.md。
+你在梦擎仓库分支 codex/ct-040-agent-admin-grant-tenant-opened 上工作。基准 origin/main，须含 7fa4946（#35 接真）与 1d847e6（CT-037），从而含 701c3ca（CT-039 实现 #31）与 75ab17a（CT-034-A 实现 #30）。只做本单范围。执行单：docs/codex-tasks/CT-040-agent-admin-grant-tenant-opened.md。
+CT-039 读口已合。生产 EmptyCapabilityCatalogAdapter 仍空。#35 接真已合 7fa4946（前端已消费读口，未改生产 adapter）。CT-037 已合 1d847e6。开通真源仍靠本单写口，合入后由读口接。测试可对照 qo_capability_tenant_grant。不要改那条读口。
 对照：docs/codex-tasks/CT-034-A-register-persist-201.md、docs/codex-tasks/CT-039-tenant-opened-capabilities-readonly.md、docs/architecture/backend-v0/ADR-B8-第四端边界-统一agent管理平台.md。
 今日代码：POST /api/agent-admin/v1/capabilities 已落库 qo_capability（无 tenant_id，V191）。AgentAdminSecurity 匹配 /api/agent-admin/**。未登录 401「还没有登录，请先登录后再试」；有会话无 CSRF 403「登录校验未通过，请刷新页面后再试」。CapabilityRegistryStubSecurity 已不存在。
 契约：contracts/public-api/capability-registry.openapi.json 里 POST /api/agent-admin/v1/tenants/{tenantId}/grants（createCapabilityTenantGrant）仍是骨架。GET listCapabilityTenantGrants 仍是骨架。今日 CapabilityTenantGrantCreate 要求 moduleVersionId 与 isDefault；仓内没有 qo_module_version，禁止编造这两个字段。
@@ -156,7 +161,7 @@ git grep -n "listCapabilityTenantGrants" -- apps/api/src/main '*.java' || echo '
 【已裁】
 1. 本单是开通写，不是登记目录。不要改 POST /api/agent-admin/v1/capabilities 的状态码和文案。不要给 qo_capability 加 tenant_id。不要改 V191。
 2. 写口只 POST /api/agent-admin/v1/tenants/{tenantId}/grants。Cookie 是 DREAMCORE_AGENT，安全链用已有的 AgentAdminSecurity。未登录 401，有会话无或错 X-CSRF-TOKEN 403。先会话，再 CSRF，再 body。禁止 permitAll，禁止 platform-admin 写入口，禁止企业端或工作台自开通。
-3. GET listCapabilityTenantGrants 保持未实现。不要实现 CT-039 的 GET /api/tenant-admin/v1/opened-capabilities。
+3. GET listCapabilityTenantGrants 保持未实现。不要改已合的 CT-039 读口 GET /api/tenant-admin/v1/opened-capabilities（生产 Empty adapter 仍空）。
 4. 新表 qo_capability_tenant_grant 必须有 tenant_id。迁移只新增。版本 = max(三处目录当前最大号 + 1, 193)。db/migration、db/migration-local、db/migration-common 都要看。禁止改已有迁移。禁止使用 V191 和 V192；V192 不存在也不要占，留给 CT-039，本单从 V193 起。
 5. 重复开通钉死为 200 且不覆盖。首次 201。同一租户、同一 enterpriseFunction、同一 capabilityId 再 POST → 200，不 UPDATE，granted_at 不变。同一租户同一 enterpriseFunction 但 capabilityId 不同 → 409，message「已经开通过了，不能改成另一项」，不覆盖。
 6. 没有行不得 201。401/403/400/404/409 不得插入或修改。message 人话。不要改 AgentAdminErrors 或 IdentityErrors 的全局文案。
@@ -178,7 +183,7 @@ capabilityId 不在 qo_capability → 404「还没有这项登记，请先登记
 1. 先看三处迁移目录的最大号。新文件放 db/migration-common，版本 = max(最大号+1, 193)。不要用 V192。文件名含 qo_capability_tenant_grant 的用途说明即可。不要 ALTER qo_capability。
 2. 在 com.dreamcore.workspace.agentadmin 新增开通控制器与最小写入类。不要改 CapabilityRegistryController 的登记逻辑。不要改 AgentAdminSecurity 的 permitAll。
 3. 校验失败不得先插入再靠回滚冒充业务错误。
-4. 回读：CapabilityTenantGrantIntegrationTest 用 JdbcTemplate 查 qo_capability_tenant_grant。默认不要新 GET。不要调用未实现的 listCapabilityTenantGrants，不要实现 CT-039。
+4. 回读：CapabilityTenantGrantIntegrationTest 用 JdbcTemplate 查 qo_capability_tenant_grant（可对照授权表）。默认不要新 GET。不要调用未实现的 listCapabilityTenantGrants，不要改已合的 CT-039 读口。
 5. 测试须覆盖：
    - 无 cookie POST（含非法 JSON）→ 401「还没有登录，请先登录后再试」，授权行数不变。
    - 有会话、不带或错 CSRF → 403「登录校验未通过，请刷新页面后再试」，不插行。先会话后 CSRF：无会话不得变成 403。
@@ -211,7 +216,7 @@ curl -si -X POST "http://127.0.0.1:50831/api/agent-admin/v1/tenants/TENANT/grant
 
 已登录且 CSRF 正确时期望首次 201，测试库 qo_capability_tenant_grant 有该 tenant_id 行。不要用 GET /api/agent-admin/v1/tenants/TENANT/grants 当验收。
 
-【做完输出】git diff --stat、迁移文件名（必须 V193 或更大，且不是 V191/V192）、201 是否能在表里读回、重复是否 200 且 granted_at 未变、409 是否不改指向、确认表有 tenant_id、确认没有新的 grants GET、没有实现 CT-039、没有恢复 permitAll、没有改登记 POST。
+【做完输出】git diff --stat、迁移文件名（必须 V193 或更大，且不是 V191/V192）、201 是否能在表里读回、重复是否 200 且 granted_at 未变、409 是否不改指向、确认表有 tenant_id、确认没有新的 grants GET、没有改已合的 CT-039 读口、没有恢复 permitAll、没有改登记 POST。
 ```
 
 ## ④ 推荐模型与思考强度

@@ -1,9 +1,9 @@
 # CT-039 企业侧「本租户已开通」只读
 
-状态：架构已裁可跑 · 待 docs 入库后交老板 Mac Codex　｜　分支：`codex/ct-039-tenant-opened-capabilities-readonly`　｜　**审查人（实现 PR 后）：架构逻辑 + 安全审查 + 质量性能**　｜　基准：切单时对照 `fdc22fe`（CT-034-A 执行单 [#28](https://github.com/luofanghao9784/mengine-app/pull/28)）。其后目录实现已合 `75ab17a` / [#30](https://github.com/luofanghao9784/mengine-app/pull/30)（平台全局 `qo_capability`，不是开通数据）。**本读口仍是生产读空 + 测试种子。开通写见 [CT-040](CT-040-agent-admin-grant-tenant-opened.md)**
+状态：架构已裁可跑 · 待 docs 入库后交老板 Mac Codex　｜　分支：`codex/ct-039-tenant-opened-capabilities-readonly`　｜　**审查人（实现 PR 后）：架构逻辑 + 安全审查 + 质量性能**　｜　基准：切单时对照 `fdc22fe`（CT-034-A 执行单 [#28](https://github.com/luofanghao9784/mengine-app/pull/28)）。其后目录实现已合 `75ab17a` / [#30](https://github.com/luofanghao9784/mengine-app/pull/30)（平台全局 `qo_capability`，不是开通数据）。**实现已合** main `701c3ca` / [#31](https://github.com/luofanghao9784/mengine-app/pull/31)。生产 `EmptyCapabilityCatalogAdapter` 仍空。**#35 接真已合** `7fa4946`（企业侧消费该读口，未改生产 adapter）。开通真源仍靠 [CT-040](CT-040-agent-admin-grant-tenant-opened.md) 写口，合入后由读口接。测试可对照授权表。**CT-037 已合** `1d847e6`。
 
 > **本单只做后端 / 契约读口。** 供 CT-036 钉死【待补-读口】。CT-036 仍是消费骨架，不是本读口的实现单。  
-> **已合空态壳**：`#25` 的 tenant-admin「已开通」与 workspace「质量检查」固定诚实空态，不发开通请求。本单不改这两页，不把空态壳接上读口（接线仍归 CT-036）。  
+> **已合空态壳**：`#25` 的 tenant-admin「已开通」与 workspace「质量检查」曾是固定诚实空态。**#35 接真已合** `7fa4946`：这两页已消费本读口，生产 adapter 仍空。本单不改这两页。  
 > **总负责人不代跑**；老板 / 后端岗在 Mac 自跑 Codex。模型 `gpt-6.1-sol`，思考强度 **high**。  
 > **仓**：`luofanghao9784/mengine-app`。
 
@@ -15,8 +15,8 @@
 - 契约骨架：`contracts/public-api/capability-registry.openapi.json`（`listCapabilities`、`listCapabilityTenantGrants` 均为骨架，**未实现**）、`contracts/public-api/check-flow-config.openapi.json`（`listBindableModulesForTenant` 是「可绑定版本」骨架，不是已开通列表）
 - 人话：[《全端文案规范》](https://www.notion.so/40966c386fbf8120aaefc0290f9dedb8)、[去黑话对照](https://app.notion.com/p/40966c386fbf81f3a2e3e1822ae6a9b9)
 
-> **脚注（现状）**：`CapabilityCatalogPort` 与 `qualityops` 都尚未落盘。登记 POST 已由 CT-034-A 落库并 201（`75ab17a`）。没有登记 GET，没有 grants GET。开通写不在本单，见 CT-040。  
-> **脚注（A 档 #30）**：目录实现已合，表 `qo_capability` 无 `tenant_id`（V191）。库内仍没有「本租户已开通」生产数据；本读口生产读空，测试用种子。不要改登记 POST，不要占 V191，不要实现 grants POST。投影若仍自建，迁移钉 **V192+**。CT-040 合入后，种子改为对照 `qo_capability_tenant_grant`，不要再造第二套开通真源。
+> **脚注（现状）**：CT-039 **实现已合** main `701c3ca` / [#31](https://github.com/luofanghao9784/mengine-app/pull/31)。`CapabilityCatalogPort`、`qualityops` 读口与 `EmptyCapabilityCatalogAdapter` 已落盘；生产 adapter 仍恒为空，不把登记行当成开通。**#35 接真已合** `7fa4946`：企业侧已消费该读口，未改生产 adapter。登记 POST 已由 CT-034-A 落库并 201（`75ab17a`）。没有登记 GET，没有 grants GET。开通真源仍靠 CT-040 写口，合入后由读口接。**CT-037 已合** `1d847e6`。  
+> **脚注（A 档 #30 / 读口 #31 / 接真 #35）**：目录实现已合，表 `qo_capability` 无 `tenant_id`（V191）。读口实现已合，生产 Empty adapter 仍空。**#35 接真已合** `7fa4946`。测试可对照授权表。不要改登记 POST，不要占 V191，不要实现 grants POST。投影若仍自建，迁移钉 **V192+**。不要再造第二套开通真源。**CT-037 已合** `1d847e6`。
 
 ### 架构已裁（2026-10-30）
 
@@ -38,7 +38,7 @@
    - `displayName` 由服务端填人话，闭集对应：「文档解析」「表格对比」「质量检查」「语义标注」「修复建议」。演示种子只用 `quality-check` / 「质量检查」
    - 响应**不要** `tenantId`、`moduleVersionId`、`isDefault`、`grantedAt`，schema 名不要用 Grant
 8. **契约 GET 未实现。** 本单新增的是上面这条企业读口，写入 `contracts/public-api/opened-capabilities.openapi.json`（新文件）。不要改 `listCapabilityTenantGrants` / `listCapabilities` 去冒充已实现，也不要改 `listBindableModulesForTenant`。错误体沿用 `contracts/public-api/error.schema.json`（`contractVersion`、`code`、`message`、`retryable`）。
-9. **数据**：目录实现已合（V191 `qo_capability`，无 `tenant_id`），开通数据仍无。生产路径读空（200 + `items: []`）。契约测试与集成测试用**种子**，种子不得走登记 POST，也不得走开通 POST。若必须建只读投影表：迁移号 **V192+**，且大于开跑时 `db/migration`、`db/migration-local`、`db/migration-common` 三处最大号。禁止改已有迁移，禁止改 V191。CT-040 的授权表占 **V193+**，本单不要占那个号，也不要建 `qo_capability_tenant_grant`。投影只供本读口。CT-040 合入之后，种子改为对照该授权表，不要再造第二套开通真源。
+9. **数据**：目录实现已合（V191 `qo_capability`，无 `tenant_id`）。CT-039 **实现已合** `701c3ca` / #31，生产 `EmptyCapabilityCatalogAdapter` 仍空（200 + `items: []`），不把登记行当成开通。开通真源仍靠 CT-040 写口，合入后由读口接。测试可对照授权表，种子不得走登记 POST，也不得走开通 POST。若必须建只读投影表：迁移号 **V192+**，且大于开跑时 `db/migration`、`db/migration-local`、`db/migration-common` 三处最大号。禁止改已有迁移，禁止改 V191。CT-040 的授权表占 **V193+**，本单不要占那个号，也不要建 `qo_capability_tenant_grant`。投影只供本读口。不要再造第二套开通真源。
 10. **与总部名单对账（E36-6）**可以做，但只在测试里对照**同一份种子投影**。禁止企业会话去请求第四端 grants。第四端只读 grants 仍未实现，本单不实现它。
 11. **非范围**：开通写、登记 POST 落库（CT-034-A）、CT-036 前端页与空态壳接线、精致开通页、批量开通、真实质量检查执行。
 
@@ -49,7 +49,7 @@
   1. 实现并契约化 `GET /api/tenant-admin/v1/opened-capabilities`（`listOpenedCapabilities`），字段按上面第 7 条。
   2. 租户只从企业会话的唯一 ACTIVE 成员身份来。带 `tenantId` 的 query 或 body → **400**，人话「有无法识别的字段，请检查后再提交」，且不按该 id 查询。
   3. `qualityops` 只调用 `CapabilityCatalogPort`。同 PR 带一条自动断言：该包源码不 import `agentregistry` / `agentadmin`（读源文件或 ArchUnit 均可，必须进默认测试并绿）。
-  4. 目录已合、开通数据仍无：生产实现返回空列表。集成测试用种子造出「已开通 / 未开通 / 跨企业」三组，PR 正文写明种子不是生产数据。CT-040 未合时不要读 `qo_capability_tenant_grant`。
+  4. 目录已合。CT-039 **实现已合** `701c3ca` / #31：生产 `EmptyCapabilityCatalogAdapter` 仍返回空列表。开通真源仍靠 CT-040 写口，合入后由读口接。集成测试可对照授权表；种子不是生产数据，不得走登记 POST，也不得走开通 POST。
   5. 有会话但定不出唯一企业 → 404 +「暂时不能查看已开通功能」。未登录沿用客户域安全链的 401；**不要**改 `IdentitySecurity.writeError` 的全局文案。若本路径未登录文案仍是「请求未获授权。」，测试断言 401，且 body 不含他企、不含 `Grant`。
 - **改哪些文件（允许）**：
   - `contracts/public-api/opened-capabilities.openapi.json`（新建）
@@ -68,7 +68,7 @@
 - **⓪ 暂停令自查（第一步）**：有或拿不准 → 立刻停，问 DQ。
 - **依赖**：
   - 企业登录已在 main（客户域 `DREAMCORE_SESSION`）。解析不出唯一企业时按【待补-会话】返回 404，不要改走第四端。
-  - 登记目录已合（`75ab17a`），开通数据仍无。允许读空；测试用种子。PR 正文写明。开通写归 CT-040，本单不做。
+  - 登记目录已合（`75ab17a`）。本读口 **实现已合**（`701c3ca` / #31），生产 Empty adapter 仍空。开通真源仍靠 CT-040 写口，合入后由读口接。测试可对照授权表。开通写归 CT-040，本单不做。
   - 空态壳 `#25` 已合。本单不接前端。
 - 正确仓：`~/Desktop/mengine-app-luofanghao9784`（origin=`luofanghao9784/mengine-app`）。
 
@@ -103,7 +103,7 @@ CT-036 只作消费骨架，不要把它改成实现单，也不要改 src/admin
 【后端前置 · 必须遵守】
 1. 登记目录是平台全局（第四端无 tenant）。本单不做登记写，也不做开通写。不要改 POST /api/agent-admin/v1/capabilities（它已是 201，禁止改回 501）。不要做 CT-040 的 grants POST。
 2. 禁止企业登录后直接调第四端 GET /api/agent-admin/v1/tenants/{tenantId}/grants，或任何 /api/agent-admin/**，来充当「本租户已开通」。另裁企业读口：GET /api/tenant-admin/v1/opened-capabilities，operationId listOpenedCapabilities。与总部名单对账可以，但只能在测试里对照同一份种子；路径和鉴权必须是企业会话（DREAMCORE_SESSION）。禁止企业会话打到 /api/agent-admin/**。
-3. 契约 GET listCapabilities 与 listCapabilityTenantGrants 均未实现。本单实现的是新的企业读口，不要写「接上已有 grants GET」。不要修改这两条 operation 去假装已实现。listBindableModulesForTenant 是可绑定版本骨架，不是本列表。若投影表需要迁移：大于三处迁移目录当前最大号，且 ≥ V192。V191 已是 qo_capability，禁止改。禁止建 qo_capability_tenant_grant（那是 CT-040，迁移 V193+）。目录已合 75ab17a，但没有开通行。生产读空，集成测用种子，PR 正文写明。CT-040 未合时不要等开通表。
+3. 契约 GET listCapabilities 与 listCapabilityTenantGrants 均未实现。本单实现的是新的企业读口，不要写「接上已有 grants GET」。不要修改这两条 operation 去假装已实现。listBindableModulesForTenant 是可绑定版本骨架，不是本列表。若投影表需要迁移：大于三处迁移目录当前最大号，且 ≥ V192。V191 已是 qo_capability，禁止改。禁止建 qo_capability_tenant_grant（那是 CT-040，迁移 V193+）。目录已合 75ab17a。CT-039 实现已合 701c3ca / #31，生产 EmptyCapabilityCatalogAdapter 仍空。开通真源仍靠 CT-040 写口，合入后由读口接。测试可对照授权表。
 
 【钉死的接口】
 GET /api/tenant-admin/v1/opened-capabilities
@@ -177,7 +177,7 @@ gh pr create -R luofanghao9784/mengine-app --base main --head codex/ct-039-tenan
 另裁企业读口 GET /api/tenant-admin/v1/opened-capabilities（listOpenedCapabilities）。禁止用第四端 grants。契约上的目录 GET / grants GET 仍未实现，本单没有接它们。
 
 ## 数据
-目录已合、开通数据仍无时生产读空。集成测使用种子。若有投影表，迁移大于当时最大号且 ≥ V192（禁止改 V191，禁止建 CT-040 授权表）。
+CT-039 实现已合 701c3ca / #31。生产 EmptyCapabilityCatalogAdapter 仍空。开通真源仍靠 CT-040 写口，合入后由读口接。测试可对照授权表。若有投影表，迁移大于当时最大号且 ≥ V192（禁止改 V191，禁止建 CT-040 授权表）。
 
 ## 审查
 - 架构逻辑 + 安全审查 + 质量性能
