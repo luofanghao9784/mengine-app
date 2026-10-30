@@ -1,15 +1,72 @@
-// Read-only connectivity probe. Until the list contract lands, never infer ModuleVersions.
-export async function probeCapabilities(signal: AbortSignal): Promise<boolean> {
+const enterpriseFunctions = [
+  'document-parse',
+  'table-compare',
+  'quality-check',
+  'semantic-annotation',
+  'repair-suggestion',
+] as const;
+
+export type Capability = {
+  capabilityId: string;
+  name: string;
+  enterpriseFunction?: (typeof enterpriseFunctions)[number];
+  kind?: 'quality_check';
+};
+
+export type CapabilityListResult =
+  | { status: 'ok'; items: Capability[] }
+  | { status: 'empty' }
+  | { status: 'unauthenticated' }
+  | { status: 'failed' };
+
+function isCapability(value: unknown): value is Capability {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const item = value as Record<string, unknown>;
+  return (
+    nonemptyString(item.capabilityId) &&
+    nonemptyString(item.name) &&
+    (!('enterpriseFunction' in item) ||
+      enterpriseFunctions.some((name) => name === item.enterpriseFunction)) &&
+    (!('kind' in item) || item.kind === 'quality_check')
+  );
+}
+
+/** 旧浏览器没有 AbortSignal.any / timeout 时降级为手动超时，避免卡在加载中。 */
+function withTimeout(signal: AbortSignal, ms: number): AbortSignal {
+  if (typeof AbortSignal.any === 'function' && typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.any([signal, AbortSignal.timeout(ms)]);
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  const stop = () => {
+    clearTimeout(timer);
+    controller.abort();
+  };
+  if (signal.aborted) stop();
+  else signal.addEventListener('abort', stop, { once: true });
+  return controller.signal;
+}
+
+export async function listCapabilities(signal: AbortSignal): Promise<CapabilityListResult> {
   try {
+    const requestSignal = withTimeout(signal, 10_000);
     const response = await fetch('/api/agent-admin/v1/capabilities', {
       method: 'GET',
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
-      signal,
+      cache: 'no-store',
+      signal: requestSignal,
     });
-    return response.ok && (response.headers.get('content-type') || '').includes('application/json');
+    if (requestSignal.aborted) return { status: 'failed' };
+    if (response.status === 401) return { status: 'unauthenticated' };
+    if (response.status !== 200) return { status: 'failed' };
+    const body: unknown = await response.json();
+    if (requestSignal.aborted || !Array.isArray(body) || !body.every(isCapability)) {
+      return { status: 'failed' };
+    }
+    return body.length ? { status: 'ok', items: body } : { status: 'empty' };
   } catch {
-    return false;
+    return { status: 'failed' };
   }
 }
 

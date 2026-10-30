@@ -88,7 +88,8 @@
   outline: 2px solid var(--accent);
   outline-offset: 4px;
 }
-.agent-admin .admin-content {
+.agent-admin .admin-content,
+.agent-live-content {
   animation: agent-enter 0.25s ease-out;
 }
 @keyframes agent-enter {
@@ -102,7 +103,8 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .agent-admin .admin-content {
+  .agent-admin .admin-content,
+  .agent-live-content {
     animation: none;
   }
 }
