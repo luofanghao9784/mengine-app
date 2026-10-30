@@ -19,7 +19,7 @@
   - 不改 `vite.config.ts` 默认 4400（保留本地 dev 约定）；不改 Java 业务、前端 DataWork、mengine 业务逻辑。
   - 不把 scene 固定死到 4400；不引入 Homebrew；不对上游 `dimmm1125-coder` 写操作。
   - **不修** `/tenant-admin/prototype/` 免登不通（另见下文 P1；今晚不修）。
-  - 禁止 commit/push/gh 由 Codex 执行；禁止开 Issue；PR 只允许 `-R luofanghao9784/mengine`。
+  - 禁止 commit/push/gh 由 Codex 执行；禁止开 Issue；PR 只允许 `-R luofanghao9784/mengine-app`。
 
 ### 验收（Mac 预览）
 
@@ -33,13 +33,13 @@
 
 - **⓪ 暂停令自查**：有暂停令或拿不准 → 禁止 Codex / 禁止推送，问 DQ。
 - 依赖：无硬依赖未合 CT；建议在 CT-006 落地脚本已在用的仓上改。
-- 正确仓：`~/Desktop/mengine-luofanghao9784`（origin=`luofanghao9784/mengine`）。
+- 正确仓：`~/Desktop/mengine-app-luofanghao9784`（origin=`luofanghao9784/mengine-app`）。
 
 ```bash
 CODEX="/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"
-REPO="$HOME/Desktop/mengine-luofanghao9784"
+REPO="$HOME/Desktop/mengine-app-luofanghao9784"
 cd "$REPO"
-git remote get-url origin | grep -q 'luofanghao9784/mengine' || { echo 'ERROR: 错误 remote，停'; exit 1; }
+git remote get-url origin | grep -q 'luofanghao9784/mengine-app' || { echo 'ERROR: 错误 remote，停'; exit 1; }
 git switch main && git pull
 git switch -c codex/ct-028-preview-mengine-api-url
 # 暂停令自查通过后：codex 粘贴第 ③ 节；或交付运维按提示词手工改
@@ -48,7 +48,7 @@ git switch -c codex/ct-028-preview-mengine-api-url
 ## ③ 完整 Codex 提示词（整段复制）
 
 ```text
-你在 mengine（老板 fork）。任务：试用预览启动 scene 后，让 vite preview 的 /mengine-api 代理打到该次动态 scene 端口。
+你在 mengine-app（正式仓，非 fork）。任务：试用预览启动 scene 后，让 vite preview 的 /mengine-api 代理打到该次动态 scene 端口。
 
 【硬约束】
 1. 主要只改 scripts/local/trial.py。可选：scripts/preview/preview-start.sh 或 preview-health.sh 加一行中文注释；可选 docs/codex-tasks/CT-006-mac-preview-land.md 文末「已知运维注意」短节指向 CT-028。禁止改 vite.config.ts、Java、前端业务、mengine 源码。
@@ -73,7 +73,7 @@ git switch -c codex/ct-028-preview-mengine-api-url
 
 - 标题：`docs(ct-028): preview MENGINE_API_URL → 动态 scene 口`
 - 正文：链本执行单；说明漏斗验收正式入口 `#place=data`；prototype 免登不在范围。
-- `-R luofanghao9784/mengine`；禁止 force push。
+- `-R luofanghao9784/mengine-app`；禁止 force push。
 
 ## ⑥ 审查与合入
 
