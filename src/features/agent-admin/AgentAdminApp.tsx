@@ -73,7 +73,7 @@ export function AgentAdminApp() {
         <div className="admin-brand">
           <DreamcoreLogo />
           <div className="admin-brand-label">
-            <strong>梦核引擎</strong>
+            <strong>梦擎引擎</strong>
             <span className="admin-brand-english">Mengine</span>
           </div>
         </div>
