@@ -8,6 +8,7 @@ import { PhoneAuth } from './PhoneAuth';
 import { uuid } from './client';
 import { entryTenant, rememberedTenant, rememberTenant } from './entry';
 import { WorkspaceNavigation } from './WorkspaceNavigation';
+import { QualityCheck, qualityCheckHref } from './QualityCheck';
 import { DrawerSlot, usePhoneLayout } from './drawer-slot';
 import { useWorkspaceNotifications } from './workspace-notifications';
 import { WorkspaceComposer } from './WorkspaceComposer';
@@ -27,6 +28,7 @@ import {
   LayoutPanelTop,
   ExternalLink,
   Puzzle,
+  ClipboardCheck,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -270,6 +272,7 @@ function GuardedAccessShell({
     profiles = view === 'profiles',
     conversations = view === 'conversations',
     skills = view === 'skills',
+    qualityCheck = view === 'quality-check',
     documents = view === 'documents',
     briefing = view === 'briefing' || (surface === 'workspace' && !view),
     fromBriefing = params.get('from') === 'briefing',
@@ -376,6 +379,10 @@ function GuardedAccessShell({
     return entryHref(target, tenant || undefined);
   };
   const choose = (id: string) => {
+    if (qualityCheck) {
+      location.hash = qualityCheckHref(id);
+      return;
+    }
     location.hash = skills
       ? skillsHref(id)
       : departure
@@ -446,7 +453,9 @@ function GuardedAccessShell({
                         ? LibraryBig
                         : skills
                           ? Puzzle
-                          : Menu;
+                          : qualityCheck
+                            ? ClipboardCheck
+                            : Menu;
                   return <Icon size={20} strokeWidth={1.7} aria-hidden="true" />;
                 })()}
                 <ChevronRight className="workspace-menu-hint" size={12} strokeWidth={2} aria-hidden="true" />
@@ -506,6 +515,12 @@ function GuardedAccessShell({
                       href: libraryHref(tenant),
                     },
                     { label: '技能中心', icon: Puzzle, active: skills, href: skillsHref(tenant) },
+                    {
+                      label: '质量检查',
+                      icon: ClipboardCheck,
+                      active: qualityCheck,
+                      href: qualityCheckHref(tenant),
+                    },
                   ]}
                 />
               ) : (
@@ -563,7 +578,9 @@ function GuardedAccessShell({
                                     ? '资料库'
                                     : skills
                                       ? '技能中心'
-                                      : labels[surface]}
+                                      : qualityCheck
+                                        ? '质量检查'
+                                        : labels[surface]}
                   </h1>
                   {surface === 'workspace' && briefing && (
                     <time
@@ -580,6 +597,7 @@ function GuardedAccessShell({
                 surface !== 'workspace' ||
                 library ||
                 skills ||
+                qualityCheck ||
                 conversations ||
                 briefing ||
                 documents ||
@@ -685,6 +703,8 @@ function GuardedAccessShell({
                 <Profiles tenant={tenant} personalOnly />
               ) : skills ? (
                 <SkillCenter key={tenant} tenant={tenant} />
+              ) : qualityCheck ? (
+                <QualityCheck />
               ) : documents ? (
                 <Documents key={tenant} tenant={tenant} />
               ) : briefing || conversations ? (
