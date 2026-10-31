@@ -1,0 +1,323 @@
+{
+  "head": "d79e27a89dcc237b4fa881523581cf877551f1c6",
+  "tree": "c84df41561ce7d3f0ce5898b0dbe10471f3ffe6e",
+  "time": "2026-10-31T02:44:49.557Z",
+  "member": {
+    "account": {
+      "id": "fde2629e-cbc5-42fd-9940-82d8d00706db",
+      "email": null,
+      "displayName": "合成页面验收",
+      "phone": "+8619900001043",
+      "username": null
+    },
+    "platformAdmin": false,
+    "memberships": [
+      {
+        "tenantId": "b195020a-788c-475e-88d3-d66990708da8",
+        "tenantName": "CT043合成验收企业",
+        "role": "MEMBER",
+        "service": {
+          "status": "ACTIVE",
+          "explanation": null,
+          "changedAt": null
+        }
+      }
+    ]
+  },
+  "events": [
+    {
+      "path": "/api/tenant-admin/v1/opened-capabilities",
+      "time": "2026-10-31T02:38:02.322Z",
+      "input": null,
+      "mode": "real",
+      "status": 200,
+      "response": {
+        "items": [
+          {
+            "enterpriseFunction": "quality-check",
+            "displayName": "质量检查"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/api/tenant-admin/v1/quality-ops/check-tasks",
+      "time": "2026-10-31T02:38:42.026Z",
+      "input": {
+        "materialText": "问题：合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。末尾核对甲\n问题：ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123END乙"
+      },
+      "mode": "real",
+      "status": 201,
+      "response": {
+        "taskId": "0f2418ca-b380-433e-8554-9e1e2d2c7a18",
+        "status": "COMPLETED",
+        "result": {
+          "verdict": "ISSUES_FOUND",
+          "issues": [
+            {
+              "message": "合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。末尾核对甲"
+            },
+            {
+              "message": "ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123END乙"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/api/tenant-admin/v1/quality-ops/check-tasks",
+      "time": "2026-10-31T02:41:26.177Z",
+      "input": {
+        "materialText": "问题：合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。末尾核对甲\n问题：ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123END乙",
+        "title": "恢复测试"
+      },
+      "mode": "real",
+      "status": 201,
+      "response": {
+        "taskId": "09fc1e54-835b-4dd9-92df-f231145f1e26",
+        "status": "COMPLETED",
+        "result": {
+          "verdict": "ISSUES_FOUND",
+          "issues": [
+            {
+              "message": "合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。合成长段落保持完整。末尾核对甲"
+            },
+            {
+              "message": "ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123ABC123END乙"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/api/tenant-admin/v1/quality-ops/check-tasks",
+      "mode": "held-front-end",
+      "time": "2026-10-31T02:42:09.442Z",
+      "input": {
+        "materialText": "问题：超时合成材料",
+        "title": "恢复测试"
+      },
+      "aborted": true,
+      "released": true
+    },
+    {
+      "path": "/api/tenant-admin/v1/quality-ops/check-tasks",
+      "time": "2026-10-31T02:42:46.340Z",
+      "input": {
+        "materialText": "问题：超时后真实重试成功",
+        "title": "恢复测试"
+      },
+      "mode": "real",
+      "status": 201,
+      "response": {
+        "taskId": "dec1783b-f7fa-43f0-b0b3-0146c5995692",
+        "status": "COMPLETED",
+        "result": {
+          "verdict": "ISSUES_FOUND",
+          "issues": [
+            {
+              "message": "超时后真实重试成功"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/api/tenant-admin/v1/quality-ops/check-tasks",
+      "mode": "desktop-held",
+      "time": "2026-10-31T02:42:55.999Z",
+      "input": {
+        "materialText": "问题：桌面超时",
+        "title": "恢复测试"
+      },
+      "aborted": true,
+      "released": true
+    },
+    {
+      "path": "/api/tenant-admin/v1/quality-ops/check-tasks",
+      "mode": "controlled-tenant-switch",
+      "time": "2026-10-31T02:43:28.244Z",
+      "input": {
+        "materialText": "问题：企业甲迟到结果",
+        "title": "恢复测试"
+      },
+      "aborted": true,
+      "released": true
+    },
+    {
+      "path": "/api/tenant-admin/v1/quality-ops/check-tasks",
+      "mode": "controlled-tenant-switch",
+      "time": "2026-10-31T02:43:57.987Z",
+      "input": {
+        "materialText": "问题：企业甲迟到结果"
+      },
+      "aborted": true,
+      "released": true
+    },
+    {
+      "path": "/api/tenant-admin/v1/quality-ops/check-tasks",
+      "mode": "controlled-tenant-switch",
+      "time": "2026-10-31T02:44:13.307Z",
+      "input": {
+        "materialText": "问题：企业乙迟到结果"
+      },
+      "aborted": true,
+      "released": true
+    }
+  ],
+  "checks": [
+    {
+      "case": "desktop-long",
+      "viewport": [
+        1440,
+        900
+      ],
+      "exact": true,
+      "overflow": false
+    },
+    {
+      "case": "desktop-overlimit",
+      "disabled": true,
+      "alerts": [
+        "检查材料不能超过 20000 字",
+        "标题不能超过 200 字"
+      ],
+      "requestsAdded": 0
+    },
+    {
+      "case": "mobile-overlimit",
+      "viewport": [
+        390,
+        844
+      ],
+      "disabled": true,
+      "alerts": [
+        "检查材料不能超过 20000 字",
+        "标题不能超过 200 字"
+      ],
+      "overflow": false
+    },
+    {
+      "case": "mobile-recovered",
+      "enabled": true
+    },
+    {
+      "case": "mobile-long",
+      "viewport": [
+        390,
+        844
+      ],
+      "exact": true,
+      "overflow": false
+    },
+    {
+      "case": "mobile-pending-duplicate",
+      "posts": 1,
+      "disabled": true,
+      "oldResult": false,
+      "status": "提交中，请稍候…"
+    },
+    {
+      "case": "mobile-timeout",
+      "alert": "未收到确定的检查结果，结果尚不确定；重试可能再次提交材料，请谨慎操作",
+      "enabled": true,
+      "oldResult": false
+    },
+    {
+      "case": "mobile-late-release",
+      "lateText": false,
+      "alert": "未收到确定的检查结果，结果尚不确定；重试可能再次提交材料，请谨慎操作"
+    },
+    {
+      "case": "timeout-real-retry",
+      "text": "超时后真实重试成功"
+    },
+    {
+      "case": "desktop-pending",
+      "viewport": [
+        1440,
+        900
+      ],
+      "posts": 1,
+      "disabled": true,
+      "oldResult": false
+    },
+    {
+      "case": "desktop-timeout",
+      "alert": "未收到确定的检查结果，结果尚不确定；重试可能再次提交材料，请谨慎操作",
+      "enabled": true,
+      "oldResult": false
+    },
+    {
+      "case": "desktop-late",
+      "lateText": false
+    },
+    {
+      "case": "desktop-switch",
+      "hash": "#tenant=00000000-0000-4000-8000-000000000037&view=quality-check",
+      "oldAborted": true,
+      "oldResult": false
+    },
+    {
+      "case": "desktop-switch-late",
+      "lateText": false
+    },
+    {
+      "case": "desktop-authorized-switch",
+      "viewport": [
+        1440,
+        900
+      ],
+      "hash": "#tenant=00000000-0000-4000-8000-000000000037&view=quality-check",
+      "input": "",
+      "oldAborted": true,
+      "oldResult": false
+    },
+    {
+      "case": "desktop-authorized-switch-late",
+      "lateText": false,
+      "input": ""
+    },
+    {
+      "case": "mobile-authorized-switch",
+      "viewport": [
+        390,
+        844
+      ],
+      "input": "",
+      "oldAborted": true,
+      "oldResult": false
+    },
+    {
+      "case": "mobile-authorized-switch-late",
+      "lateText": false,
+      "input": ""
+    },
+    {
+      "case": "mobile-opened-503",
+      "noForm": true,
+      "noResult": true,
+      "message": "暂时不能查看已开通功能（后台开通中）\n\n开通信息暂时无法读取，请稍后刷新重试。",
+      "viewport": [
+        390,
+        844
+      ]
+    },
+    {
+      "case": "desktop-opened-503",
+      "noForm": true,
+      "noResult": true,
+      "message": "暂时不能查看已开通功能（后台开通中）\n\n开通信息暂时无法读取，请稍后刷新重试。",
+      "viewport": [
+        1440,
+        900
+      ]
+    }
+  ],
+  "limits": [
+    "long-input set through native input event in mounted browser",
+    "held responses and opened-503 are front-end controlled only",
+    "switch used temporary real second membership and controlled opened response",
+    "first switch to absent membership denied; later authorized switch verified separately"
+  ]
+}
