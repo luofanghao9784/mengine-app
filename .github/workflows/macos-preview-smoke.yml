@@ -15,9 +15,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
-      PREVIEW_HOME: ${{ runner.temp }}/dreamcore-preview
       DREAMCORE_REPO: ${{ github.workspace }}
     steps:
+      - name: Initialize preview home
+        run: echo "PREVIEW_HOME=$RUNNER_TEMP/dreamcore-preview" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with: { persist-credentials: false }
       - uses: actions/setup-node@v4
