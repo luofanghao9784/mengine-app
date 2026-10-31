@@ -1,0 +1,987 @@
+{
+  "sourceMerge": "3e6bdc740955b06ce6f5b250b43fb600d359104a",
+  "head": "3e450e72660eda88498d4719e17f84a7a335f380",
+  "base": "d945af9235b07ecfbfc4990bd6c4ebae4324b769",
+  "sourceUnmodified": true,
+  "productionFixPublished": false,
+  "originalRun": 41158561952,
+  "terminalStatus": "completed/cancelled",
+  "originalReportTotals": {
+    "general": {
+      "tests": 55,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3,
+      "partial": true
+    },
+    "rest": {
+      "tests": 1634,
+      "failures": 60,
+      "errors": 71,
+      "skipped": 33,
+      "suites": 187,
+      "partial": true
+    }
+  },
+  "artifacts": {
+    "general": {
+      "id": 13028792309,
+      "sha256": "d54bc40c6fb0970d3c7de3c757f0550f488fd88e6da233d01b751ad9c53f98e1"
+    },
+    "rest": {
+      "id": 13029256525,
+      "sha256": "3b8c7b61dc71e890a0acef42c67d61890895bff6aa9032fcb89f1713950977b3"
+    }
+  },
+  "environment": {
+    "node": {
+      "argv": [
+        "node",
+        "--version"
+      ],
+      "exit": 0,
+      "output": "v24.20.0\n"
+    },
+    "java": {
+      "argv": [
+        "java",
+        "-version"
+      ],
+      "exit": 0,
+      "output": "openjdk version \"21.0.13\" 2026-10-20 LTS\nOpenJDK Runtime Environment Temurin-21.0.13+9 (build 21.0.13+9-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.13+9 (build 21.0.13+9-LTS, mixed mode, sharing)\n"
+    },
+    "postgres": {
+      "argv": [
+        "initdb",
+        "--version"
+      ],
+      "exit": 0,
+      "output": "initdb (PostgreSQL) 18.6 (Debian 18.6-1.pgdg12+2)\n"
+    },
+    "parser-python": {
+      "argv": [
+        "python3",
+        "-c",
+        "import venv; print(\"venv available\")"
+      ],
+      "exit": 0,
+      "output": "venv available\n"
+    },
+    "bwrap": {
+      "argv": [
+        "bwrap",
+        "--unshare-all",
+        "--die-with-parent",
+        "--ro-bind",
+        "/",
+        "/",
+        "--proc",
+        "/proc",
+        "--dev",
+        "/dev",
+        "/bin/true"
+      ],
+      "exit": 1,
+      "output": "bwrap: Failed to make / slave: Operation not permitted\n"
+    },
+    "systemd-user": {
+      "argv": [
+        "systemctl",
+        "--user",
+        "is-system-running"
+      ],
+      "exit": 1,
+      "output": "offline\n"
+    }
+  },
+  "steps": [
+    {
+      "label": "engine-install",
+      "argv": [
+        "npm",
+        "ci",
+        "--prefix",
+        "engine"
+      ],
+      "cwd": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/merge",
+      "sourceMerge": "3e6bdc740955b06ce6f5b250b43fb600d359104a",
+      "head": "3e450e72660eda88498d4719e17f84a7a335f380",
+      "exit": 0,
+      "start": 1793418755.5266733,
+      "end": 1793418764.7122166,
+      "summary": [],
+      "classes": []
+    },
+    {
+      "label": "engine-build",
+      "argv": [
+        "npm",
+        "run",
+        "build",
+        "--prefix",
+        "engine"
+      ],
+      "cwd": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/merge",
+      "sourceMerge": "3e6bdc740955b06ce6f5b250b43fb600d359104a",
+      "head": "3e450e72660eda88498d4719e17f84a7a335f380",
+      "exit": 0,
+      "start": 1793418792.1310072,
+      "end": 1793418792.5980093,
+      "summary": [],
+      "classes": []
+    },
+    {
+      "label": "harness-isolated",
+      "argv": [
+        "python3",
+        "scripts/with-test-postgres.py",
+        "./apps/api/mvnw",
+        "-s",
+        "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-settings.xml",
+        "-B",
+        "-f",
+        "apps/api/pom.xml",
+        "-Dtest=TaskContextHarnessIT",
+        "test"
+      ],
+      "cwd": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/merge",
+      "sourceMerge": "3e6bdc740955b06ce6f5b250b43fb600d359104a",
+      "head": "3e450e72660eda88498d4719e17f84a7a335f380",
+      "exit": 0,
+      "start": 1793418801.691599,
+      "end": 1793418841.7324386,
+      "summary": [
+        {
+          "name": "com.dreamcore.workspace.TaskContextHarnessIT",
+          "tests": "1",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "22.848"
+        }
+      ],
+      "archivedSnapshotIncludesPriorReports": true,
+      "classes": [
+        {
+          "name": "com.dreamcore.workspace.TaskContextHarnessIT",
+          "tests": "1",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "22.848"
+        }
+      ]
+    },
+    {
+      "label": "knowledge-claim-isolated",
+      "argv": [
+        "python3",
+        "scripts/with-test-postgres.py",
+        "./apps/api/mvnw",
+        "-s",
+        "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-settings.xml",
+        "-B",
+        "-f",
+        "apps/api/pom.xml",
+        "-Dtest=KnowledgeIntegrationTest#ordinaryHistoricalUploadStillGetsItsParse+supersededAutomaticSceneVersionDoesNotStarveCurrentParse+repeatedWorkerCrashesStopAfterThreeAttempts",
+        "test"
+      ],
+      "cwd": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/merge",
+      "sourceMerge": "3e6bdc740955b06ce6f5b250b43fb600d359104a",
+      "head": "3e450e72660eda88498d4719e17f84a7a335f380",
+      "exit": 0,
+      "start": 1793418904.8520274,
+      "end": 1793418920.95889,
+      "summary": [
+        {
+          "name": "com.dreamcore.workspace.KnowledgeIntegrationTest",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "11.758"
+        }
+      ],
+      "archivedSnapshotIncludesPriorReports": true,
+      "classes": [
+        {
+          "name": "com.dreamcore.workspace.KnowledgeIntegrationTest",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "11.758"
+        }
+      ]
+    },
+    {
+      "label": "table-access-isolated",
+      "argv": [
+        "python3",
+        "scripts/with-test-postgres.py",
+        "./apps/api/mvnw",
+        "-s",
+        "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-settings.xml",
+        "-B",
+        "-f",
+        "apps/api/pom.xml",
+        "-Dtest=TableCalculationIntegrationTest#sourceAndCapabilityMustBelongToCurrentSpaceAndAttemptAndToolMustBeStarted",
+        "test"
+      ],
+      "cwd": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/merge",
+      "sourceMerge": "3e6bdc740955b06ce6f5b250b43fb600d359104a",
+      "head": "3e450e72660eda88498d4719e17f84a7a335f380",
+      "exit": 0,
+      "start": 1793418930.4870372,
+      "end": 1793418946.9068933,
+      "summary": [
+        {
+          "name": "com.dreamcore.workspace.TableCalculationIntegrationTest",
+          "tests": "1",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "12.083"
+        }
+      ],
+      "archivedSnapshotIncludesPriorReports": true,
+      "classes": [
+        {
+          "name": "com.dreamcore.workspace.TableCalculationIntegrationTest",
+          "tests": "1",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "12.083"
+        }
+      ]
+    },
+    {
+      "label": "material-then-knowledge-v2",
+      "argv": [
+        "python3",
+        "scripts/with-test-postgres.py",
+        "python3",
+        "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/cross-jvm.py",
+        "material-then-knowledge-v2",
+        "MaterialIntegrationTest#editableTextUsesOriginalAndMaintenanceAndVersionUpload",
+        "KnowledgeIntegrationTest#ordinaryHistoricalUploadStillGetsItsParse"
+      ],
+      "cwd": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/merge",
+      "sourceMerge": "3e6bdc740955b06ce6f5b250b43fb600d359104a",
+      "head": "3e450e72660eda88498d4719e17f84a7a335f380",
+      "exit": 0,
+      "start": 1793419132.898896,
+      "end": 1793419161.38665,
+      "summary": [
+        {
+          "name": "com.dreamcore.workspace.KnowledgeIntegrationTest",
+          "tests": "1",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "8.301"
+        }
+      ],
+      "classes": [
+        {
+          "selector": "MaterialIntegrationTest#editableTextUsesOriginalAndMaintenanceAndVersionUpload",
+          "argv": [
+            "./apps/api/mvnw",
+            "-s",
+            "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-settings.xml",
+            "-B",
+            "-f",
+            "apps/api/pom.xml",
+            "-Dtest=MaterialIntegrationTest#editableTextUsesOriginalAndMaintenanceAndVersionUpload",
+            "test"
+          ],
+          "exit": 0,
+          "start": 1793419133.6710873,
+          "end": 1793419149.4200976,
+          "beforeQueue": [],
+          "afterQueue": [],
+          "summary": [
+            {
+              "name": "com.dreamcore.workspace.MaterialIntegrationTest",
+              "tests": "1",
+              "failures": "0",
+              "errors": "0",
+              "skipped": "0",
+              "time": "12.229",
+              "issues": []
+            }
+          ]
+        },
+        {
+          "selector": "KnowledgeIntegrationTest#ordinaryHistoricalUploadStillGetsItsParse",
+          "argv": [
+            "./apps/api/mvnw",
+            "-s",
+            "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-settings.xml",
+            "-B",
+            "-f",
+            "apps/api/pom.xml",
+            "-Dtest=KnowledgeIntegrationTest#ordinaryHistoricalUploadStillGetsItsParse",
+            "test"
+          ],
+          "exit": 0,
+          "start": 1793419149.4593773,
+          "end": 1793419161.222357,
+          "beforeQueue": [],
+          "afterQueue": [],
+          "summary": [
+            {
+              "name": "com.dreamcore.workspace.KnowledgeIntegrationTest",
+              "tests": "1",
+              "failures": "0",
+              "errors": "0",
+              "skipped": "0",
+              "time": "8.301",
+              "issues": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "native-then-knowledge",
+      "argv": [
+        "python3",
+        "scripts/with-test-postgres.py",
+        "python3",
+        "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/cross-jvm.py",
+        "native-then-knowledge",
+        "NativeConversationIntegrationTest#crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions",
+        "KnowledgeIntegrationTest#ordinaryHistoricalUploadStillGetsItsParse"
+      ],
+      "cwd": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/merge",
+      "sourceMerge": "3e6bdc740955b06ce6f5b250b43fb600d359104a",
+      "head": "3e450e72660eda88498d4719e17f84a7a335f380",
+      "exit": 1,
+      "start": 1793419185.7925882,
+      "end": 1793419212.388925,
+      "summary": [
+        {
+          "name": "com.dreamcore.workspace.KnowledgeIntegrationTest",
+          "tests": "1",
+          "failures": "1",
+          "errors": "0",
+          "skipped": "0",
+          "time": "8.426"
+        }
+      ],
+      "classes": [
+        {
+          "selector": "NativeConversationIntegrationTest#crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions",
+          "argv": [
+            "./apps/api/mvnw",
+            "-s",
+            "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-settings.xml",
+            "-B",
+            "-f",
+            "apps/api/pom.xml",
+            "-Dtest=NativeConversationIntegrationTest#crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions",
+            "test"
+          ],
+          "exit": 0,
+          "start": 1793419186.6690078,
+          "end": 1793419200.089504,
+          "beforeQueue": [],
+          "afterQueue": [
+            {
+              "id": "4d00090c-6b39-4244-8366-a7d270989a7d",
+              "tenant_id": "36e63cc2-49f8-4aa3-8406-6eb4c2ad5732",
+              "workspace_id": "4335b68f-df13-41f0-a1e8-71d057992f04",
+              "material_id": "0eb9f2be-e945-4b93-ac6d-b5900f963fb0",
+              "version_id": "782a5a0f-8923-4f3b-95fc-4823815a6d3b",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T11:59:59.39857+08:00"
+            },
+            {
+              "id": "285eb192-0c9c-4332-9a03-6b24180ba315",
+              "tenant_id": "36e63cc2-49f8-4aa3-8406-6eb4c2ad5732",
+              "workspace_id": "4335b68f-df13-41f0-a1e8-71d057992f04",
+              "material_id": "0eb9f2be-e945-4b93-ac6d-b5900f963fb0",
+              "version_id": "adf22df5-572e-4351-9470-8550838cd054",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T11:59:59.484883+08:00"
+            }
+          ],
+          "summary": [
+            {
+              "name": "com.dreamcore.workspace.NativeConversationIntegrationTest",
+              "tests": "1",
+              "failures": "0",
+              "errors": "0",
+              "skipped": "0",
+              "time": "9.798",
+              "issues": []
+            }
+          ]
+        },
+        {
+          "selector": "KnowledgeIntegrationTest#ordinaryHistoricalUploadStillGetsItsParse",
+          "argv": [
+            "./apps/api/mvnw",
+            "-s",
+            "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-settings.xml",
+            "-B",
+            "-f",
+            "apps/api/pom.xml",
+            "-Dtest=KnowledgeIntegrationTest#ordinaryHistoricalUploadStillGetsItsParse",
+            "test"
+          ],
+          "exit": 1,
+          "start": 1793419200.1286533,
+          "end": 1793419212.2036874,
+          "beforeQueue": [
+            {
+              "id": "4d00090c-6b39-4244-8366-a7d270989a7d",
+              "tenant_id": "36e63cc2-49f8-4aa3-8406-6eb4c2ad5732",
+              "workspace_id": "4335b68f-df13-41f0-a1e8-71d057992f04",
+              "material_id": "0eb9f2be-e945-4b93-ac6d-b5900f963fb0",
+              "version_id": "782a5a0f-8923-4f3b-95fc-4823815a6d3b",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T11:59:59.39857+08:00"
+            },
+            {
+              "id": "285eb192-0c9c-4332-9a03-6b24180ba315",
+              "tenant_id": "36e63cc2-49f8-4aa3-8406-6eb4c2ad5732",
+              "workspace_id": "4335b68f-df13-41f0-a1e8-71d057992f04",
+              "material_id": "0eb9f2be-e945-4b93-ac6d-b5900f963fb0",
+              "version_id": "adf22df5-572e-4351-9470-8550838cd054",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T11:59:59.484883+08:00"
+            }
+          ],
+          "afterQueue": [
+            {
+              "id": "4d00090c-6b39-4244-8366-a7d270989a7d",
+              "tenant_id": "36e63cc2-49f8-4aa3-8406-6eb4c2ad5732",
+              "workspace_id": "4335b68f-df13-41f0-a1e8-71d057992f04",
+              "material_id": "0eb9f2be-e945-4b93-ac6d-b5900f963fb0",
+              "version_id": "782a5a0f-8923-4f3b-95fc-4823815a6d3b",
+              "status": "RUNNING",
+              "attempts": 1,
+              "lease_until": "2026-10-31T12:02:11.674825+08:00",
+              "created_at": "2026-10-31T11:59:59.39857+08:00"
+            },
+            {
+              "id": "285eb192-0c9c-4332-9a03-6b24180ba315",
+              "tenant_id": "36e63cc2-49f8-4aa3-8406-6eb4c2ad5732",
+              "workspace_id": "4335b68f-df13-41f0-a1e8-71d057992f04",
+              "material_id": "0eb9f2be-e945-4b93-ac6d-b5900f963fb0",
+              "version_id": "adf22df5-572e-4351-9470-8550838cd054",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T11:59:59.484883+08:00"
+            }
+          ],
+          "summary": [
+            {
+              "name": "com.dreamcore.workspace.KnowledgeIntegrationTest",
+              "tests": "1",
+              "failures": "1",
+              "errors": "0",
+              "skipped": "0",
+              "time": "8.426",
+              "issues": [
+                "expected: <e7060bbc-8d29-410c-ab8d-676c2fbebcc3> but was: <782a5a0f-8923-4f3b-95fc-4823815a6d3b>"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "knowledge-then-native",
+      "argv": [
+        "python3",
+        "scripts/with-test-postgres.py",
+        "python3",
+        "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/cross-jvm.py",
+        "knowledge-then-native",
+        "KnowledgeIntegrationTest#ordinaryHistoricalUploadStillGetsItsParse",
+        "NativeConversationIntegrationTest#crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions"
+      ],
+      "cwd": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/merge",
+      "sourceMerge": "3e6bdc740955b06ce6f5b250b43fb600d359104a",
+      "head": "3e450e72660eda88498d4719e17f84a7a335f380",
+      "exit": 0,
+      "start": 1793419237.5101032,
+      "end": 1793419263.1913118,
+      "summary": [
+        {
+          "name": "com.dreamcore.workspace.NativeConversationIntegrationTest",
+          "tests": "1",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "7.526"
+        }
+      ],
+      "classes": [
+        {
+          "selector": "KnowledgeIntegrationTest#ordinaryHistoricalUploadStillGetsItsParse",
+          "argv": [
+            "./apps/api/mvnw",
+            "-s",
+            "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-settings.xml",
+            "-B",
+            "-f",
+            "apps/api/pom.xml",
+            "-Dtest=KnowledgeIntegrationTest#ordinaryHistoricalUploadStillGetsItsParse",
+            "test"
+          ],
+          "exit": 0,
+          "start": 1793419238.3279324,
+          "end": 1793419251.9607027,
+          "beforeQueue": [],
+          "afterQueue": [],
+          "summary": [
+            {
+              "name": "com.dreamcore.workspace.KnowledgeIntegrationTest",
+              "tests": "1",
+              "failures": "0",
+              "errors": "0",
+              "skipped": "0",
+              "time": "10.12",
+              "issues": []
+            }
+          ]
+        },
+        {
+          "selector": "NativeConversationIntegrationTest#crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions",
+          "argv": [
+            "./apps/api/mvnw",
+            "-s",
+            "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-settings.xml",
+            "-B",
+            "-f",
+            "apps/api/pom.xml",
+            "-Dtest=NativeConversationIntegrationTest#crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions",
+            "test"
+          ],
+          "exit": 0,
+          "start": 1793419251.9971235,
+          "end": 1793419263.039549,
+          "beforeQueue": [],
+          "afterQueue": [
+            {
+              "id": "d98cf747-d404-4367-9285-6fec66b22ffd",
+              "tenant_id": "b03f9685-e26c-4e38-8b7f-a723ccb62fc1",
+              "workspace_id": "b33af2a4-ba4b-44fa-8fb5-6c308facee0d",
+              "material_id": "532f5a05-2c55-4b2f-be93-7b2b06793049",
+              "version_id": "0df083ef-10b6-4efc-95cf-670271333a7c",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T12:01:02.362416+08:00"
+            },
+            {
+              "id": "55ee5abf-f4ab-458c-a04a-29a6bb745137",
+              "tenant_id": "b03f9685-e26c-4e38-8b7f-a723ccb62fc1",
+              "workspace_id": "b33af2a4-ba4b-44fa-8fb5-6c308facee0d",
+              "material_id": "532f5a05-2c55-4b2f-be93-7b2b06793049",
+              "version_id": "0d80daa2-4440-4e33-a907-6393e3c8c2d0",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T12:01:02.441004+08:00"
+            }
+          ],
+          "summary": [
+            {
+              "name": "com.dreamcore.workspace.NativeConversationIntegrationTest",
+              "tests": "1",
+              "failures": "0",
+              "errors": "0",
+              "skipped": "0",
+              "time": "7.526",
+              "issues": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "native-then-table",
+      "argv": [
+        "python3",
+        "scripts/with-test-postgres.py",
+        "python3",
+        "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/cross-jvm.py",
+        "native-then-table",
+        "NativeConversationIntegrationTest#crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions",
+        "TableCalculationIntegrationTest#sourceAndCapabilityMustBelongToCurrentSpaceAndAttemptAndToolMustBeStarted"
+      ],
+      "cwd": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/merge",
+      "sourceMerge": "3e6bdc740955b06ce6f5b250b43fb600d359104a",
+      "head": "3e450e72660eda88498d4719e17f84a7a335f380",
+      "exit": 1,
+      "start": 1793419269.3126671,
+      "end": 1793419298.8104255,
+      "summary": [
+        {
+          "name": "com.dreamcore.workspace.TableCalculationIntegrationTest",
+          "tests": "1",
+          "failures": "0",
+          "errors": "1",
+          "skipped": "0",
+          "time": "10.767"
+        }
+      ],
+      "classes": [
+        {
+          "selector": "NativeConversationIntegrationTest#crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions",
+          "argv": [
+            "./apps/api/mvnw",
+            "-s",
+            "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-settings.xml",
+            "-B",
+            "-f",
+            "apps/api/pom.xml",
+            "-Dtest=NativeConversationIntegrationTest#crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions",
+            "test"
+          ],
+          "exit": 0,
+          "start": 1793419270.104011,
+          "end": 1793419283.6997845,
+          "beforeQueue": [],
+          "afterQueue": [
+            {
+              "id": "f2e1233b-740f-4bc8-9420-f5ea9be6b34e",
+              "tenant_id": "9e9d6af8-3760-4376-bf38-46cd16c703d3",
+              "workspace_id": "fdb2f58b-5e8f-42da-8266-2769a62daac4",
+              "material_id": "16fd8d56-361a-495e-97b2-c81ca63fafd2",
+              "version_id": "6b061e0e-7965-4ef3-b12a-fd42a64a031d",
+              "requested_by": "08c8c956-88fb-4c11-b090-3293b904d443",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T12:01:22.972106+08:00",
+              "material_active": true,
+              "version_exists": true,
+              "actor_material_mask": 0
+            },
+            {
+              "id": "993763d8-1081-4664-84da-2b78122df827",
+              "tenant_id": "9e9d6af8-3760-4376-bf38-46cd16c703d3",
+              "workspace_id": "fdb2f58b-5e8f-42da-8266-2769a62daac4",
+              "material_id": "16fd8d56-361a-495e-97b2-c81ca63fafd2",
+              "version_id": "5fbed0f9-2638-4501-86a1-14c7af75d896",
+              "requested_by": "08c8c956-88fb-4c11-b090-3293b904d443",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T12:01:23.052461+08:00",
+              "material_active": true,
+              "version_exists": true,
+              "actor_material_mask": 0
+            }
+          ],
+          "summary": [
+            {
+              "name": "com.dreamcore.workspace.NativeConversationIntegrationTest",
+              "tests": "1",
+              "failures": "0",
+              "errors": "0",
+              "skipped": "0",
+              "time": "10.064",
+              "issues": []
+            }
+          ]
+        },
+        {
+          "selector": "TableCalculationIntegrationTest#sourceAndCapabilityMustBelongToCurrentSpaceAndAttemptAndToolMustBeStarted",
+          "argv": [
+            "./apps/api/mvnw",
+            "-s",
+            "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-settings.xml",
+            "-B",
+            "-f",
+            "apps/api/pom.xml",
+            "-Dtest=TableCalculationIntegrationTest#sourceAndCapabilityMustBelongToCurrentSpaceAndAttemptAndToolMustBeStarted",
+            "test"
+          ],
+          "exit": 1,
+          "start": 1793419283.7634413,
+          "end": 1793419298.5881393,
+          "beforeQueue": [
+            {
+              "id": "f2e1233b-740f-4bc8-9420-f5ea9be6b34e",
+              "tenant_id": "9e9d6af8-3760-4376-bf38-46cd16c703d3",
+              "workspace_id": "fdb2f58b-5e8f-42da-8266-2769a62daac4",
+              "material_id": "16fd8d56-361a-495e-97b2-c81ca63fafd2",
+              "version_id": "6b061e0e-7965-4ef3-b12a-fd42a64a031d",
+              "requested_by": "08c8c956-88fb-4c11-b090-3293b904d443",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T12:01:22.972106+08:00",
+              "material_active": true,
+              "version_exists": true,
+              "actor_material_mask": 0
+            },
+            {
+              "id": "993763d8-1081-4664-84da-2b78122df827",
+              "tenant_id": "9e9d6af8-3760-4376-bf38-46cd16c703d3",
+              "workspace_id": "fdb2f58b-5e8f-42da-8266-2769a62daac4",
+              "material_id": "16fd8d56-361a-495e-97b2-c81ca63fafd2",
+              "version_id": "5fbed0f9-2638-4501-86a1-14c7af75d896",
+              "requested_by": "08c8c956-88fb-4c11-b090-3293b904d443",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T12:01:23.052461+08:00",
+              "material_active": true,
+              "version_exists": true,
+              "actor_material_mask": 0
+            }
+          ],
+          "afterQueue": [
+            {
+              "id": "f2e1233b-740f-4bc8-9420-f5ea9be6b34e",
+              "tenant_id": "9e9d6af8-3760-4376-bf38-46cd16c703d3",
+              "workspace_id": "fdb2f58b-5e8f-42da-8266-2769a62daac4",
+              "material_id": "16fd8d56-361a-495e-97b2-c81ca63fafd2",
+              "version_id": "6b061e0e-7965-4ef3-b12a-fd42a64a031d",
+              "requested_by": "08c8c956-88fb-4c11-b090-3293b904d443",
+              "status": "RUNNING",
+              "attempts": 1,
+              "lease_until": "2026-10-31T12:03:37.958516+08:00",
+              "created_at": "2026-10-31T12:01:22.972106+08:00",
+              "material_active": true,
+              "version_exists": true,
+              "actor_material_mask": 0
+            },
+            {
+              "id": "993763d8-1081-4664-84da-2b78122df827",
+              "tenant_id": "9e9d6af8-3760-4376-bf38-46cd16c703d3",
+              "workspace_id": "fdb2f58b-5e8f-42da-8266-2769a62daac4",
+              "material_id": "16fd8d56-361a-495e-97b2-c81ca63fafd2",
+              "version_id": "5fbed0f9-2638-4501-86a1-14c7af75d896",
+              "requested_by": "08c8c956-88fb-4c11-b090-3293b904d443",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T12:01:23.052461+08:00",
+              "material_active": true,
+              "version_exists": true,
+              "actor_material_mask": 0
+            }
+          ],
+          "summary": [
+            {
+              "name": "com.dreamcore.workspace.TableCalculationIntegrationTest",
+              "tests": "1",
+              "failures": "0",
+              "errors": "1",
+              "skipped": "0",
+              "time": "10.767",
+              "issues": [
+                "MATERIAL_NOT_FOUND"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "table-then-native",
+      "argv": [
+        "python3",
+        "scripts/with-test-postgres.py",
+        "python3",
+        "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/cross-jvm.py",
+        "table-then-native",
+        "TableCalculationIntegrationTest#sourceAndCapabilityMustBelongToCurrentSpaceAndAttemptAndToolMustBeStarted",
+        "NativeConversationIntegrationTest#crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions"
+      ],
+      "cwd": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/merge",
+      "sourceMerge": "3e6bdc740955b06ce6f5b250b43fb600d359104a",
+      "head": "3e450e72660eda88498d4719e17f84a7a335f380",
+      "exit": 0,
+      "start": 1793419310.3823092,
+      "end": 1793419554.887666,
+      "summary": [
+        {
+          "name": "com.dreamcore.workspace.NativeConversationIntegrationTest",
+          "tests": "1",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "91.837"
+        }
+      ],
+      "classes": [
+        {
+          "selector": "TableCalculationIntegrationTest#sourceAndCapabilityMustBelongToCurrentSpaceAndAttemptAndToolMustBeStarted",
+          "argv": [
+            "./apps/api/mvnw",
+            "-s",
+            "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-settings.xml",
+            "-B",
+            "-f",
+            "apps/api/pom.xml",
+            "-Dtest=TableCalculationIntegrationTest#sourceAndCapabilityMustBelongToCurrentSpaceAndAttemptAndToolMustBeStarted",
+            "test"
+          ],
+          "exit": 0,
+          "start": 1793419311.3098445,
+          "end": 1793419441.9638655,
+          "beforeQueue": [],
+          "afterQueue": [],
+          "summary": [
+            {
+              "name": "com.dreamcore.workspace.TableCalculationIntegrationTest",
+              "tests": "1",
+              "failures": "0",
+              "errors": "0",
+              "skipped": "0",
+              "time": "117.759",
+              "issues": []
+            }
+          ]
+        },
+        {
+          "selector": "NativeConversationIntegrationTest#crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions",
+          "argv": [
+            "./apps/api/mvnw",
+            "-s",
+            "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-settings.xml",
+            "-B",
+            "-f",
+            "apps/api/pom.xml",
+            "-Dtest=NativeConversationIntegrationTest#crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions",
+            "test"
+          ],
+          "exit": 0,
+          "start": 1793419442.0256839,
+          "end": 1793419554.72724,
+          "beforeQueue": [],
+          "afterQueue": [
+            {
+              "id": "430e24d7-2677-45ca-878c-47cce1fba33a",
+              "tenant_id": "00abaa93-126d-4be5-bb80-15a4d8209110",
+              "workspace_id": "4d496cdb-ae1d-470b-ba5e-4057a8d59b28",
+              "material_id": "f36f8d41-9f08-4f55-95bb-fa9c323b8a3b",
+              "version_id": "3767f26d-080b-45d8-876b-9a62184ce64f",
+              "requested_by": "8458c6b0-d471-4df8-b65a-2d30818fba24",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T12:05:51.99766+08:00",
+              "material_active": true,
+              "version_exists": true,
+              "actor_material_mask": 0
+            },
+            {
+              "id": "0d6fef6e-e089-4501-86d7-660e31ec4106",
+              "tenant_id": "00abaa93-126d-4be5-bb80-15a4d8209110",
+              "workspace_id": "4d496cdb-ae1d-470b-ba5e-4057a8d59b28",
+              "material_id": "f36f8d41-9f08-4f55-95bb-fa9c323b8a3b",
+              "version_id": "d6dc7fd7-9cc4-4003-a203-f9159595b2f4",
+              "requested_by": "8458c6b0-d471-4df8-b65a-2d30818fba24",
+              "status": "QUEUED",
+              "attempts": 0,
+              "lease_until": null,
+              "created_at": "2026-10-31T12:05:52.319519+08:00",
+              "material_active": true,
+              "version_exists": true,
+              "actor_material_mask": 0
+            }
+          ],
+          "summary": [
+            {
+              "name": "com.dreamcore.workspace.NativeConversationIntegrationTest",
+              "tests": "1",
+              "failures": "0",
+              "errors": "0",
+              "skipped": "0",
+              "time": "91.837",
+              "issues": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "orchestrationFailure": {
+    "label": "material-then-knowledge",
+    "exit": 1,
+    "testsExecuted": 0,
+    "reason": "diagnostic snapshot queried before Flyway migration; original failure retained; snapshot now probes to_regclass before querying"
+  },
+  "scope": "Selected original tests only. Cross-JVM pairs share one wrapper-owned new database; reverse pairs each get another new database. Each result and Surefire copy saved before next command. No global cleanup, production auth changes, parser sandbox bypass, CI rerun or timeout increase.",
+  "runtimePaths": {
+    "JAVA_HOME": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/runtime/jdk-21.0.13+9",
+    "POSTGRES_BIN": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/runtime/pg/usr/lib/postgresql/18/bin",
+    "nodeBin": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/engine-validation/node-v24.20.0-linux-x64/bin",
+    "MAVEN_USER_HOME": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-home",
+    "mavenRepository": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/maven-repository"
+  },
+  "generalSlowestCompletedCases": [
+    {
+      "class": "com.dreamcore.workspace.GeneralExperienceLibraryIntegrationTest",
+      "name": "visibilityIsAppliedBeforePagingAndCountsAreProcessingNotAssets",
+      "seconds": 236.259
+    },
+    {
+      "class": "com.dreamcore.workspace.GeneralExperienceLibraryIntegrationTest",
+      "name": "actualHttpSeparatesPermissionsAndNeverCachesBodies",
+      "seconds": 201.202
+    },
+    {
+      "class": "com.dreamcore.workspace.GeneralExperienceLibraryIntegrationTest",
+      "name": "activityCountsFixedRetainedLiveAttemptsWithoutPrivateRowsOrDuplicateAdoptions",
+      "seconds": 128.61
+    },
+    {
+      "class": "com.dreamcore.workspace.GeneralExperiencePipelineIntegrationTest",
+      "name": "duplicateAcrossEnterprisesNeverAddsIndependentEvidenceOrChangesOriginalSource",
+      "seconds": 109.386
+    },
+    {
+      "class": "com.dreamcore.workspace.GeneralExperienceLibraryIntegrationTest",
+      "name": "stopRemainsPlatformReadableOnlyWhileSourceIsValid",
+      "seconds": 104.043
+    },
+    {
+      "class": "com.dreamcore.workspace.GeneralExperienceLibraryIntegrationTest",
+      "name": "historyFiltersUnavailableVersionsBeforePagingAndHonorsGlobalStop",
+      "seconds": 97.703
+    },
+    {
+      "class": "com.dreamcore.workspace.GeneralExperiencePipelineIntegrationTest",
+      "name": "confirmedFailuresAreBoundedButUnknownResultsNeverResend",
+      "seconds": 96.469
+    },
+    {
+      "class": "com.dreamcore.workspace.GeneralExperienceLibraryIntegrationTest",
+      "name": "withdrawnSourceAndStaleVersionCannotBeRestoredLocally",
+      "seconds": 80.322
+    },
+    {
+      "class": "com.dreamcore.workspace.GeneralExperienceLibraryIntegrationTest",
+      "name": "pendingCandidatesAndRawFailuresAreOnlyFiniteAggregates",
+      "seconds": 75.933
+    },
+    {
+      "class": "com.dreamcore.workspace.GeneralExperienceLibraryIntegrationTest",
+      "name": "automaticallyRediscoveredSameMethodCannotBypassPlatformStop",
+      "seconds": 72.218
+    }
+  ]
+}
