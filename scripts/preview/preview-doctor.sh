@@ -37,10 +37,10 @@ else
   bad "需要 Python 3.9+（放入 PATH）"
 fi
 if detect_pg_bin; then
-  v="$("${POSTGRES_BIN}/initdb" --version 2>/dev/null | awk '{print $NF}')"
+  v="$("${POSTGRES_BIN}/initdb" --version 2>/dev/null | awk '$1=="initdb" && $2=="(PostgreSQL)" && $3 ~ /^[0-9]+([.][0-9]+)*$/ {print $3}')"
   v="${v:-}"
   case "${v}" in
-    18*) ok "PostgreSQL 服务端 ${v}（POSTGRES_BIN=${POSTGRES_BIN}）";;
+    18|18.*) ok "PostgreSQL 服务端 ${v}（POSTGRES_BIN=${POSTGRES_BIN}）";;
     *) bad "initdb 版本 ${v}，需要 18：export POSTGRES_BIN=.../postgres/bin";;
   esac
   [ -x "${POSTGRES_BIN}/pg_ctl" ] && [ -x "${POSTGRES_BIN}/psql" ] || bad "POSTGRES_BIN 下缺 pg_ctl/psql：export POSTGRES_BIN=.../postgres/bin"
