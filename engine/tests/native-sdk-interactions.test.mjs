@@ -35,46 +35,104 @@ test('real SDK extension: prompt, status, stop and same-root restart', {timeout:
  await client.prompt('test-root',[{type:'text',text:'continue'}]);await client.request('session/wait',{sessionId:'test-root'});
  }finally{await client.close();await rm(dir,{recursive:true,force:true});}
 });
-test('real SDK pending approval/question, timeout and late answer', {timeout:90000},async()=>{
+test('real SDK pending approval/question, timeout and late answer', {timeout:90000},async t=>{
  const dir=await mkdtemp(join(tmpdir(),'dh-sdk-pending-'));const patch=join(dir,'patch.yml');
  await writeFile(patch,`- id: sdk-jsonrpc-server\n  disabled: true\n- id: llm-deepseek\n  disabled: true\n- id: llm-pi-ai\n  disabled: true\n- insert:\n    - id: enterprise-sdk\n      name: ${JSON.stringify(join(root,'scripts/native-sdk-plugin.mjs'))}\n    - id: fixture\n      name: ${JSON.stringify(join(root,'tests/fixtures/native-interaction-model.mjs'))}\n`);
  const client=new HarnessClient({profile:'sdk',patches:[join(root,'profiles/enterprise-web.patch.yml'),patch],dshHome:join(dir,'home'),processCwd:dir,initializeTimeoutMs:30000,requestTimeoutMs:10000,env:{PATH:process.env.PATH,HOME:dir,NARB_DISABLE_NATIVE_CACHE:'1'}});
- const notices=[];const sub=client.subscribe();void(async()=>{try{for await(const n of sub)notices.push(n);}catch{}})();
+ const notices=[];const sub=client.subscribe();
+ let observeStop,rejectStop,collectorFailure,closing=false;
+ const consume=(async()=>{
+  try{for await(const n of sub){notices.push(n);observeStop?.(n);}}
+  catch(error){if(!closing){collectorFailure=error;rejectStop?.(error);}}
+ })();
+ const bounded=async(operation,label,ms=10000)=>{
+  let deadline;
+  try{return await Promise.race([
+   operation,
+   new Promise((_,reject)=>{deadline=setTimeout(()=>reject(Error(label)),ms);})
+  ]);}finally{clearTimeout(deadline);}
+ };
  const until=async predicate=>{const end=Date.now()+10000;while(Date.now()<end){const found=notices.find(predicate);if(found)return found;await new Promise(r=>setTimeout(r,20));}throw Error('notification missing: '+JSON.stringify(notices));};
  try{
  await client.initialize({cwd:dir,provider:'interaction-test',model:'fixture'});
  await client.prompt('root',[{type:'text',text:'APPROVAL'}]);
- const approval=await until(n=>n.params.event?.type==='approval/asked');
+ const approval=await until(n=>n.params?.event?.type==='approval/asked');
  await client.request('enterprise/approval',{sessionId:'root',approvalId:approval.params.event.data.id,decision:'ALLOW_ONCE'});
  await client.request('session/wait',{sessionId:'root'});
- assert.ok(notices.some(n=>n.params.event?.type==='approval/decided'&&n.params.event.data.outcome==='allowed-once'));
+ assert.ok(notices.some(n=>n.params?.event?.type==='approval/decided'&&n.params?.event.data.outcome==='allowed-once'));
  await assert.rejects(client.request('enterprise/approval',{sessionId:'root',approvalId:approval.params.event.data.id,decision:'REJECT'}));
  notices.length=0;await client.prompt('root',[{type:'text',text:'QUESTION'}]);
- const question=await until(n=>n.params.type==='question/asked');
+ const question=await until(n=>n.params?.type==='question/asked');
  await assert.rejects(client.request('enterprise/answer',{sessionId:'root',callId:question.params.data.callId,answers:[{id:'invalid',selected:[]}]}));
  await client.request('enterprise/answer',{sessionId:'root',callId:question.params.data.callId,answers:[{id:'choice',selected:['Yes']}]});
  await client.request('session/wait',{sessionId:'root'});
  notices.length=0;await client.prompt('root',[{type:'text',text:'QUESTION TIMEOUT'}]);
- const timed=await until(n=>n.params.type==='question/asked');await client.request('session/wait',{sessionId:'root'});
- assert.ok(notices.some(n=>n.params.type==='question/closed'&&n.params.data.outcome==='ASK_TIMED_OUT'));
+ const timed=await until(n=>n.params?.type==='question/asked');await client.request('session/wait',{sessionId:'root'});
+ assert.ok(notices.some(n=>n.params?.type==='question/closed'&&n.params?.data.outcome==='ASK_TIMED_OUT'));
  await client.request('enterprise/answer',{sessionId:'root',callId:timed.params.data.callId,answers:[{id:'choice',selected:[]}]});
  await client.request('session/wait',{sessionId:'root'});
  for(const decision of ['APPROVE','REVISE']){
   notices.length=0;await client.prompt('root',[{type:'text',text:'PLAN '+decision}]);
-  const plan=await until(n=>n.params.type==='question/asked');
+  const plan=await until(n=>n.params?.type==='question/asked');
   await client.request('enterprise/plan-review',{sessionId:'root',callId:plan.params.data.callId,decision,comment:'Change synthetic plan'});
   await client.request('session/wait',{sessionId:'root'});
-  const result=notices.find(n=>n.params.event?.type==='tool/result');assert.notEqual(result.params.event.data.message.isError,true);
+  const result=notices.find(n=>n.params?.event?.type==='tool/result');assert.notEqual(result.params.event.data.message.isError,true);
  }
  notices.length=0;await client.prompt('root',[{type:'text',text:'APPROVAL reject'}]);
- const rejected=await until(n=>n.params.event?.type==='approval/asked');
+ const rejected=await until(n=>n.params?.event?.type==='approval/asked');
  await client.request('enterprise/approval',{sessionId:'root',approvalId:rejected.params.event.data.id,decision:'REJECT'});
  await client.request('session/wait',{sessionId:'root'});
- assert.ok(notices.some(n=>n.params.event?.type==='approval/decided'&&n.params.event.data.outcome==='rejected'));
- notices.length=0;await client.prompt('root',[{type:'text',text:'QUESTION stop'}]);await until(n=>n.params.type==='question/asked');
- await client.request('enterprise/stop',{sessionId:'root'});await client.request('session/wait',{sessionId:'root'});
- assert.ok(notices.some(n=>n.method==='session.status'&&n.params.status==='idle'));
- }finally{await client.close();await rm(dir,{recursive:true,force:true});}
+ assert.ok(notices.some(n=>n.params?.event?.type==='approval/decided'&&n.params?.event.data.outcome==='rejected'));
+ notices.length=0;await client.prompt('root',[{type:'text',text:'QUESTION stop'}]);
+ const stoppedQuestion=await until(n=>n.params?.sessionId==='root'&&n.params?.type==='question/asked');
+ const callId=stoppedQuestion.params.data.callId;
+ assert.equal(typeof callId,'string');
+ let closedIndex=-1,idleIndex=-1;
+ // The ordered subscription must observe THIS question close before root idle.
+ // A prior phase's queued/late idle cannot satisfy this boundary.
+ const observedIdle=new Promise((resolve,reject)=>{
+  rejectStop=reject;
+  observeStop=n=>{
+   if(n.params?.sessionId!=='root')return;
+   if(n.params?.type==='question/closed'&&n.params?.data?.callId===callId)closedIndex=notices.length-1;
+   if(closedIndex>=0&&n.method==='session.status'&&n.params?.status==='idle'){
+    idleIndex=notices.length-1;resolve();
+   }
+  };
+  if(collectorFailure)reject(collectorFailure);
+ });
+ try{
+  await bounded(Promise.all([
+   observedIdle,
+   (async()=>{
+    await client.request('enterprise/stop',{sessionId:'root'});
+    await client.request('session/wait',{sessionId:'root'});
+   })()
+  ]),'STOP_IDLE_OR_RPC_TIMEOUT');
+  assert.ok(notices.some(n=>n.method==='session.status'&&n.params?.status==='idle'));
+  assert.ok(idleIndex>closedIndex&&closedIndex>=0);
+  assert.equal(notices[idleIndex].params?.sessionId,'root');
+ }finally{
+  observeStop=undefined;rejectStop=undefined;
+  // Only method/status/type and correlation flags; no question text or answers.
+  t.diagnostic('stop events '+JSON.stringify(notices.map((n,index)=>({
+   index,method:n.method,root:n.params?.sessionId==='root',
+   status:n.method==='session.status'?n.params?.status:undefined,
+   type:n.params?.type||n.params?.event?.type,
+   currentQuestion:n.params?.data?.callId===callId
+  }))));
+ }
+ }finally{
+  closing=true;
+  try{
+   sub.close();
+   await bounded(consume,'NOTIFICATION_CONSUMER_CLOSE_TIMEOUT');
+   if(collectorFailure)throw collectorFailure;
+  }finally{
+   try{await bounded(client.close(),'SDK_CLOSE_TIMEOUT',15000);}
+   finally{await rm(dir,{recursive:true,force:true});}
+  }
+ }
 });
 
 test('disconnected outbox coalesces disposable status without dropping conversation events',async()=>{
