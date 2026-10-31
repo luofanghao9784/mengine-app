@@ -54,8 +54,13 @@ class MigrationManifestTest(unittest.TestCase):
         (self.db/'migration-common/V1__duplicate.sql').write_text('SELECT 1;')
         with self.assertRaises(trial.TrialError): backup.migrations()
 
+    def test_empty_directory_is_rejected(self):
+        (self.db/'migration-common/V149__common.sql').unlink()
+        with self.assertRaises(trial.TrialError): backup.migrations()
+
     def test_missing_directory_is_rejected(self):
         (self.db/'migration-common/V149__common.sql').unlink()
+        (self.db/'migration-common').rmdir()
         with self.assertRaises(trial.TrialError): backup.migrations()
 
     def jar(self, changes=None, duplicate=False):
@@ -91,10 +96,10 @@ class ActualMigrationBackupTest(unittest.TestCase):
             with backup.offline_database(source,True) as (run,args,sql):
                 sql('CREATE TABLE flyway_schema_history(installed_rank integer PRIMARY KEY,version varchar(50),script varchar(1000),success boolean)')
                 files=trial.api_migration_files()
-                for rank,path in enumerate(files,1):
-                    run([backup.pg('psql'),'-X',*args,'-v','ON_ERROR_STOP=1','-1','-f',str(path)])
-                    version=path.name.split('__')[0][1:]
-                    sql(f"INSERT INTO flyway_schema_history VALUES({rank},'{version}','{path.name}',true)")
+                run([backup.pg('psql'),'-X',*args,'-v','ON_ERROR_STOP=1','-1',
+                     *[arg for path in files for arg in ('-f',str(path))]])
+                values=','.join(f"({rank},'{path.name.split('__')[0][1:]}','{path.name}',true)" for rank,path in enumerate(files,1))
+                sql('INSERT INTO flyway_schema_history VALUES '+values)
                 backup.check_migrations(sql)
                 # Exact old enumeration is demonstrably short of this actual synthetic history.
                 old=[m for m in backup.migrations() if int(m['version'])<149]
@@ -105,7 +110,9 @@ class ActualMigrationBackupTest(unittest.TestCase):
             self.assertEqual('created',result['status'])
             manifest=backup.verify(root/'bundle',key)
             self.assertEqual(len(files),len(manifest['migrations']))
-            with self.assertRaises(trial.TrialError):backup.restore(root/'bundle',root/'restored',key)
+            with self.assertRaisesRegex(trial.TrialError,'当前迁移未全部纳入恢复控制对象清单'):
+                backup.restore(root/'bundle',root/'restored',key)
+            self.assertFalse((root/'restored').exists())
             print('SYNTHETIC_BACKUP created+verified; restore rejected by existing gate (not recoverability approval)')
             with backup.offline_database(source) as (_,__,sql):sql('UPDATE flyway_schema_history SET success=false WHERE installed_rank=1')
             with self.assertRaises(trial.TrialError):backup.create(source,root/'bad-bundle',key)
