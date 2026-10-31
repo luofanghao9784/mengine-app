@@ -1,0 +1,48 @@
+{
+  "revision": {
+    "argv": [
+      "git",
+      "-C",
+      "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/merge",
+      "rev-parse",
+      "HEAD"
+    ],
+    "exit": 0,
+    "output": "3e6bdc740955b06ce6f5b250b43fb600d359104a\n"
+  },
+  "status": {
+    "argv": [
+      "git",
+      "-C",
+      "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/ct076-diagnosis/merge",
+      "status",
+      "--short"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  "java": {
+    "argv": [
+      "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/runtime/jdk-21.0.13+9/bin/java",
+      "-version"
+    ],
+    "exit": 0,
+    "output": "openjdk version \"21.0.13\" 2026-10-20 LTS\nOpenJDK Runtime Environment Temurin-21.0.13+9 (build 21.0.13+9-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.13+9 (build 21.0.13+9-LTS, mixed mode, sharing)\n"
+  },
+  "postgres": {
+    "argv": [
+      "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/runtime/pg/usr/lib/postgresql/18/bin/initdb",
+      "--version"
+    ],
+    "exit": 127,
+    "output": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/context-validation/runtime/pg/usr/lib/postgresql/18/bin/initdb: error while loading shared libraries: libpq.so.5: cannot open shared object file: No such file or directory\n"
+  },
+  "node": {
+    "argv": [
+      "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/engine-validation/node-v24.20.0-linux-x64/bin/node",
+      "--version"
+    ],
+    "exit": 0,
+    "output": "v24.20.0\n"
+  }
+}

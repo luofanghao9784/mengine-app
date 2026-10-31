@@ -1,0 +1,17 @@
+[
+  {
+    "binary": "initdb",
+    "exit": 0,
+    "output": "initdb (PostgreSQL) 18.6 (Debian 18.6-1.pgdg12+2)\n"
+  },
+  {
+    "binary": "pg_ctl",
+    "exit": 0,
+    "output": "pg_ctl (PostgreSQL) 18.6 (Debian 18.6-1.pgdg12+2)\n"
+  },
+  {
+    "binary": "psql",
+    "exit": 0,
+    "output": "psql (PostgreSQL) 18.6 (Debian 18.6-1.pgdg12+2)\n"
+  }
+]
