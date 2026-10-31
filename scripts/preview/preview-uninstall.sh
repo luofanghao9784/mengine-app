@@ -12,6 +12,11 @@ if [ "$DRY_RUN" = 1 ]; then run bash "$(dirname "$0")/preview-stop.sh" --dry-run
 if [ "$BACKUP" = 1 ] && [ -d "$INSTANCE/postgres" ]; then
   # trial 自带 backup.py 只对已停止实例备份（含 pg 数据与密码散列），输出 0600；密钥文件单独保存
   run bash -c "cd '$REPO' && umask 077 && python3 scripts/local/backup.py create --directory '$INSTANCE' --output '$BACKUPS/preview-$(date +%Y%m%d-%H%M%S).bundle'"
+  # Integrity is not recoverability: current recovery needs the source lineage and rejects newer coverage.
+  # Do not delete the only source merely because pg_dump/verify completed. No automatic --no-backup fallback.
+  if [ "$DRY_RUN" != 1 ]; then
+    die "备份已生成，但当前受支持恢复仍依赖原实例且覆盖未完成；默认卸载保留实例、密钥、登记证据与备份，未执行删除。"
+  fi
 fi
 [ "$YES" = 1 ] || { log "未带 --yes：只打印将删除的内容"; DRY_RUN=1; }
 for d in "$INSTANCE" "$SECRETS" "$LOGS" "$STATE"; do run rm -rf "$d"; done

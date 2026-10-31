@@ -162,17 +162,42 @@ def ready(url, child, stopping):
     raise TrialError('本地服务启动超时；请查看私有日志。')
 
 
+def api_migration_files():
+    """Default Flyway lineage only; never infer or merge migration-local."""
+    import re
+    root = WORKSPACE / 'apps/api/src/main/resources/db'
+    files = []
+    versions = set()
+    for location in ('migration', 'migration-common'):
+        directory = root / location
+        found = list(directory.glob('V*__*.sql'))
+        if not found:
+            raise TrialError('默认迁移目录缺失或为空；拒绝不完整迁移清单。')
+        for path in found:
+            match = re.fullmatch(r'V(\d+)__.+\.sql', path.name)
+            if not match or int(match[1]) in versions:
+                raise TrialError('默认迁移版本无效或重复；拒绝覆盖或猜测迁移谱系。')
+            versions.add(int(match[1]))
+            files.append(path)
+    return sorted(files, key=lambda path: int(re.match(r'V(\d+)__', path.name)[1]))
+
+
 def verify_api_migrations(jar):
     """A stale runtime must not open a newer recovered schema without its access guards."""
     import zipfile
-    directory=WORKSPACE/'apps/api/src/main/resources/db/migration'
-    expected={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in directory.glob('V*__*.sql')}
+    root = WORKSPACE / 'apps/api/src/main/resources/db'
+    expected = {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in api_migration_files()}
     try:
         with zipfile.ZipFile(jar) as archive:
-            entries=[x for x in archive.namelist() if x.startswith('BOOT-INF/classes/db/migration/') and x.endswith('.sql')]
-            actual={name.rsplit('/',1)[-1]:hashlib.sha256(archive.read(name)).hexdigest() for name in entries}
-        if not expected or actual!=expected or len(actual)!=len(entries):raise ValueError()
-    except (OSError,ValueError,zipfile.BadZipFile):
+            prefix = 'BOOT-INF/classes/db/'
+            entries = [x for x in archive.namelist()
+                       if x.startswith(tuple(prefix + part + '/' for part in ('migration', 'migration-common')))
+                       and x.endswith('.sql')]
+            actual = {name[len(prefix):]: hashlib.sha256(archive.read(name)).hexdigest() for name in entries}
+        if actual != expected or len(actual) != len(entries):
+            raise ValueError()
+    except (OSError, ValueError, zipfile.BadZipFile):
         raise TrialError('API 构建中的迁移与当前已核验版本不一致；先运行 npm run trial:build，禁止用旧运行时开放恢复数据。') from None
 
 

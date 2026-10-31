@@ -68,10 +68,12 @@ class BackupBoundaryTest(unittest.TestCase):
         import zipfile
         workspace=self.root/'build-fixture';migrations=workspace/'apps/api/src/main/resources/db/migration'
         migrations.mkdir(parents=True);(migrations/'V1__guard.sql').write_text('SELECT 1;')
+        common=migrations.parent/'migration-common';common.mkdir();(common/'V149__common.sql').write_text('SELECT 149;')
         jar=workspace/'api.jar'
         def write(entries):
             with zipfile.ZipFile(jar,'w') as archive:
                 for name,body in entries.items():archive.writestr('BOOT-INF/classes/db/migration/'+name,body)
+                archive.writestr('BOOT-INF/classes/db/migration-common/V149__common.sql','SELECT 149;')
         with patch.object(trial,'WORKSPACE',workspace):
             write({'V1__guard.sql':'SELECT 1;'});trial.verify_api_migrations(jar)
             for entries in [{},{'V1__guard.sql':'SELECT 2;'},{'V1__guard.sql':'SELECT 1;','V2__unknown.sql':'SELECT 1;'}]:

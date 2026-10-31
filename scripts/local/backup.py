@@ -78,7 +78,7 @@ def canonical(value):
 
 def schema_hash():
     result = hashlib.sha256()
-    for file in sorted((trial.WORKSPACE / 'apps/api/src/main/resources/db/migration').glob('V*__*.sql')):
+    for file in trial.api_migration_files():
         result.update(file.name.encode() + b'\0' + file.read_bytes() + b'\0')
     return result.hexdigest()
 
@@ -88,7 +88,7 @@ def now():
 
 
 def migrations():
-    files = (trial.WORKSPACE / 'apps/api/src/main/resources/db/migration').glob('V*__*.sql')
+    files = trial.api_migration_files()
     return [{'version': re.match(r'V(\d+)__', file.name)[1], 'script': file.name,
              'sha256': hashlib.sha256(file.read_bytes()).hexdigest()}
             for file in sorted(files, key=lambda p: int(re.match(r'V(\d+)__', p.name)[1]))]
