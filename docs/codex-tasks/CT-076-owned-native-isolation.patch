@@ -202,7 +202,7 @@
 +        after=snapshot()
 +        expected=("ownership did not match" in text if args.negative in ("token","directory")
 +                  else "Isolated integration tests require scripts/with-test-postgres.py" in text)
-+        valid=record["exit"]!=0 and expected and before==after
++        valid=record["exit"]!=0 and record["sourceUnchanged"] and expected and before==after
 +        save(out/"negative.json",{"exit":record["exit"],"before":before,"after":after,
 +             "guardRejectedBeforeDatabaseCreation":valid})
 +        sys.exit(0 if valid else 1)
@@ -259,7 +259,7 @@
 +                           DATABASE_PASSWORD="synthetic-negative-not-a-secret")
 +            record=run_case(N,out/label,args.settings,args.expected_head,env)
 +            text=(out/label/"maven.log").read_text()
-+            valid=record["exit"]!=0 and "Isolated integration tests require scripts/with-test-postgres.py" in text
++            valid=record["exit"]!=0 and record["sourceUnchanged"] and "Isolated integration tests require scripts/with-test-postgres.py" in text
 +            record["expectedGuardFailure"]=valid
 +            save(out/label/"result.json",record)
 +            overview[label]=0 if valid else 1
