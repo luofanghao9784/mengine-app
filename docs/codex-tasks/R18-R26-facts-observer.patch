@@ -1,0 +1,219 @@
+--- a/scripts/local/backup.py
++++ b/scripts/local/backup.py
+@@ -16,6 +16,7 @@
+ import subprocess
+ import sys
+ import tempfile
++import time
+ import uuid
+ import trial
+ 
+@@ -217,17 +218,34 @@
+                         fail('临时数据库未能正常停止；已保留数据库目录，请检查此本地环境后再重试。')
+ 
+ 
+-def facts(sql):
+-    check_migrations(sql)
+-    tables = sql("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename").splitlines()
++def facts(sql, observe=None):
++    """Return the complete original fingerprints; optional diagnostics never authorize restore."""
++    def measured(phase, operation, table=None):
++        started = time.monotonic()
++        try:
++            value = operation()
++        except BaseException as error:
++            if observe:
++                observe({'phase': phase, 'table': table, 'seconds': time.monotonic()-started,
++                         'ok': False, 'errorType': type(error).__name__})
++            raise
++        if observe:
++            event = {'phase': phase, 'table': table, 'seconds': time.monotonic()-started, 'ok': True}
++            if phase == 'table_count':
++                event['rows'] = value
++            observe(event)
++        return value
++    measured('migration_history', lambda: check_migrations(sql))
++    tables = measured('table_list', lambda: sql("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename")).splitlines()
+     result = {}
+     for table in tables:
+         if table in TRANSIENT:
+             continue
+         if not re.fullmatch('[a-z_][a-z0-9_]*', table):
+             fail('数据库包含不支持的表标识。')
+-        checksum = sql(f'COPY (SELECT to_jsonb(t)::text FROM public.{table} t ORDER BY to_jsonb(t)::text) TO STDOUT', True)
+-        result[table] = {'rows': int(sql(f'SELECT count(*) FROM public.{table}')), 'sha256': checksum}
++        checksum = measured('table_copy', lambda: sql(f'COPY (SELECT to_jsonb(t)::text FROM public.{table} t ORDER BY to_jsonb(t)::text) TO STDOUT', True), table)
++        count = measured('table_count', lambda: int(sql(f'SELECT count(*) FROM public.{table}')), table)
++        result[table] = {'rows': count, 'sha256': checksum}
+     return result
+ 
+ 
+--- /dev/null
++++ b/docs/codex-tasks/R18-R26-profile-facts.py
+@@ -0,0 +1,123 @@
++#!/usr/bin/env python3
++"""Synthetic PG18 cost sample only. Never activates, reconciles, or updates coverage."""
++import argparse, hashlib, json, os, pathlib, re, secrets, subprocess, sys, tempfile, time
++REPO=pathlib.Path(__file__).resolve().parents[2]
++sys.path.insert(0,str(REPO/"scripts/local"))
++import backup
++import trial
++
++class SampleComplete(Exception): pass
++
++def main():
++    parser=argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--root",type=pathlib.Path,required=True)
++    parser.add_argument("--expected-head",required=True)
++    parser.add_argument("--max-tables",type=int,default=8)
++    parser.add_argument("--seconds",type=int,default=30)
++    args=parser.parse_args()
++    head=subprocess.check_output(["git","rev-parse","HEAD"],cwd=REPO,text=True).strip()
++    dirty=subprocess.check_output(["git","status","--porcelain","--untracked-files=normal"],cwd=REPO,text=True).strip()
++    if head!=args.expected_head or dirty:
++        parser.error("exact expected HEAD and clean checkout required")
++    if not 1<=args.max_tables<=8 or not 1<=args.seconds<=30:
++        parser.error("sample cap: at most eight tables and 30 seconds between SQL boundaries")
++    root=args.root.resolve()
++    forbidden=pathlib.Path("/home/user/mengine-preview/repo")
++    if root==REPO or REPO in root.parents or root==forbidden or forbidden in root.parents:
++        parser.error("new synthetic directory must be outside checkout/preview")
++    trial.directory(root.parent)
++    root=backup.reserve(root)
++    log=root/"profile.jsonl"
++    fd=os.open(log,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
++    completed=0
++    with os.fdopen(fd,"w") as output:
++        def emit(event):
++            output.write(json.dumps(event,sort_keys=True)+"\n");output.flush()
++        def phase(name,operation):
++            started=time.monotonic()
++            try:
++                result=operation()
++            except BaseException as error:
++                emit({"phase":name,"seconds":time.monotonic()-started,
++                      "ok":False,"errorType":type(error).__name__})
++                raise
++            emit({"phase":name,"seconds":time.monotonic()-started,"ok":True})
++            return result
++        emit({"phase":"identity","head":head,"synthetic":True,"activationAllowed":False})
++        # Only version probes before creating a fresh synthetic cluster. No existing DB is opened.
++        for command in ("initdb","pg_ctl","psql","pg_dump","pg_restore"):
++            phase("probe_"+command,lambda command=command:backup.pg(command))
++        source=backup.reserve(root/"synthetic-source")
++        target=backup.reserve(root/"synthetic-restored")
++        for folder in (source,target):
++            trial.private_write(folder/"database.json",{"password":secrets.token_urlsafe(32)})
++        dump=root/"synthetic.dump"
++        try:
++            with backup.offline_database(source,True) as (run,connection,sql):
++                sql("CREATE TABLE flyway_schema_history(installed_rank integer PRIMARY KEY,version varchar(50),script varchar(1000),success boolean)")
++                files=trial.api_migration_files()
++                if len(files)!=178:
++                    raise RuntimeError("fixed source requires 178 default migrations")
++                phase("migrations",lambda:run([backup.pg("psql"),"-X",*connection,"-v","ON_ERROR_STOP=1","-1",
++                    *[arg for path in files for arg in ("-f",str(path))]]))
++                values=",".join("(%d,'%s','%s',true)"%(rank,path.name.split("__")[0][1:],path.name)
++                                for rank,path in enumerate(files,1))
++                sql("INSERT INTO flyway_schema_history VALUES "+values)
++                backup.check_migrations(sql)
++                phase("pg_dump",lambda:run([backup.pg("pg_dump"),*connection,
++                    "--format=custom","--no-owner","--no-acl","--file",str(dump)]))
++                dump.chmod(0o600)
++            with backup.offline_database(target,True) as (run,connection,sql):
++                phase("pg_restore",lambda:run([backup.pg("pg_restore"),*connection,
++                    "--no-owner","--no-acl","--single-transaction","--exit-on-error",str(dump)]))
++                profile_started=time.monotonic()
++                env={**trial.clean_environment(),
++                     "PGPASSWORD":trial.private_read(target/"database.json")["password"],
++                     "PGCONNECT_TIMEOUT":"3","PGTZ":"UTC",
++                     "PGOPTIONS":"-c statement_timeout=3500"}
++                def measured_sql(query,fingerprint=False):
++                    # Same COPY bytes/hash algorithm as backup.offline_database, shorter diagnostic limits.
++                    command=[backup.pg("psql"),"-X",*connection,"-qAt","-v","ON_ERROR_STOP=1","-c",query]
++                    with tempfile.TemporaryFile() as data, (root/"sql-private-errors.log").open("ab") as errors:
++                        result=subprocess.run(command,env=env,stdout=data,stderr=errors,timeout=5)
++                        if result.returncode:
++                            raise RuntimeError("synthetic SQL probe failed; see private error file")
++                        data.seek(0)
++                        if not fingerprint:return data.read().decode().strip()
++                        checksum=hashlib.sha256()
++                        while chunk:=data.read(1024*1024):checksum.update(chunk)
++                        return checksum.hexdigest()
++                # Error file is synthetic but remains private; no SQL rows, hashes or secrets in profile.
++                error_file=root/"sql-private-errors.log"
++                private_fd=os.open(error_file,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
++                os.close(private_fd)
++                def observe(event):
++                    nonlocal completed
++                    emit(event)
++                    if event["phase"]=="table_count" and event["ok"]:
++                        completed+=1
++                        if completed>=args.max_tables:
++                            raise SampleComplete()
++                    if time.monotonic()-profile_started>=args.seconds:
++                        raise SampleComplete()
++                try:
++                    backup.facts(measured_sql,observe)
++                except SampleComplete:
++                    emit({"phase":"bounded_sample_end","completedTables":completed,
++                          "seconds":time.monotonic()-profile_started,
++                          "fullIntegrityVerified":False,"activationAllowed":False})
++                else:
++                    emit({"phase":"sample_end","completedTables":completed,
++                          "fullIntegrityVerified":False,"activationAllowed":False})
++            emit({"phase":"clusters_stopped",
++                  "sourcePidAbsent":not (source/"postgres/postmaster.pid").exists(),
++                  "targetPidAbsent":not (target/"postgres/postmaster.pid").exists()})
++        except BaseException as error:
++            emit({"phase":"failed","errorType":type(error).__name__,"activationAllowed":False})
++            return 1
++    print(json.dumps({"status":"synthetic_cost_sample_only","evidence":str(log),
++                      "completedTables":completed,"activationAllowed":False}))
++    return 0
++
++if __name__=="__main__":
++    sys.exit(main())
+--- /dev/null
++++ b/tests/local/backup_facts_diagnostics_test.py
+@@ -0,0 +1,40 @@
++"""Diagnostic observer must not weaken backup fingerprints; no PostgreSQL is simulated as passing."""
++import pathlib,sys,unittest
++sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[2]/"scripts/local"))
++import backup
++
++class FactsDiagnosticsTest(unittest.TestCase):
++    def sql(self, query, fingerprint=False):
++        self.calls.append((query,fingerprint))
++        if "FROM flyway_schema_history" in query:
++            return backup.json.dumps([{"installed_rank":i,"version":m["version"],"script":m["script"],"success":True}
++                                      for i,m in enumerate(backup.migrations(),1)])
++        if "FROM pg_tables" in query:return "sample_table"
++        if query.startswith("COPY"):return "a"*64
++        if query.startswith("SELECT count(*)"):return "3"
++        raise AssertionError("unexpected query")
++    def setUp(self):self.calls=[]
++    def test_observer_preserves_result_and_query_sequence(self):
++        before=backup.facts(self.sql);calls=list(self.calls);self.calls=[]
++        events=[]
++        after=backup.facts(self.sql,events.append)
++        self.assertEqual(before,after)
++        self.assertEqual(calls,self.calls)
++        self.assertEqual({"sample_table":{"rows":3,"sha256":"a"*64}},after)
++        self.assertEqual(["migration_history","table_list","table_copy","table_count"],[e["phase"] for e in events])
++        self.assertEqual(3,events[-1]["rows"])
++        self.assertTrue(all(set(e)<= {"phase","table","seconds","ok","rows","errorType"} for e in events))
++    def test_copy_failure_propagates_without_count(self):
++        original=self.sql
++        def sql(query,fingerprint=False):
++            if query.startswith("COPY"):raise ValueError("synthetic secret must not be logged")
++            return original(query,fingerprint)
++        events=[]
++        with self.assertRaises(ValueError):backup.facts(sql,events.append)
++        self.assertFalse(any(q.startswith("SELECT count(*)") for q,_ in self.calls))
++        self.assertFalse(events[-1]["ok"])
++        self.assertNotIn("synthetic secret",str(events))
++    def test_observer_stop_never_returns_partial_success(self):
++        def stop(event):
++            if event["phase"]=="table_count":raise RuntimeError("diagnostic budget")
++        with self.assertRaisesRegex(RuntimeError,"diagnostic budget"):backup.facts(self.sql,stop)

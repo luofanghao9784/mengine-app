@@ -1,0 +1,1252 @@
+{
+  "source": "4415c11d7882db1968cadb5ff5d8e7a1acdd9f2d",
+  "count": 178,
+  "files": [
+    {
+      "path": "apps/api/src/main/resources/db/migration/V1__identity_and_tenants.sql",
+      "gitBlob": "2ea18887aeddf2c36a48648bcd2d227c5d9862c4",
+      "sha256": "840e534e3eac0743b988fac501a5d735354ba39373994cbf149792f510ebe3c4",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V2__jdbc_sessions.sql",
+      "gitBlob": "d372728829d65e64a8466f0349878e42222597dd",
+      "sha256": "6db2dfd5ae3dae0d52abfed2666416bd808bae9ced3c94252020a6ce397c561e",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V3__platform_tenant_management.sql",
+      "gitBlob": "148c98885c20c78defeae7f67e66f23717c5e56d",
+      "sha256": "96fc31ca803169b8dd4f69706578e6ed48bfba68b7b4184bd47e5192ede038c1",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V4__tenant_management.sql",
+      "gitBlob": "c178a48f7f16224bba42ee322a6f9ef467a44ca1",
+      "sha256": "7c7368fbd4acd0911013cb4e31c24b425f3275b72d5f45926d0c68875c9ff435",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V5__material_library.sql",
+      "gitBlob": "0bce5dfac4e9b400a0449540ab4f83d5ae501e16",
+      "sha256": "84f3470ed9dc52567a58917e12e7a3518cbe198d015eaf1e9a55d734fb2db54d",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V6__knowledge.sql",
+      "gitBlob": "3d2f32776423cc8467fd763e9e19afd3a7a9545c",
+      "sha256": "44ad2eb182d61e3b762ea781f3b364ed6421e083196605ab5aa56faf8a3e92e4",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V7__conversations.sql",
+      "gitBlob": "ca43ae84e73a876a790bbea8b5cd71e0ab83b4a5",
+      "sha256": "abe3611eb52bf653a21e36cfb963a1b1f49034d2637aad50607f8e7e52aca726",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V8__agent_tasks.sql",
+      "gitBlob": "c2ed0ad9dca591ad3354b2ff0a89fc4a3ed5f345",
+      "sha256": "eab2173902a67972f248b4acb806b28fc4a89d5b23f637f8ac4cbc910e652d65",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V9__agent_public_research.sql",
+      "gitBlob": "8e05d0194d4548da00f0b5935434a6ba1ceda2e1",
+      "sha256": "a37692f3b7487c0cb1f8cfb1abdbfffd2e97ea90f1b85958290b44fcca58ff15",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V10__task_original_grants.sql",
+      "gitBlob": "347d6b2f2437daa9c616a45041a609981d6652ad",
+      "sha256": "e632c500e028de62bfd4e9e0109616e935762ea77f8398efd490ae7158f95e1b",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V11__private_briefing_preferences.sql",
+      "gitBlob": "0fec56243188b44958397c604448e8e44815aabc",
+      "sha256": "5c6b2321317b896666506b4bd2306d055ff4f8b4cb3cbd3013ccdfd53f285532",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V12__private_documents.sql",
+      "gitBlob": "f11e5e8d270ec77b167a6ecda82097c5f9744337",
+      "sha256": "813da499fbf146492bc1eb9ff4cea077ebb4091d7a091ecd670af41cf0228bd4",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V13__document_publications.sql",
+      "gitBlob": "7aece9f7caac8a436231ebee6e5c3e39957d31fe",
+      "sha256": "cd891dd6f2bbcc0ba299e367bc29c6478b3d1d6d1ce3c6a37c66bdb09acf4787",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V14__shared_activity_index.sql",
+      "gitBlob": "982a51ff6c20f904a23e3ea2a2e455d6d7c86927",
+      "sha256": "fab8d6700fbea00ae6906ccf05d3432d3f20bfa586153126582c508a068b443f",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V15__agent_usage_ledger.sql",
+      "gitBlob": "918fa1fb6181d2a304b4710db11452f9237efb2f",
+      "sha256": "7acdf924c67c3355698b2cd98d8ed027a53b33ea7419aecdb807b52e25808800",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V16__governance_and_profiles.sql",
+      "gitBlob": "ad4c3c6b131b0678491f24ba491b0e416fd8f071",
+      "sha256": "2ba611f165e332e83b56601f362e30547bbcf4f00043e21418481c5cb349bf9b",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V17__input_receipts_and_task_versions.sql",
+      "gitBlob": "9aa5ff612f13c81053135778de2e7099ece2d184",
+      "sha256": "52d7a86ebaa6cbee7fcab6a0c3220147cbb14030ae09cac96ed23475480a85e8",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V18__manual_business_sources.sql",
+      "gitBlob": "c22acce6b34afc2adeac0610a523bb33f1df1c16",
+      "sha256": "5209c97fdc546abef79c366ff31390f002141eea9b192a07bc5056e0dc0a6746",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V19__task_control_and_attempt_history.sql",
+      "gitBlob": "6235c7bf2f9a394996a6ff4ab51e2d33b1ee3043",
+      "sha256": "f746e8e9194047c59d02e3e8b3cdc0e77733e8652f37afde655eaf9606da239a",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V20__material_lifecycle.sql",
+      "gitBlob": "b7b238c0ba5f44b8aeec2d73dc8db0ffd1fd3a28",
+      "sha256": "e630448c5ef44f8db9cdd53e4460be07583652c1a31976088392969ac4451dc5",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V21__experience_library.sql",
+      "gitBlob": "069e70105268f1376fba0df1f75baef77a920e2a",
+      "sha256": "8b0064c9d0df3339ecac891d2eaa6bdeebbd7e1d488e066ee55b295d4da4c156",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V22__ongoing_plans.sql",
+      "gitBlob": "15914f504c9cc0a3c1da115e742600969fb1a323",
+      "sha256": "ee7d793bdf544b86a137d5dd39ebc6692b14432fe5c7c8aaf6b1040d605a15b0",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V23__versioned_feedback.sql",
+      "gitBlob": "3dac70cbc3b27e37e48fe57245f7a74d374b5d96",
+      "sha256": "c7456cdf05fe7adcd85d99cbedc7dfa8c96dd25f6f356ff218ebd911b0b88766",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V24__task_context_reads.sql",
+      "gitBlob": "b23970972921e1b7e30aa2912af7b3a3bd008249",
+      "sha256": "7e99777439d932aaae1b6b67ad27aaacb64d698684c7548340d306084f7257f6",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V26__bounded_export_batches.sql",
+      "gitBlob": "932f2db81d8faf6eff9ffe91d6cf573754d684a7",
+      "sha256": "d1321b79174473fd3b36331c05a7e6330eeeae2397a378fbddfdd69968401472",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V27__evaluation_and_issues.sql",
+      "gitBlob": "2b5045f0ca17341fb04cbf992f614edeae4388c4",
+      "sha256": "bef823dece84e296427462a16c07f307c762f4a7b618f60696ba188720913ef7",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V28__method_versions_and_adoption.sql",
+      "gitBlob": "2aa3d188ee7c28d2966c7ee1b64931a7d8745e79",
+      "sha256": "824c0e9630fbd2cbaf284fb989f2de2bfa3d82e06f929cf8dacbfec0a1bfaf7e",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V29__retention_policies_and_exit_readiness.sql",
+      "gitBlob": "f320f6f71a553479b908d9b34816d8e1b5af885f",
+      "sha256": "67ecf03fd2b760b776e71bd09782eacdbf730c0b07f2147508bb8c70a56f6e11",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V30__recommendation_delivery.sql",
+      "gitBlob": "719027df53e12e3802ca72f79d93fc1ee0d21e99",
+      "sha256": "69e540238a03103d7212cf62616a875f149dc369aaac06695379394b92500402",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V31__all_task_source_authority.sql",
+      "gitBlob": "79ac228572a0b1a1522429b70343eb57cf86bf84",
+      "sha256": "13386034662d2fe81f673133daec4e362773166486cb98ede849af673032fab0",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V32__recommendation_presentations.sql",
+      "gitBlob": "3a9a51930db6d1168dbeaa38b5e86539640eddd8",
+      "sha256": "7f795a5c76a2ed89c7fe55eede444b2840764c1147da1e597fe296b70b0cb2f8",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V33__object_lifecycle.sql",
+      "gitBlob": "553fb9791a9e6728c88cba7c4ebbcc3da101e7e9",
+      "sha256": "4a71a21131db4a9d00066eca0d15b4cb31b2e83284ff4152eed58e8b4d80f6aa",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V34__effective_departures_and_exit_exports.sql",
+      "gitBlob": "106c62109389f6933700e6b01beca8ff244d6212",
+      "sha256": "c14210f9bfe96ce30779097b6c2ccf9b8a2ce71df043dc0b4bc44aab61d35e75",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V35__retention_execution_bindings.sql",
+      "gitBlob": "098d1c6292ca1e0e9ec392b572b0400b3cd3b2de",
+      "sha256": "e48b25d6588964fb7cd7daf63592ea3280807159ccc9bb3b94c80135e89d370e",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V36__closed_operation_retention.sql",
+      "gitBlob": "6c537b897727a672a374c74f8ab290bf915e110f",
+      "sha256": "77c08d23989cd9141519aaf050e523356ed5f60a5a90357d3485bdb3822b6203",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V37__publication_feedback.sql",
+      "gitBlob": "33b71ee55adab2d406507676c538fcf927a67095",
+      "sha256": "0e6489ebf5bb397429efa191a9cc1db720f00169d179e1fc5c5a871d9d0a80a2",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V38__task_work_bridges.sql",
+      "gitBlob": "4506fba9a2a06d47643a07fe47ad6cde0b908cfd",
+      "sha256": "b9d5a886357022f63d4f630fe67c6b720623be8d7d9b173c38160cb14c403fea",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V39__private_briefing_adjustments.sql",
+      "gitBlob": "45f7f5a552a9a077b4ef8ff5aeeeb588f362b95f",
+      "sha256": "311055f1c2fdb65eade35ea6fd5681ec0e93e5bd3ceeffc7112613b84e0c91ab",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V40__briefing_focus_layout.sql",
+      "gitBlob": "fae3d1488c55a428c6e3491681c87e5dd6190b86",
+      "sha256": "4e4afa70a14349fee697fd0ac9c456609d59560fdcd32a74ad31e547350b525f",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V41__publication_forwarding.sql",
+      "gitBlob": "ff6da9861e8affa16cf708ac53ec85353423751c",
+      "sha256": "c36b7ef99759e421353047fa4333ef055d1e6819b06f4e773bc58115c3302d69",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V42__profile_and_method_version_lifecycle.sql",
+      "gitBlob": "d712bf4a742c74e32c7a0da74594a546ce827bb3",
+      "sha256": "ba64012f5b53c3d263b4484ce8f04dd59eccb1a6d96b717712c79c965a9af2a4",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V43__phone_accounts.sql",
+      "gitBlob": "b268477dbf8e2a442cd281abd01c741eb2a8fc01",
+      "sha256": "9e5124ff312d5e25ba31e6763e124d2fd8c60e8e307e0dc2e5bc044e41967aea",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V44__client_input_scope.sql",
+      "gitBlob": "a8a6cdd7ba59aea02bfcdfd0135790b964c64501",
+      "sha256": "cea6393e7610c8295ffbc1be035e32660a00ef8a4a3f4a5fc26dbcd074129f42",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V45__client_publication_preferences.sql",
+      "gitBlob": "75e78dd85971ac007ef08bbc34d4f07abb008963",
+      "sha256": "51b328e7e71a3e350bb38015d9f0802dd675e5c14954b07f1f2877fff9fb6f55",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V46__conversation_plan_commands.sql",
+      "gitBlob": "3ae44e057c5a86e8879455a71c2dee4f181cb988",
+      "sha256": "df8477922075322123660bc152d959d5059dd8acb580b72a361c6fa94c8fb596",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V47__briefing_cards_and_generation.sql",
+      "gitBlob": "450ec194197f34018c80ae1ba2caedcbc35ea951",
+      "sha256": "a97b987a7a053f9d7274c65440a8f67d6e19f0111babbabef35487f9f4ab8c5a",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V48__resume_briefing_generation.sql",
+      "gitBlob": "6ef550cb3ed64df974bed6fc6b8ae884fb36fcab",
+      "sha256": "acb72a02ec5b5f566b8182da0856363b4394c7e1a40cd2b1947de51c9299c274",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V49__briefing_discussions.sql",
+      "gitBlob": "30d330146081002993bc2c26921daa2d32592b46",
+      "sha256": "2079421d4a3d06378fdac79eed5e3ab25f6cc8362a9a6fb031b28672e5d46a60",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V50__conversation_realtime.sql",
+      "gitBlob": "832750cf65e62e18641cdb6d12935e59e080289e",
+      "sha256": "9d90d3577b364973912015e87a5ed07e314cd253a877967266812dd8fe771baa",
+      "inCoverage": true,
+      "coveredShaMatches": true
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V55__platform_identity_sessions.sql",
+      "gitBlob": "f973cc000788a9a742843da4ceb08d0cca3b0977",
+      "sha256": "dbb72c9e7a033931dacd6f1803e63a55e61f92ef989129ace37b4b20ad39a3ab",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V56__platform_account_management.sql",
+      "gitBlob": "44c9e98b0b0c9f30ecfebfd7a2c4311fbea596f2",
+      "sha256": "8aa270c4e2bf1140abf604cc6a084a54d2c90bbdeb40d516cd80f7cf0179f70e",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V57__platform_staff_invitations.sql",
+      "gitBlob": "dc6afe51519d19aade0775b1793d18f830c7414c",
+      "sha256": "45b2c1af609824f1e24beccc1645148f05b326f3c88b0fba5614f7ff7f403f3d",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V58__shared_space_responsibility.sql",
+      "gitBlob": "2fd5f302b319a38b92979babc64013f766de0080",
+      "sha256": "1315e1a532e718b66561000b9d204ade0c2ea6ddd6f78fe283befb744a7b0078",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V59__owner_handover_choices.sql",
+      "gitBlob": "757c35e3da1b6c3fd0302de79bac1ed647837052",
+      "sha256": "795f8cb508052ad12627e938699a619302136af07d0dbadfb2ec13c28134cdce",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V60__tenant_service_lifecycle.sql",
+      "gitBlob": "78a7b04cd6e4e482e56737f5dc3d2faacf214c35",
+      "sha256": "62be0c323834a3a7f6a592ba7bacea44b4268b64b739f94f6cc93658e2db5895",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V61__deployed_data_collection.sql",
+      "gitBlob": "42e2fdaee583a8f2dd4227c35db4f2da4560d854",
+      "sha256": "64c6d1827db3f376fc24cfd5c0b65ab96fc319aa3f444ef3e81612701f65d8f4",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V62__collection_exit_lifecycle.sql",
+      "gitBlob": "cb216f01827a3cba7890d5decf73385b00bf61f3",
+      "sha256": "6b887ed0e3518549bcfaf229e49e0377a9493111fd103098b2348748413ee682",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V63__task_dataset_context.sql",
+      "gitBlob": "a0826b20cc23650f2ac7cf0aba6662f716557d53",
+      "sha256": "81bf28c9ad3a3d12472c947524ba454b72ba942eaea4f2e000a3f5c617332411",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V64__company_information_tags.sql",
+      "gitBlob": "64b9b67caf56409e3ed884e7e752c4d16575c188",
+      "sha256": "2bad0c3c872cc5308a856007a31338c8c610507db26a2cdcc6afe9c441211baa",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V65__company_information_inference.sql",
+      "gitBlob": "086784f887d1cd279a8ff69e16fac90da299e19d",
+      "sha256": "e9f22dc8e167b38866d838fe2b51c0f5cbec7aa1b639e57a877ab53827b33cb5",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V66__company_analysis_dispatch.sql",
+      "gitBlob": "ca100affa37ee07061da986a02db820ec4a5d4b3",
+      "sha256": "2aaa0357e40d4ff56261ce576d9e0eaaf7743d6653981b74b072685cfd970d10",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V67__briefing_dataset_selection.sql",
+      "gitBlob": "64ec53a3a72cf03cdf67791835700c2f5e55abeb",
+      "sha256": "61a8cd65c1944d72cd5c12af52b7ff443258b1ab2ca02db84cdd7505b927a862",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V68__experience_intake_sources.sql",
+      "gitBlob": "873fe632fa2b705ad6645aa9a892dc4454effb25",
+      "sha256": "13688527c3c6e8b2fd1b22ebe83e050baab53d4297baea836a7515caf21dbc5e",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V69__bounded_lifecycle_dependency_checks.sql",
+      "gitBlob": "0a646795908547b759e48d1d2a6010edf78bc960",
+      "sha256": "53d68760c4d3917d9f76ba010952cf5a38f6dfbb1ad5a24aaac74a47e65c93ce",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V70__experience_analysis_dispatch.sql",
+      "gitBlob": "71c15b1f137d2a786890b8b35ed1a6bca93f427a",
+      "sha256": "5f46131ffe05d08867da337245b8a9d1fd7bdec2d0f7a07c451682cdc248e14f",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V71__automatic_experience_admission.sql",
+      "gitBlob": "2a6f00662ec567b886e95421ffb0244076e42709",
+      "sha256": "b81d524e011ed63a0b77840707508d283f4d223fb1759ad140f0c277633caf37",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V72__experience_stop_preserves_own_versions.sql",
+      "gitBlob": "7e6c38ea49d513f7cce325d33b88f0176229b046",
+      "sha256": "92860e2d94f3dde2da80080e512a3067c471b93da5f4bbbf358da22808a17a9e",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V73__automatic_experience_adjustments.sql",
+      "gitBlob": "e8fea30bef358fb19bf5a41cfbffcafb82b78a89",
+      "sha256": "09619f9ac23ce07fa21a14891406e6b269549ab45c28a529ab6f52da9aa4611f",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V74__general_experience_pipeline.sql",
+      "gitBlob": "9bbefeac0a212ac3e5d1e7171bdbad98b6d95db9",
+      "sha256": "cd2ea06da8a272c2b59c7f602bb5423893116d18de186aea7b20227843459bf5",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V75__general_experience_task_context.sql",
+      "gitBlob": "253a47c11308aa5753478263a57a48a1fe12d766",
+      "sha256": "3ea52b424bbd4426aeb8bc556d944b78d7417e1393c54b41477b2092a2610f94",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V76__tenant_general_experience_usage.sql",
+      "gitBlob": "78f4550b77278e5bafc075ef1d13e6121c95564c",
+      "sha256": "45abca75616aa041c8a02d4ea154226fd25ea14c2662b6d61f28f6f6343ec183",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V77__general_experience_management.sql",
+      "gitBlob": "d0d494939db438d32be445849e736cd09957ae73",
+      "sha256": "961da62880709d4d24fde8077abb84e0678164dbaa77267708169fe0b3c10609",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V78__general_experience_local_suggestions.sql",
+      "gitBlob": "bb8076d5df3d1461df5e809e0be6902ef2b7b779",
+      "sha256": "ff85f18b4472f76b5310ca9862d61e5bd6fca4ea7cdc8b3cec0f7beb41a4bbe1",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V79__platform_general_experience_adjustments.sql",
+      "gitBlob": "01065d9a70c31c14688e5bd0b9bb12cfc6410e4f",
+      "sha256": "1ed5d23aaa173ae506abe104502823beb0bfa09253253e6ce6733f90e5a5569c",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V80__usage_observation_facts.sql",
+      "gitBlob": "d791634ec642581da8625e821ca2f644d4d602b4",
+      "sha256": "97d5055f6b3def0dbd8f8a4b62f9e3699719b4337135d02c9cbfb4797fd1c6c2",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V81__general_experience_contribution_ancestry.sql",
+      "gitBlob": "04504ebd1fd1b9618cb5b233fc2506f6e7ef6a54",
+      "sha256": "d1fde9aa5f4ef39d70aea174eab2b7158bfe39f4aac921eab68b4702cc01bde8",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V82__personal_follow_board.sql",
+      "gitBlob": "96f020317c03a0fc8ae0ccc631092466ffb5296e",
+      "sha256": "4bc595ad9d48d326932bc9c8489eda1dff5a4164607884394265f6cf7e12056a",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V83__background_briefing_conversations.sql",
+      "gitBlob": "5a7aee95f5735fbb2ed115ab3d077a723251d344",
+      "sha256": "0e03426ba5ad9d72056a7b929560a1598420b404aeff713671423137b4d9db21",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V84__conversation_titles.sql",
+      "gitBlob": "1fc12e5d07c4ceb74311ea8b2d8772b93b877696",
+      "sha256": "3092f7c0eb830f1b231bb76104db0f954cb279556989590277b85311807661d3",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V85__conversation_title_fingerprints.sql",
+      "gitBlob": "41a3acdc254cccb396839db628d369ff81b45a90",
+      "sha256": "2a89c2cb68714cd946a91825a3806868cbe64e9bacd747551b383887ad395c53",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V86__conversation_management.sql",
+      "gitBlob": "b39c4cb1fda3a43ea3856acbfe59cbe39c2c9eef",
+      "sha256": "9ce565fbaf2cf7141d90c7c75f90e86f6b4118f3da9a89f39cb1f126b32494a7",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V87__headquarters_support_access.sql",
+      "gitBlob": "5492fb582394d58f677c7f803030c6b9de72414b",
+      "sha256": "e3bf0771ae66f324b5d8d387e1e8c2b56c546b6a8393961c4a858b1130782235",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V88__briefing_quota_resets.sql",
+      "gitBlob": "32a895029af4a12052008b5bff55246e607b31e6",
+      "sha256": "d809409d4a51c519bed496f0905fdf50988440779a6f726ec1aaf96582cd8bcc",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V89__expression_preference_defaults.sql",
+      "gitBlob": "a2f93132e5cf4118cc355f318f2be2f8ffc3e682",
+      "sha256": "5abad0cb52ec256ec673fe27d26cc3e6feac9f2dac243261e4a3c2a25ecf1709",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V90__expression_rule_books.sql",
+      "gitBlob": "bfdaef18f5193b4a56c8c20299b59b6ad0600509",
+      "sha256": "22e6d5032f61e91704186decac8c1cb141cc00ae2e829362b92c46f69a802a92",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V91__briefing_topic_rules.sql",
+      "gitBlob": "d2d3a386aadc1944c8f2f062fa52974ffd3cf8cc",
+      "sha256": "e1f8f2136a63c162fb549d4cc359b81a58c7fca6302c1b68fdc62ba6f928c57e",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V92__briefing_generation_selections.sql",
+      "gitBlob": "a23779a71534a97f60dd760b882d50ade1e46bd5",
+      "sha256": "03f04ca72d2ff48189d36caf17c622096c8e638abb64b1335d1a3c627a94b773",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V93__news_source_catalog.sql",
+      "gitBlob": "4eb966376e9313b05922141479b5bd588066c6b3",
+      "sha256": "db46a14170334bf5fd68b690a74d7605791e70895d55a004390c85508183c656",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V94__briefing_news_topic_search.sql",
+      "gitBlob": "bd7761252e97cd5f522bdfd7c77cf63ab6d3472f",
+      "sha256": "9398ea00e70f74ed334ffef733dcc07b773bee8504bf5b85a2163919d1290b7f",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V95__authorized_cross_workspace_briefing.sql",
+      "gitBlob": "df3757ca6c5064d1576d8d0a8fec37fe85587c6b",
+      "sha256": "a402a55b33c4b5c9475db89145e28442d0549d0f5c702a2dc80787230de1c7e1",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V96__analysis_calculation_materials.sql",
+      "gitBlob": "6596824faf9230c322052d9be33024045857b421",
+      "sha256": "1af8bfbc1fa10077fe094e22bd2e4a0a7aa3409e880d34601c8d12dd71498b49",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V97__briefing_daily_schedule.sql",
+      "gitBlob": "de5e1f2ce39ff479d96d4083634584406a3ea4a1",
+      "sha256": "4eebaac723c1f834ba74d199ea1fc608e9a48b0af14ad3a1a803c2972549fcc8",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V98__briefing_daily_retry.sql",
+      "gitBlob": "e9cefff8d47546f09e649cf04d11017ce0272720",
+      "sha256": "21e7edd3f34edb8545d179261db3257744401955821c581b9487d4762676156a",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V99__company_analysis_parallel_slots.sql",
+      "gitBlob": "46e0caced95b12216481d951735e276eb1a471cf",
+      "sha256": "d538b3efd35ca4c843744d97847f4c08615fd9386766bc3e3e4407872efc82ea",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V100__dataset_lifecycle.sql",
+      "gitBlob": "85bf4c9b9319085eadb72b1f926a450b90201b78",
+      "sha256": "55cbc518cd9108ce7838d355cdafb434387d651d840045b41002fc8717812eed",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V101__empty_workspace_archive.sql",
+      "gitBlob": "5640e9a0c58a154abbd4d8acbe2c6ddf91a25af9",
+      "sha256": "0b152a9664ef83296babc2ac98db2ee8faf7d5a02d5ef05349f3cc9a220be0ab",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V102__archive_preserves_management_flows.sql",
+      "gitBlob": "15e4028797187764248d8c4463db34614c8a70c9",
+      "sha256": "a151bed86de8b0571f8f38e5a5f5dda3516a3d32d63ec049b3a14097585ac327",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V103__unified_identity_foundation.sql",
+      "gitBlob": "8c5298a4adc2a66c004d03e4a0829e1c9a83dbf7",
+      "sha256": "2c45f9deab56a09915e84be488450ceb46581c6dcb1ddde647c3c25585fb4415",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V104__pending_enterprise_opening.sql",
+      "gitBlob": "c7eded3d42710148cfe0d405309aa4f82bd8765f",
+      "sha256": "b2d5e634a63eb52761bd1c6e9fa76892929d6fab5bf96bc4623ba2e674cc1107",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V105__platform_invitation_verification.sql",
+      "gitBlob": "a99e72eb03a97dc9668709b20bfc9b54f80c55a6",
+      "sha256": "4647415250b9d659a080e9f5ea1d2afee2774f13bb616f9a92ae714115f36c2f",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V106__verified_identity_links.sql",
+      "gitBlob": "fa4c06f6a68fbbae168db48d44d0e2fe61be9ae1",
+      "sha256": "69decd4433abc20ded8291f973e81982fa581c1044f0ec18524102d926079818",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V107__invitation_initial_spaces.sql",
+      "gitBlob": "f544bc47d23e4840cfe9c5ec3045b5a9621a8be2",
+      "sha256": "781d401d349bae35066e418339975efe8fa1ad354e5e9c0c7f67f22bb77e26a7",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V108__platform_initialization.sql",
+      "gitBlob": "9f5041ea8ad156a5a54c89496571c15b74c695ab",
+      "sha256": "842515a22489ac90a720fc1efb0750d821dead4fd4918ec3d4df2c62ad265eb4",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V109__library_permissions.sql",
+      "gitBlob": "d9e58068a2804894d22448144e4c4e15100b7ad7",
+      "sha256": "1a6c233a1c66bf66de3e0031b4789ca8948c5c02697b9b11623e7e5a763a8bdf",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V110__material_governance.sql",
+      "gitBlob": "4fbe9c2e54fe340171bf455b83391b95237b6eec",
+      "sha256": "9b8440c8800c165ab2481fab515c359cd38baa2112171be2acba5e867bf37c97",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V111__library_moves_and_audit.sql",
+      "gitBlob": "54ef8b296259ca233796c071e60164946966c207",
+      "sha256": "a38cbf3c7d968ea77a215f23123225414350ffbf917fdf6dc03fa9f6159265d9",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V112__task_artifact_transfers.sql",
+      "gitBlob": "7fe965da236ea236534f82ccd519191fc5a08644",
+      "sha256": "1393ee265ac8fe79fd7782aac900a28c6f30f79b8ea2bd59697bc24473d280e7",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V113__library_task_source_access.sql",
+      "gitBlob": "87676954770fa2023e7df739066fe2a2cf814364",
+      "sha256": "d56c3cbd4bc2ef1eac107e7ced77b72da31e7b25f70a1bc89cc27cbdf2fa6078",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V114__deployed_dataset_fields.sql",
+      "gitBlob": "cdaa32728ac951dcefc083cc4241a0d1576bb4c3",
+      "sha256": "6172c8c30dcf43dfa2086e9a48650b80bd811fb65526fec7e99ba7f7a16fd6b5",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V115__library_launch_boundaries.sql",
+      "gitBlob": "662a6096344a899c14997c29175d66cca9828f86",
+      "sha256": "ed81655505f5d06b9a5f3e4caa36d17e428078337cbf5f089daa362f4ec395ad",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V116__wiki_learning_drafts.sql",
+      "gitBlob": "5f4176fb6b6bdef5196607e4a18411c1e97141b7",
+      "sha256": "0ab1861ad0f37babb15d78e3eb937c96951be5b115a61a51b29673250b9019fc",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V117__presentation_confirmation.sql",
+      "gitBlob": "789cf271c30383d41c54649cbe0442c43ed4a89d",
+      "sha256": "21ab83c6ff6edb876aad17bef7313efa89ac1ee56605f2d82e7e4537c01a4e4e",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V118__wiki_articles.sql",
+      "gitBlob": "1efa899b6a7fb65e6af449d28fa62738a7059cc6",
+      "sha256": "2ec02d1e470833dba00b32e7256f2e5ac8ad29389ce7be904e247af4a1bc4a1a",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V119__wiki_graphs.sql",
+      "gitBlob": "c02226ef275565e1339eeed30d50d3cb290a7301",
+      "sha256": "fab443d80a408dc8678f3eadad426f8474252c31f84861a44d1df3bebb772256",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V120__governance_proposals.sql",
+      "gitBlob": "9320ae8a2942de8d941ac36e8e951d668d99caf1",
+      "sha256": "5f743c971d3826a183f054e8fd6134fd87fd4b5a0a4a6c347c499a4acf2fb7ff",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V121__wiki_insights.sql",
+      "gitBlob": "eba60ec414c060edec21742e818de64070a36514",
+      "sha256": "df317265f08371d1ab8a769f1605c68e9b8425cb0cfd89c019a41b7f352239c9",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V122__tenant_scene_bridge.sql",
+      "gitBlob": "9e1754119a1f06fcfddfc77f7113a7f39e0fd421",
+      "sha256": "b0c46298a5b0f4a310c780f1430becee063f4c8a32ac614fc8ab77418d7c7d5f",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V123__scene_source_revisions.sql",
+      "gitBlob": "547eaf36aa30e1632e03311cd9db71eeda4f85af",
+      "sha256": "26991fbe67c5bab5f7e7a7e438edfbd09f1a87ca4d37a8902b9b4996baefd505",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V124__uploaded_file_tables.sql",
+      "gitBlob": "23e7fc9d90bb4fdc3d8ec0e1f789b97b04fa9e22",
+      "sha256": "88054bfa338fcade834e2498cf82c9e391b994f4ef50fbacc885b4aeb749832e",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V125__platform_engine_retries.sql",
+      "gitBlob": "b466dd9838782f7a4bdb52554f0a6797be27559a",
+      "sha256": "2ca97a52f1c354e1fc60a4416bb313a9764f32a9350712205a418e7a70bbe06a",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V126__durable_engine_receipts.sql",
+      "gitBlob": "16810c87aae17bab7df5d654ddea871d920b6fc2",
+      "sha256": "0f48d4f7793d752369e17a6bbf8dcbcdd1166d4045ff3fe70550018293584607",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V127__scene_governance_gate.sql",
+      "gitBlob": "395c693e2e9a52194eb1f180aaaa740a65f06622",
+      "sha256": "9b8e780a4814f8da52c2418cac662afab78c25323b358373ff5193ed87f0b9a6",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V128__scene_metric_catalog.sql",
+      "gitBlob": "e03a3c2fe17a07ae304555b599b062299ee7e5a1",
+      "sha256": "7f7dd093fa0c4993961d2c131c4d12afed704eeda02ef0ba0394f73d74d5ed48",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V129__metric_generation_execution.sql",
+      "gitBlob": "28ae87be3183d8579bf9397402983a21b8d66f6a",
+      "sha256": "55a0a904300271c9eaf8a6d17d2c79744441b1b19f865064e9b772ba6ac046f7",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V130__metric_delegated_definition.sql",
+      "gitBlob": "b9057738f095d3bb51c5959148765c443f04941e",
+      "sha256": "9ff41b8e81e0b603c4e87d69b34aad15fd20032153edb8f0009a49ed16acf6b1",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V131__metric_generation_cursor.sql",
+      "gitBlob": "824ddf105ce231b56af3d584611cf38e1c115b6f",
+      "sha256": "d3d379e5a7943d1c521a906582042050ed88ce5c5ca31c20df19258c51c6917f",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V132__governed_fusion_task_plans.sql",
+      "gitBlob": "7697f2ba86700d675011152094fc1354f35ae97f",
+      "sha256": "0b532b3b8c9bb3c36bc7f72fbb24c31b5dfb25999c79160bfe964b2c9e23b4dc",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V133__fusion_relation_schema_identity.sql",
+      "gitBlob": "0fac678e1a08aea5797dbef5a07fb5813970ef7e",
+      "sha256": "9e37249160b4a92caca5ba668b3c53ad3f277c5d9bfc482c9081c66a02773a9e",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V134__bound_task_source_permission_checks.sql",
+      "gitBlob": "ef9025a80b4070ec3a9061e92d37e41b7fcf4109",
+      "sha256": "1e458ae127c7ffaac547b9c1b385b4759d1e3252ac4703b806a45946ca701abc",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V135__customer_username_login.sql",
+      "gitBlob": "fec0210c3dc47784bf57917d838bed8487b2ff60",
+      "sha256": "c1115efe01b944d5de8536fa03a6987e26d7d0aa2ca78e37439450a87a408a5b",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V136__external_briefing_bootstrap.sql",
+      "gitBlob": "c97ec1a8cb2db00decaf7a2cc59f50754dfbdc44",
+      "sha256": "80d27444c116e792d2d128328e72d63221b1331d47976d7782c65edb1a1dcfe0",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V137__briefing_bootstrap_handoff.sql",
+      "gitBlob": "8cc5e17a033614dac71e02e3bf9f07586533ce5b",
+      "sha256": "bd5a9dbc527174481dec95a141709fe1075428102aa5e0fff47e7a0f255cb848",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V138__scene_dataset_version_continuity.sql",
+      "gitBlob": "02d7592d62f6edea373299c31a6897415f2332e6",
+      "sha256": "82ae077bb0f12ea224f0bc6aea2ad20e99cb32d7c924f9af460537b0ad01e630",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration/V139__governed_history_continuity.sql",
+      "gitBlob": "69dfcc097209058331335918de1ceec2ebbca258",
+      "sha256": "5255e5c6a753c156c48373d964efa489f0ec55902916177574b3c8b475fae430",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V149__unified_development_baseline.sql",
+      "gitBlob": "afec56677ed4b8dfce70b227068c27bc5dc6617c",
+      "sha256": "4b1e79ff524efda8796c412e702c037da32fedb699e4b50d0e2bcb68b054c311",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V150__weknora_index.sql",
+      "gitBlob": "912ab529c79a71d540661b8c1eeee578a4472a2d",
+      "sha256": "e0e6b480897e9fd4de50e098486ddd2624cc043e2aad1862e8df652392824fa8",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V151__background_knowledge_dependencies.sql",
+      "gitBlob": "30e41c4aa8a892ee35376973454ec140530de5e5",
+      "sha256": "d55018264a12338660c112fca9e6e8aa124d34d6a8353afaa925cb9b45d42a3b",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V152__work_audience.sql",
+      "gitBlob": "ecbceec5bf83c240afd36dc79c013cf726195c9d",
+      "sha256": "81d99ebfdc708aa56e67f68b2f534f80e02b90d9b0400fc6741848629f8f3871",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V153__scene_publication.sql",
+      "gitBlob": "568f8e4709a897933cb6cb6a5771840cdc29671d",
+      "sha256": "daa2e8061f483e9e07bada582d628048707123b2752560e4da733bd8a5dd5c8b",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V154__scene_resource_routing.sql",
+      "gitBlob": "0fbf77a7ce2c26e490d171584df309cf4a7c2cde",
+      "sha256": "92b616795d1ac8105da7f582df2a19e05061e16c498fa210f52db610e0894abc",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V155__task_reconciliation_receipts.sql",
+      "gitBlob": "b0cc9ad9182f73327e1e4f4616850b3b1444b9d6",
+      "sha256": "7577f5dd39516b187ef98e1eb09317b64b1308c8ed3b48fb8797155536f7820a",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V156__member_governance_goals.sql",
+      "gitBlob": "76057a61b1f974929d86cef324d6ff9bcad280af",
+      "sha256": "95abc92b62f326e4f2d57c7447c6b47abf9c1c4dce68c6996bf5987aacfa9684",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V157__briefing_editorial_plans.sql",
+      "gitBlob": "fa7fe92647d536aeaa97a3c5535791832479f76d",
+      "sha256": "a9196da978c2fd1fd6fda7e6937804bddbf6f36ff1e50499d98dfc7f8a6d1b6d",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V158__briefing_batch_topic_capacity.sql",
+      "gitBlob": "8fe24cfb12912cd3788d3cbad74ac4f31a72b78c",
+      "sha256": "48f6b65089434ac247819e482d13781b239d2b30afdb7e00366bacb318c7f836",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V159__bounded_scene_permission_candidates.sql",
+      "gitBlob": "299cc55db982dbf0481b0139e061008dff76fd39",
+      "sha256": "e1bf3419a4a33a741e55a119c114e42d62ef2ab040d1a4cb59e382b2a8a3f4d9",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V160__native_governance_release.sql",
+      "gitBlob": "edb14609740d2dc77b4d5922b8ac83a0da85f55b",
+      "sha256": "343e922a633b1b4e714069677616301bdde021ec61da21bd0ab09eea97bd98cb",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V161__native_material_release.sql",
+      "gitBlob": "a2b93adc5273aa06ffee79b443b9b2600d4757f6",
+      "sha256": "f30faa933ceb58305772d19a2ea8087709060f3a6ac4e58b10e13307dd14aa5d",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V162__durable_governance_jobs.sql",
+      "gitBlob": "085d666a3427c5454a32b099e2f38c624e30064e",
+      "sha256": "f1949cfbac10f5eaf6a9a70768b771e75a889346c2350be9b4462c32173fe357",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V163__shared_library_creation.sql",
+      "gitBlob": "31ce291d4ec37649ea3bbcd311938f86f109fec7",
+      "sha256": "814b958551a05ca0c31f9958a43c3c1dcfa42fc580b75ba3cd546ce148ce282c",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V164__governance_model_input_history.sql",
+      "gitBlob": "d36aba5f249a6caef6fe2d8d04788959535ccc62",
+      "sha256": "be877e44f64df656db4b82eb0968ca51a5d76a0967e7067744ae950ed4856867",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V165__governance_native_dispatch.sql",
+      "gitBlob": "e7ba910b411e077e8fc34471039f9d0910b98eb3",
+      "sha256": "8bb1e026decc994361cdc8d2820c2a6861acdd0f80038b117b2a00f303435974",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V166__shared_library_deletion_sources.sql",
+      "gitBlob": "ba47ae008c1c1eca914e87443f08938b5dcf6305",
+      "sha256": "0d6d116b2e7abd9046bc1fd75376e712cb3b39d87214d28fb70ce50798bdf158",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V167__engine_diagnostic_archives.sql",
+      "gitBlob": "de2aed73a6e1a4e66376643ef5801daa0f04fa96",
+      "sha256": "f312243ad7fcb796f1f24fbc9b2bb7f769059009da1a3d950dffbb143a113e97",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V168__native_governance_diagnostic_archives.sql",
+      "gitBlob": "ae8900c2645b9ab80e4154d2fa90791c31fe942f",
+      "sha256": "b1857920041413a838d74d7073c3f64dda69176b733349248839c5a0e600e01b",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V169__governance_usage_receipts.sql",
+      "gitBlob": "9bb0e8db9e9ad58ce8d55a0d8078fff6e567c1a6",
+      "sha256": "36fb197c8c54d4d94e97155aa6bbd20399470f7973e21d190471cdc9aab46bd7",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V170__collection_snapshot_receipts.sql",
+      "gitBlob": "06c6408c9a2c72f5a0c4065c5812c44edc90606b",
+      "sha256": "bbc0687fc1f01b7520c0df6b875adac4a9d19d634f3152f9466eeb72880cf3b3",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V171__native_conversation_sessions.sql",
+      "gitBlob": "533dfc0b2cb5a9d1d8d7e669792b2a87caab594d",
+      "sha256": "c319c055cf32226d1782af141679bb2ce2aa18f07409c75c34cc1f432cd8c12c",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V172__tool_context_argument_rejections.sql",
+      "gitBlob": "a0a43d113ed126c1322a45e1ed579831abe4020f",
+      "sha256": "6ed843e41fae6a865f766a1c05c6609795b86366279779927290c6e35b1cde8d",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V173__collection_source_contracts.sql",
+      "gitBlob": "77be2a69e72ae7405a34f11445536916b28afa45",
+      "sha256": "831b037b69bc53b471a09f87c0adf80620c032e93aa6842279ae305537c5fd5c",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V174__automatic_dataset_knowledge.sql",
+      "gitBlob": "79b7ad05d488e6e4175d161ec35a064eb9aef866",
+      "sha256": "318a27abb9007e22302dd1b21d145c087d078d38477ae22383510c49c5479747",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V175__collection_delivery_waits.sql",
+      "gitBlob": "07015ee242a1f4a37b53606093262ec1fc07d310",
+      "sha256": "2269b4228b08c6021e0cb906f5f029d72c5e2aa9cb5e8e8f21d71196c440d5aa",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V176__dataset_business_knowledge.sql",
+      "gitBlob": "d72c631f4e8a84978f8ef9432feb6a4d0c0197f5",
+      "sha256": "6b942ce3db85ce98a910b9da48d2b24343d397a56c7cdd5fc7fe097d470750c9",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V177__collection_diagnostic_archives.sql",
+      "gitBlob": "3ce47f58c921af2e8edd0bba4d96dc169303be9a",
+      "sha256": "f848d6467f079fa84cc2a2822d82b4e7f150d3f49fd79d7faf1e222ad6749e57",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V178__native_conversation_stream.sql",
+      "gitBlob": "d8a5af596ee8b05c7de26cc60591fca4a2efaf1e",
+      "sha256": "a6825c4268901cdbf57c082c74b76ca2f30a1512a468dc60901545f47f37b076",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V179__native_latest_status.sql",
+      "gitBlob": "7b1dfc77fa017c50ec01ec7bce46a8bad4b3b80d",
+      "sha256": "f9587156d786482e3fd9d05e05df4ef4fd57aaf06e207c2fc9e6cc2c70cac442",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V180__native_conversation_metadata.sql",
+      "gitBlob": "fccd5cd59eb7159d6465362d0557dc4eff1446b3",
+      "sha256": "2179faec75e296b6ef744df085cee08bf1863c00ce804b5398cc5ed83b7147c8",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V181__native_enterprise_skills.sql",
+      "gitBlob": "e4d441a2bc72c75e05f2b19fd1c60ebf952eeb13",
+      "sha256": "2f59f6145d421e1b44e117c7cbad131f5270878f6503c629a8fc85d2b450aa07",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V182__native_conversation_attachments.sql",
+      "gitBlob": "57e1d6c9df46c54ead050919382596784f051952",
+      "sha256": "a1958b891c1e64f878fbbdf86f25bc7a4c3f8310d644160b9a669cc289a7789e",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V183__native_schedules.sql",
+      "gitBlob": "a6712aeab4364cc4948e3495c32ae4a5c1570896",
+      "sha256": "5795928fb0fea64294fe4ccf0a5f7a87864c3049bfc289532e9077745208c56a",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V184__native_plugin_policy.sql",
+      "gitBlob": "92c964c7842e15890b3f93ec0244078e80b4246e",
+      "sha256": "dbb8fb27bed09346489349e0e62288fd6281bf2d01f83670f0cd6c795646f79a",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V185__dataset_evidence_receipts.sql",
+      "gitBlob": "e0a4b46e6a202997150e213114a0470622ca3b54",
+      "sha256": "b6fd060fe587f1b1bffc9f1f4c1f9336ab60a685930c776bff381c3b92e2f81d",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V186__knowledge_pipeline_progress.sql",
+      "gitBlob": "21a3179cba9d19d5861875f488b6e71c15385076",
+      "sha256": "b8c81aad9f0ca903a8dcd08bdde5f01a2bca8931565a1886c94555cdbe5159d8",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V187__company_discovery_per_run.sql",
+      "gitBlob": "84fb2342da2753367f71fdc9797511bcb234f27d",
+      "sha256": "473fcef4c5bb317c27272575d3756327c471d7a6d517090d07b72003f01a9e80",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V188__briefing_idle_scheduling.sql",
+      "gitBlob": "41d9aa3c6ac1db239197e5ad8178b12f9940df79",
+      "sha256": "07574b79014c6bd0de80cadcfffaaf5e5de62f592ae10a3f781bbad1e8eeb076",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V189__dataset_content_fingerprint.sql",
+      "gitBlob": "87166cf1dfcb0a7580656f6b83807470cd12ca32",
+      "sha256": "1daacc8d3accb545b6762ce526ebb0937d2b1d657f92e589c422b07d40af38b6",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V190__agent_admin_identity_sessions.sql",
+      "gitBlob": "c461ba18516b419a107ef7583dd4e2522a66c376",
+      "sha256": "db67254f8988adec68068a0c9ff874ee9d862525274da768b895bb0b34b84db7",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V191__platform_capability_registry.sql",
+      "gitBlob": "408d6828a0ab8c4ba7f1a6a4b239b3036f327c30",
+      "sha256": "b65c9bcd1aba5b903276e7bab40244e835f6962e18f85d2d4af8185a89046822",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    },
+    {
+      "path": "apps/api/src/main/resources/db/migration-common/V193__qo_capability_tenant_grant.sql",
+      "gitBlob": "a828106d10f2dd061f053e1d02433c08cc411bbc",
+      "sha256": "e631a2e33e8c56d1ceee58668d745aa27f250cb826fdc409b7833cf4dd226429",
+      "inCoverage": false,
+      "coveredShaMatches": null
+    }
+  ]
+}

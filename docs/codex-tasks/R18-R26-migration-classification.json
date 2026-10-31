@@ -1,0 +1,4832 @@
+{
+  "source": "4415c11d7882db1968cadb5ff5d8e7a1acdd9f2d",
+  "base": "1aac85b32d0186101713cee998b646734efc80b1",
+  "sourceTree": "5178fd8a2e56bce1b480ee4abe1706732872bf8e",
+  "coverageCount": 49,
+  "defaultCount": 178,
+  "missing": 129,
+  "defaultLineageCounts": {
+    "migration": 134,
+    "migrationCommon": 44
+  },
+  "missingLineageCounts": {
+    "migration": 85,
+    "migrationCommon": 44
+  },
+  "coveredHashesExact": true,
+  "validation": "49 source SQL SHA256 matches checked by Python; 129 source SQL read via authenticated repository connection.",
+  "coverageUnmodified": true,
+  "activationAllowed": false,
+  "classificationIsAdmission": false,
+  "sourceLostDisasterRecoveryImplemented": false,
+  "rows": [
+    {
+      "version": 55,
+      "path": "apps/api/src/main/resources/db/migration/V55__platform_identity_sessions.sql",
+      "gitBlob": "f973cc000788a9a742843da4ceb08d0cca3b0977",
+      "group": "A身份/租户/会话/能力",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "会话/凭据",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "platform_accounts",
+        "platform_sessions"
+      ],
+      "alterTables": [],
+      "functions": [
+        "reject_platform_membership",
+        "revoke_platform_role_sessions",
+        "revoke_platform_credential_sessions",
+        "revoke_platform_account_sessions"
+      ],
+      "triggers": [
+        "tenant_customer_identity",
+        "platform_role_session_revocation",
+        "platform_credential_session_revocation",
+        "platform_account_session_revocation"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威同步账号/租户/能力与开通；所有旧登录/验证/邀请/操作能力失效；不得复制旧授权扩大权限。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "platform_accounts",
+          "platform_sessions"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 56,
+      "path": "apps/api/src/main/resources/db/migration/V56__platform_account_management.sql",
+      "gitBlob": "44c9e98b0b0c9f30ecfebfd7a2c4311fbea596f2",
+      "group": "A身份/租户/会话/能力",
+      "signals": [
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "platform_account_changes"
+      ],
+      "alterTables": [
+        "accounts"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威同步账号/租户/能力与开通；所有旧登录/验证/邀请/操作能力失效；不得复制旧授权扩大权限。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "accounts"
+        ],
+        "scripts/local/backup_experience.py": [
+          "accounts"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "accounts"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 57,
+      "path": "apps/api/src/main/resources/db/migration/V57__platform_staff_invitations.sql",
+      "gitBlob": "dc6afe51519d19aade0775b1793d18f830c7414c",
+      "group": "A身份/租户/会话/能力",
+      "signals": [
+        "权限/撤权源",
+        "队列/租约/执行",
+        "会话/凭据"
+      ],
+      "createTables": [
+        "platform_staff_invitations"
+      ],
+      "alterTables": [
+        "platform_accounts"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威同步账号/租户/能力与开通；所有旧登录/验证/邀请/操作能力失效；不得复制旧授权扩大权限。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "platform_staff_invitations",
+          "platform_accounts"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 58,
+      "path": "apps/api/src/main/resources/db/migration/V58__shared_space_responsibility.sql",
+      "gitBlob": "2fd5f302b319a38b92979babc64013f766de0080",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "权限/撤权源",
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "workspace_owner_changes"
+      ],
+      "alterTables": [
+        "workspaces"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "workspaces"
+        ],
+        "scripts/local/backup_experience.py": [
+          "workspaces"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "workspaces"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 59,
+      "path": "apps/api/src/main/resources/db/migration/V59__owner_handover_choices.sql",
+      "gitBlob": "757c35e3da1b6c3fd0302de79bac1ed647837052",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "权限/撤权源",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "governance_handovers"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "governance_handovers"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 60,
+      "path": "apps/api/src/main/resources/db/migration/V60__tenant_service_lifecycle.sql",
+      "gitBlob": "78a7b04cd6e4e482e56737f5dc3d2faacf214c35",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "tenant_service_changes"
+      ],
+      "alterTables": [
+        "tenants",
+        "briefing_generation_policies"
+      ],
+      "functions": [
+        "fence_plan_tenant_service"
+      ],
+      "triggers": [
+        "plan_tenant_disabled"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "tenants",
+          "briefing_generation_policies"
+        ],
+        "scripts/local/backup_experience.py": [
+          "tenants"
+        ],
+        "scripts/local/backup_company.py": [
+          "tenants"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "tenants"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 61,
+      "path": "apps/api/src/main/resources/db/migration/V61__deployed_data_collection.sql",
+      "gitBlob": "42e2fdaee583a8f2dd4227c35db4f2da4560d854",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "会话/凭据",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "data_connections",
+        "collection_runs",
+        "business_datasets",
+        "dataset_snapshots"
+      ],
+      "alterTables": [
+        "business_datasets"
+      ],
+      "functions": [
+        "guard_dataset_deployment",
+        "fence_collection_deployment",
+        "fence_collection_connection",
+        "fence_collection_tenant",
+        "fence_collection_requester",
+        "fence_collection_departure"
+      ],
+      "triggers": [
+        "dataset_deployment_guard",
+        "dataset_deployment_fence",
+        "connection_deployment_fence",
+        "collection_tenant_fence",
+        "collection_account_fence",
+        "collection_member_fence",
+        "collection_departure_fence"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "data_connections",
+          "collection_runs",
+          "business_datasets",
+          "dataset_snapshots"
+        ],
+        "scripts/local/backup_collection.py": [
+          "data_connections",
+          "collection_runs",
+          "business_datasets",
+          "dataset_snapshots"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "data_connections",
+          "business_datasets",
+          "dataset_snapshots"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 62,
+      "path": "apps/api/src/main/resources/db/migration/V62__collection_exit_lifecycle.sql",
+      "gitBlob": "cb216f01827a3cba7890d5decf73385b00bf61f3",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "business_datasets",
+        "dataset_snapshots",
+        "departure_export_items"
+      ],
+      "functions": [
+        "guard_dataset_deployment",
+        "guard_dataset_snapshot",
+        "revoke_dataset_archives"
+      ],
+      "triggers": [
+        "dataset_snapshot_guard",
+        "dataset_archive_fence",
+        "snapshot_archive_fence"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "business_datasets",
+          "dataset_snapshots",
+          "departure_export_items"
+        ],
+        "scripts/local/backup_collection.py": [
+          "business_datasets",
+          "dataset_snapshots"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "business_datasets",
+          "dataset_snapshots"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 63,
+      "path": "apps/api/src/main/resources/db/migration/V63__task_dataset_context.sql",
+      "gitBlob": "a0826b20cc23650f2ac7cf0aba6662f716557d53",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "task_dataset_reads",
+        "task_dataset_fences",
+        "dataset_task_inheritance"
+      ],
+      "alterTables": [],
+      "functions": [
+        "task_dataset_sources",
+        "task_datasets_readable",
+        "fence_task_dataset_access",
+        "scrub_dataset_derived_content"
+      ],
+      "triggers": [
+        "task_dataset_permission_fence",
+        "task_dataset_withdrawal_fence",
+        "dataset_derived_scrub"
+      ],
+      "views": [
+        "dataset_task_edges",
+        "readable_source_tasks",
+        "readable_feedback"
+      ],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": true,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "task_dataset_reads",
+          "task_dataset_fences",
+          "dataset_task_inheritance"
+        ],
+        "scripts/local/backup_collection.py": [
+          "task_dataset_reads",
+          "task_dataset_fences",
+          "dataset_task_inheritance"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 64,
+      "path": "apps/api/src/main/resources/db/migration/V64__company_information_tags.sql",
+      "gitBlob": "64b9b67caf56409e3ed884e7e752c4d16575c188",
+      "group": "D企业资料/推断/后台调度",
+      "signals": [
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "company_information_groups",
+        "company_information_tags"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前来源与正文清除联动；队列/推断任务暂停，不把旧建议或调度槽作为重新执行授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "company_information_groups",
+          "company_information_tags"
+        ],
+        "scripts/local/backup_company.py": [
+          "company_information_groups",
+          "company_information_tags"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 65,
+      "path": "apps/api/src/main/resources/db/migration/V65__company_information_inference.sql",
+      "gitBlob": "086784f887d1cd279a8ff69e16fac90da299e19d",
+      "group": "D企业资料/推断/后台调度",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "会话/凭据",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "company_inference_runs",
+        "company_inference_inputs",
+        "company_information_suggestions",
+        "company_suggestion_evidence",
+        "company_profile_inferences"
+      ],
+      "alterTables": [],
+      "functions": [
+        "company_chunk_eligible",
+        "company_inference_readable",
+        "company_profile_readable",
+        "fence_company_inference",
+        "fence_company_material",
+        "scrub_company_inference"
+      ],
+      "triggers": [
+        "company_member_fence",
+        "company_space_fence",
+        "company_material_lifecycle_fence",
+        "company_material_scope_fence",
+        "company_service_fence",
+        "company_source_scrub"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "当前来源与正文清除联动；队列/推断任务暂停，不把旧建议或调度槽作为重新执行授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "company_inference_runs",
+          "company_inference_inputs",
+          "company_information_suggestions",
+          "company_suggestion_evidence",
+          "company_profile_inferences"
+        ],
+        "scripts/local/backup_company.py": [
+          "company_inference_runs",
+          "company_inference_inputs",
+          "company_information_suggestions",
+          "company_suggestion_evidence",
+          "company_profile_inferences",
+          "company_inference_readable",
+          "company_profile_readable"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 66,
+      "path": "apps/api/src/main/resources/db/migration/V66__company_analysis_dispatch.sql",
+      "gitBlob": "ca100affa37ee07061da986a02db820ec4a5d4b3",
+      "group": "D企业资料/推断/后台调度",
+      "signals": [
+        "正文/派生物",
+        "队列/租约/执行",
+        "会话/凭据",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "company_analysis_items",
+        "company_analysis_attempts"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [
+        "company_analysis_current_chunks"
+      ],
+      "requiredRecoveryPolicy": "当前来源与正文清除联动；队列/推断任务暂停，不把旧建议或调度槽作为重新执行授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "company_analysis_items",
+          "company_analysis_attempts"
+        ],
+        "scripts/local/backup_company.py": [
+          "company_analysis_items",
+          "company_analysis_attempts"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 67,
+      "path": "apps/api/src/main/resources/db/migration/V67__briefing_dataset_selection.sql",
+      "gitBlob": "64ec53a3a72cf03cdf67791835700c2f5e55abeb",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "briefing_dataset_selections"
+      ],
+      "alterTables": [],
+      "functions": [
+        "guard_briefing_dataset_selection",
+        "task_dataset_sources",
+        "task_datasets_readable",
+        "fence_briefing_dataset_selection",
+        "scrub_dataset_derived_content"
+      ],
+      "triggers": [
+        "briefing_dataset_guard",
+        "briefing_dataset_withdrawal",
+        "briefing_dataset_permission"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "briefing_dataset_selections"
+        ],
+        "scripts/local/backup_collection.py": [
+          "briefing_dataset_selections"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 68,
+      "path": "apps/api/src/main/resources/db/migration/V68__experience_intake_sources.sql",
+      "gitBlob": "873fe632fa2b705ad6645aa9a892dc4454effb25",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "会话/凭据",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "experience_intake_sources"
+      ],
+      "alterTables": [],
+      "functions": [
+        "experience_intake_available",
+        "fence_experience_intake"
+      ],
+      "triggers": [
+        "experience_intake_workspace",
+        "experience_intake_membership",
+        "experience_intake_account"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "experience_intake_sources"
+        ],
+        "scripts/local/backup_experience.py": [
+          "experience_intake_sources",
+          "experience_intake_available"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 69,
+      "path": "apps/api/src/main/resources/db/migration/V69__bounded_lifecycle_dependency_checks.sql",
+      "gitBlob": "0a646795908547b759e48d1d2a6010edf78bc960",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [
+        "object_is_active_internal"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 70,
+      "path": "apps/api/src/main/resources/db/migration/V70__experience_analysis_dispatch.sql",
+      "gitBlob": "71c15b1f137d2a786890b8b35ed1a6bca93f427a",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "触发器/函数",
+        "正文/派生物",
+        "队列/租约/执行",
+        "会话/凭据",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "experience_analysis_items",
+        "experience_analysis_runs"
+      ],
+      "alterTables": [
+        "experience_analysis_items"
+      ],
+      "functions": [
+        "invalidate_experience_analysis"
+      ],
+      "triggers": [
+        "experience_analysis_invalidated",
+        "experience_analysis_task_changed",
+        "experience_analysis_feedback_changed",
+        "experience_analysis_object_changed"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "experience_analysis_items",
+          "experience_analysis_runs"
+        ],
+        "scripts/local/backup_experience.py": [
+          "experience_analysis_items",
+          "experience_analysis_runs"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 71,
+      "path": "apps/api/src/main/resources/db/migration/V71__automatic_experience_admission.sql",
+      "gitBlob": "2a6f00662ec567b886e95421ffb0244076e42709",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "触发器/函数",
+        "正文/派生物",
+        "外部对象/路由"
+      ],
+      "createTables": [
+        "experience_admissions",
+        "experience_automatic_sources",
+        "experience_automatic_dependencies"
+      ],
+      "alterTables": [
+        "experience_versions",
+        "experience_entries"
+      ],
+      "functions": [
+        "erase_invalid_automatic_experience"
+      ],
+      "triggers": [
+        "automatic_experience_source_erased",
+        "automatic_experience_version_erased",
+        "automatic_experience_dependency_erased",
+        "automatic_experience_manually_stopped"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "experience_admissions",
+          "experience_automatic_sources",
+          "experience_automatic_dependencies",
+          "experience_versions",
+          "experience_entries"
+        ],
+        "scripts/local/backup_experience.py": [
+          "experience_admissions",
+          "experience_automatic_sources",
+          "experience_automatic_dependencies",
+          "experience_versions",
+          "experience_entries"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 72,
+      "path": "apps/api/src/main/resources/db/migration/V72__experience_stop_preserves_own_versions.sql",
+      "gitBlob": "7e6c38ea49d513f7cce325d33b88f0176229b046",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "触发器/函数",
+        "外部对象/路由"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [
+        "erase_invalid_automatic_experience"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 73,
+      "path": "apps/api/src/main/resources/db/migration/V73__automatic_experience_adjustments.sql",
+      "gitBlob": "e8fea30bef358fb19bf5a41cfbffcafb82b78a89",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "会话/凭据",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "experience_adjustments"
+      ],
+      "alterTables": [
+        "experience_intake_sources"
+      ],
+      "functions": [
+        "experience_intake_available",
+        "fence_experience_adjustments"
+      ],
+      "triggers": [
+        "adjustment_entry_changed",
+        "adjustment_version_changed",
+        "adjustment_lifecycle_changed",
+        "adjustment_authority_changed",
+        "adjustment_source_changed"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "experience_adjustments",
+          "experience_intake_sources"
+        ],
+        "scripts/local/backup_experience.py": [
+          "experience_adjustments",
+          "experience_intake_sources",
+          "experience_intake_available"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 74,
+      "path": "apps/api/src/main/resources/db/migration/V74__general_experience_pipeline.sql",
+      "gitBlob": "9bbefeac0a212ac3e5d1e7171bdbad98b6d95db9",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "会话/凭据",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "experience_generalization_sources",
+        "experience_generalization_runs",
+        "general_experience_entries",
+        "general_experience_versions",
+        "general_experience_origins",
+        "general_experience_admissions"
+      ],
+      "alterTables": [
+        "experience_versions",
+        "experience_generalization_sources",
+        "general_experience_entries"
+      ],
+      "functions": [
+        "generalization_source_available",
+        "general_experience_available",
+        "fence_general_experience",
+        "scrub_automatic_experience_steps"
+      ],
+      "triggers": [
+        "generalization_source_invalidated",
+        "generalization_entry_changed",
+        "generalization_version_changed",
+        "generalization_membership_changed",
+        "generalization_tenant_member_changed",
+        "generalization_account_changed",
+        "generalization_tenant_changed",
+        "generalization_lifecycle_changed",
+        "generalization_departure_changed",
+        "generalization_material_state_changed",
+        "generalization_material_scope_changed",
+        "automatic_steps_scrubbed",
+        "generalization_workspace_owner_changed"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "experience_generalization_sources",
+          "experience_generalization_runs",
+          "general_experience_entries",
+          "general_experience_versions",
+          "general_experience_origins",
+          "general_experience_admissions",
+          "experience_versions"
+        ],
+        "scripts/local/backup_experience.py": [
+          "experience_generalization_sources",
+          "experience_generalization_runs",
+          "general_experience_entries",
+          "general_experience_versions",
+          "general_experience_origins",
+          "general_experience_admissions",
+          "experience_versions",
+          "generalization_source_available"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 75,
+      "path": "apps/api/src/main/resources/db/migration/V75__general_experience_task_context.sql",
+      "gitBlob": "253a47c11308aa5753478263a57a48a1fe12d766",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "task_general_experience_reads",
+        "task_general_experience_reviews",
+        "task_general_experience_fences"
+      ],
+      "alterTables": [],
+      "functions": [
+        "generalization_source_available",
+        "general_experience_history_readable",
+        "task_general_experiences_readable",
+        "task_general_experience_dependencies",
+        "task_general_experiences_current",
+        "fence_general_experience_tasks"
+      ],
+      "triggers": [
+        "general_task_adoption_fence",
+        "general_task_source_erased",
+        "general_task_review_erased"
+      ],
+      "views": [
+        "readable_source_tasks",
+        "readable_feedback"
+      ],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": true,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_experience.py": [
+          "generalization_source_available"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 76,
+      "path": "apps/api/src/main/resources/db/migration/V76__tenant_general_experience_usage.sql",
+      "gitBlob": "78f4550b77278e5bafc075ef1d13e6121c95564c",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "tenant_general_experience_usage",
+        "tenant_general_experience_usage_events"
+      ],
+      "alterTables": [],
+      "functions": [
+        "tenant_general_experience_enabled",
+        "task_general_experiences_current",
+        "fence_tenant_general_experience_tasks"
+      ],
+      "triggers": [
+        "tenant_general_use_fence"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "tenant_general_experience_usage",
+          "tenant_general_experience_usage_events"
+        ],
+        "scripts/local/backup_experience.py": [
+          "tenant_general_experience_usage",
+          "tenant_general_experience_usage_events"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 77,
+      "path": "apps/api/src/main/resources/db/migration/V77__general_experience_management.sql",
+      "gitBlob": "d0d494939db438d32be445849e736cd09957ae73",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "general_experience_management_events"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "general_experience_management_events"
+        ],
+        "scripts/local/backup_experience.py": [
+          "general_experience_management_events"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 78,
+      "path": "apps/api/src/main/resources/db/migration/V78__general_experience_local_suggestions.sql",
+      "gitBlob": "bb8076d5df3d1461df5e809e0be6902ef2b7b779",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "general_experience_suggestions",
+        "experience_general_dependencies"
+      ],
+      "alterTables": [
+        "experience_intake_sources"
+      ],
+      "functions": [
+        "experience_general_dependencies_readable",
+        "experience_general_dependencies_current",
+        "experience_intake_available",
+        "task_general_experience_dependency_status",
+        "task_general_experience_dependencies",
+        "task_general_experiences_current",
+        "invalidate_pending_general_suggestions",
+        "fence_general_suggestions"
+      ],
+      "triggers": [
+        "general_suggestions_entry",
+        "general_suggestions_usage",
+        "general_suggestions_body",
+        "general_suggestions_authority",
+        "general_suggestions_intake"
+      ],
+      "views": [
+        "experience_general_dependency_closure",
+        "general_experience_task_roots"
+      ],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "general_experience_suggestions",
+          "experience_general_dependencies",
+          "experience_intake_sources"
+        ],
+        "scripts/local/backup_experience.py": [
+          "general_experience_suggestions",
+          "experience_general_dependencies",
+          "experience_intake_sources",
+          "experience_intake_available"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 79,
+      "path": "apps/api/src/main/resources/db/migration/V79__platform_general_experience_adjustments.sql",
+      "gitBlob": "01065d9a70c31c14688e5bd0b9bb12cfc6410e4f",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "会话/凭据",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "general_experience_adjustments",
+        "general_experience_adjustment_runs",
+        "general_experience_version_dependencies"
+      ],
+      "alterTables": [
+        "general_experience_adjustments"
+      ],
+      "functions": [
+        "general_experience_history_readable",
+        "general_experience_available",
+        "platform_general_adjustment_available",
+        "clear_platform_general_adjustment",
+        "fence_platform_general_adjustments",
+        "erase_general_adjustment_descendants"
+      ],
+      "triggers": [
+        "general_adjustment_terminal",
+        "general_adjustment_entry_fence",
+        "general_adjustment_role_fence",
+        "general_adjustment_account_fence",
+        "general_adjustment_platform_fence",
+        "general_adjustment_source_erased"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "general_experience_adjustments",
+          "general_experience_adjustment_runs",
+          "general_experience_version_dependencies"
+        ],
+        "scripts/local/backup_experience.py": [
+          "general_experience_adjustments",
+          "general_experience_adjustment_runs",
+          "general_experience_version_dependencies"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 80,
+      "path": "apps/api/src/main/resources/db/migration/V80__usage_observation_facts.sql",
+      "gitBlob": "d791634ec642581da8625e821ca2f644d4d602b4",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "队列/租约/执行",
+        "会话/凭据"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "conversation_tool_receipts",
+        "company_analysis_attempts"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "company_analysis_attempts"
+        ],
+        "scripts/local/backup_company.py": [
+          "company_analysis_attempts"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 81,
+      "path": "apps/api/src/main/resources/db/migration/V81__general_experience_contribution_ancestry.sql",
+      "gitBlob": "04504ebd1fd1b9618cb5b233fc2506f6e7ef6a54",
+      "group": "E经验/通用经验/祖先及派生清除",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [
+        "general_experience_dependencies_enabled",
+        "general_experience_available",
+        "generalization_source_current",
+        "fence_pending_general_contributions"
+      ],
+      "triggers": [
+        "general_contribution_stop",
+        "general_contribution_tenant_stop"
+      ],
+      "views": [
+        "experience_general_direct_closure",
+        "general_experience_version_edges",
+        "general_experience_ancestry",
+        "experience_general_dependency_closure",
+        "general_experience_task_roots"
+      ],
+      "requiredRecoveryPolicy": "保留证据但递归按当前祖先可读性/停用/擦除裁剪正文；所有分析、提炼、调整、建议运行暂停。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 82,
+      "path": "apps/api/src/main/resources/db/migration/V82__personal_follow_board.sql",
+      "gitBlob": "96f020317c03a0fc8ae0ccc631092466ffb5296e",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "权限/撤权源",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "personal_follow_boards",
+        "personal_follow_board_receipts"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 83,
+      "path": "apps/api/src/main/resources/db/migration/V83__background_briefing_conversations.sql",
+      "gitBlob": "5a7aee95f5735fbb2ed115ab3d077a723251d344",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "conversation_tasks",
+        "conversations"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "conversation_tasks",
+          "conversations"
+        ],
+        "scripts/local/backup_collection.py": [
+          "conversation_tasks"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "conversation_tasks",
+          "conversations"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 84,
+      "path": "apps/api/src/main/resources/db/migration/V84__conversation_titles.sql",
+      "gitBlob": "1fc12e5d07c4ceb74311ea8b2d8772b93b877696",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "权限/撤权源",
+        "队列/租约/执行",
+        "会话/凭据",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "conversation_titles"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "conversation_titles"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 85,
+      "path": "apps/api/src/main/resources/db/migration/V85__conversation_title_fingerprints.sql",
+      "gitBlob": "41a3acdc254cccb396839db628d369ff81b45a90",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "正文/派生物"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "conversation_titles"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "conversation_titles"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 86,
+      "path": "apps/api/src/main/resources/db/migration/V86__conversation_management.sql",
+      "gitBlob": "b39c4cb1fda3a43ea3856acbfe59cbe39c2c9eef",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "触发器/函数",
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "conversations"
+      ],
+      "functions": [
+        "conversation_record_reply"
+      ],
+      "triggers": [
+        "conversation_reply_receipt"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "conversations"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "conversations"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 87,
+      "path": "apps/api/src/main/resources/db/migration/V87__headquarters_support_access.sql",
+      "gitBlob": "5492fb582394d58f677c7f803030c6b9de72414b",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "会话/凭据",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "headquarters_support_access",
+        "headquarters_support_events",
+        "headquarters_support_changes"
+      ],
+      "alterTables": [
+        "export_batches",
+        "experience_adjustments",
+        "general_experience_suggestions",
+        "experience_intake_sources"
+      ],
+      "functions": [
+        "headquarters_permission_actor",
+        "headquarters_support_metadata",
+        "headquarters_support_journal",
+        "headquarters_source_permission_actor",
+        "headquarters_support_revoke"
+      ],
+      "triggers": [
+        "headquarters_support_journal",
+        "headquarters_session_revoke",
+        "headquarters_role_revoke",
+        "headquarters_account_revoke",
+        "headquarters_credentials_revoke"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": true,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "export_batches",
+          "experience_adjustments",
+          "general_experience_suggestions",
+          "experience_intake_sources"
+        ],
+        "scripts/local/backup_experience.py": [
+          "experience_adjustments",
+          "general_experience_suggestions",
+          "experience_intake_sources"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 88,
+      "path": "apps/api/src/main/resources/db/migration/V88__briefing_quota_resets.sql",
+      "gitBlob": "32a895029af4a12052008b5bff55246e607b31e6",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "权限/撤权源",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "briefing_quota_resets"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 89,
+      "path": "apps/api/src/main/resources/db/migration/V89__expression_preference_defaults.sql",
+      "gitBlob": "a2f93132e5cf4118cc355f318f2be2f8ffc3e682",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "expression_preference_defaults"
+      ],
+      "alterTables": [
+        "task_preference_saves"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "task_preference_saves"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "task_preference_saves"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 90,
+      "path": "apps/api/src/main/resources/db/migration/V90__expression_rule_books.sql",
+      "gitBlob": "bfdaef18f5193b4a56c8c20299b59b6ad0600509",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "expression_rule_books",
+        "expression_rule_task_snapshots"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 91,
+      "path": "apps/api/src/main/resources/db/migration/V91__briefing_topic_rules.sql",
+      "gitBlob": "d2d3a386aadc1944c8f2f062fa52974ffd3cf8cc",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [],
+      "createTables": [
+        "briefing_topic_selections"
+      ],
+      "alterTables": [
+        "expression_rule_books"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": []
+    },
+    {
+      "version": 92,
+      "path": "apps/api/src/main/resources/db/migration/V92__briefing_generation_selections.sql",
+      "gitBlob": "a23779a71534a97f60dd760b882d50ade1e46bd5",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "briefing_generation_batches"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "briefing_generation_batches"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 93,
+      "path": "apps/api/src/main/resources/db/migration/V93__news_source_catalog.sql",
+      "gitBlob": "4eb966376e9313b05922141479b5bd588066c6b3",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "触发器/函数",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "news_sources",
+        "tenant_news_sources",
+        "news_source_changes",
+        "news_article_deliveries"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [
+        "headquarters_support_journal"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 94,
+      "path": "apps/api/src/main/resources/db/migration/V94__briefing_news_topic_search.sql",
+      "gitBlob": "bd7761252e97cd5f522bdfd7c77cf63ab6d3472f",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "触发器/函数",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "briefing_news_search_scope",
+        "briefing_news_search_queries"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [
+        "headquarters_support_journal"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 95,
+      "path": "apps/api/src/main/resources/db/migration/V95__authorized_cross_workspace_briefing.sql",
+      "gitBlob": "df3757ca6c5064d1576d8d0a8fec37fe85587c6b",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [
+        "guard_briefing_dataset_selection"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 96,
+      "path": "apps/api/src/main/resources/db/migration/V96__analysis_calculation_materials.sql",
+      "gitBlob": "6596824faf9230c322052d9be33024045857b421",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "触发器/函数",
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "analysis_computation_receipts",
+        "analysis_materials",
+        "analysis_material_versions",
+        "analysis_material_observations"
+      ],
+      "alterTables": [],
+      "functions": [
+        "guard_analysis_computation_receipt",
+        "guard_analysis_material_record",
+        "guard_analysis_material_identity"
+      ],
+      "triggers": [
+        "analysis_computation_receipt_guard",
+        "analysis_version_guard",
+        "analysis_observation_guard",
+        "analysis_material_identity_guard"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 97,
+      "path": "apps/api/src/main/resources/db/migration/V97__briefing_daily_schedule.sql",
+      "gitBlob": "de5e1f2ce39ff479d96d4083634584406a3ea4a1",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "briefing_daily_schedules",
+        "briefing_daily_runs",
+        "briefing_flow_tasks",
+        "briefing_flow_materials",
+        "briefing_material_uses"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 98,
+      "path": "apps/api/src/main/resources/db/migration/V98__briefing_daily_retry.sql",
+      "gitBlob": "e9cefff8d47546f09e649cf04d11017ce0272720",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "正文/派生物",
+        "队列/租约/执行"
+      ],
+      "createTables": [
+        "briefing_daily_retries"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 99,
+      "path": "apps/api/src/main/resources/db/migration/V99__company_analysis_parallel_slots.sql",
+      "gitBlob": "46e0caced95b12216481d951735e276eb1a471cf",
+      "group": "D企业资料/推断/后台调度",
+      "signals": [
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "company_analysis_attempts"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前来源与正文清除联动；队列/推断任务暂停，不把旧建议或调度槽作为重新执行授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "company_analysis_attempts"
+        ],
+        "scripts/local/backup_company.py": [
+          "company_analysis_attempts"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 100,
+      "path": "apps/api/src/main/resources/db/migration/V100__dataset_lifecycle.sql",
+      "gitBlob": "85bf4c9b9319085eadb72b1f926a450b90201b78",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "触发器/函数",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "business_datasets"
+      ],
+      "functions": [
+        "guard_withdrawn_dataset"
+      ],
+      "triggers": [
+        "withdrawn_dataset_guard"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "business_datasets"
+        ],
+        "scripts/local/backup_collection.py": [
+          "business_datasets"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "business_datasets"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 101,
+      "path": "apps/api/src/main/resources/db/migration/V101__empty_workspace_archive.sql",
+      "gitBlob": "5640e9a0c58a154abbd4d8acbe2c6ddf91a25af9",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "触发器/函数",
+        "正文/派生物",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "workspaces"
+      ],
+      "functions": [
+        "guard_archived_workspace_insert"
+      ],
+      "triggers": [
+        "archive_insert_guard"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": true,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "workspaces"
+        ],
+        "scripts/local/backup_experience.py": [
+          "workspaces"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "workspaces"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 102,
+      "path": "apps/api/src/main/resources/db/migration/V102__archive_preserves_management_flows.sql",
+      "gitBlob": "15e4028797187764248d8c4463db34614c8a70c9",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "触发器/函数",
+        "队列/租约/执行",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": true,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 103,
+      "path": "apps/api/src/main/resources/db/migration/V103__unified_identity_foundation.sql",
+      "gitBlob": "8c5298a4adc2a66c004d03e4a0829e1c9a83dbf7",
+      "group": "A身份/租户/会话/能力",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "会话/凭据",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "platform_sessions",
+        "platform_staff_invitations",
+        "platform_account_changes",
+        "tenant_service_changes"
+      ],
+      "functions": [
+        "invalidate_unified_platform_password",
+        "invalidate_unified_support_sessions",
+        "headquarters_permission_actor",
+        "headquarters_source_permission_actor",
+        "platform_general_adjustment_available"
+      ],
+      "triggers": [
+        "unified_platform_password_change",
+        "unified_credential_change"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威同步账号/租户/能力与开通；所有旧登录/验证/邀请/操作能力失效；不得复制旧授权扩大权限。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "platform_sessions",
+          "platform_staff_invitations"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 104,
+      "path": "apps/api/src/main/resources/db/migration/V104__pending_enterprise_opening.sql",
+      "gitBlob": "c7eded3d42710148cfe0d405309aa4f82bd8765f",
+      "group": "A身份/租户/会话/能力",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "tenants"
+      ],
+      "functions": [
+        "require_pending_opening_owner"
+      ],
+      "triggers": [
+        "pending_opening_owner"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威同步账号/租户/能力与开通；所有旧登录/验证/邀请/操作能力失效；不得复制旧授权扩大权限。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "tenants"
+        ],
+        "scripts/local/backup_experience.py": [
+          "tenants"
+        ],
+        "scripts/local/backup_company.py": [
+          "tenants"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "tenants"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 105,
+      "path": "apps/api/src/main/resources/db/migration/V105__platform_invitation_verification.sql",
+      "gitBlob": "a99e72eb03a97dc9668709b20bfc9b54f80c55a6",
+      "group": "A身份/租户/会话/能力",
+      "signals": [
+        "会话/凭据"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "phone_challenges"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威同步账号/租户/能力与开通；所有旧登录/验证/邀请/操作能力失效；不得复制旧授权扩大权限。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "phone_challenges"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 106,
+      "path": "apps/api/src/main/resources/db/migration/V106__verified_identity_links.sql",
+      "gitBlob": "fa4c06f6a68fbbae168db48d44d0e2fe61be9ae1",
+      "group": "A身份/租户/会话/能力",
+      "signals": [
+        "正文/派生物",
+        "会话/凭据"
+      ],
+      "createTables": [
+        "unified_identity_links"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威同步账号/租户/能力与开通；所有旧登录/验证/邀请/操作能力失效；不得复制旧授权扩大权限。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "unified_identity_links"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 107,
+      "path": "apps/api/src/main/resources/db/migration/V107__invitation_initial_spaces.sql",
+      "gitBlob": "f544bc47d23e4840cfe9c5ec3045b5a9621a8be2",
+      "group": "A身份/租户/会话/能力",
+      "signals": [
+        "会话/凭据",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "invitation_space_plans",
+        "invitation_initial_spaces"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威同步账号/租户/能力与开通；所有旧登录/验证/邀请/操作能力失效；不得复制旧授权扩大权限。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "invitation_space_plans",
+          "invitation_initial_spaces"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 108,
+      "path": "apps/api/src/main/resources/db/migration/V108__platform_initialization.sql",
+      "gitBlob": "9f5041ea8ad156a5a54c89496571c15b74c695ab",
+      "group": "A身份/租户/会话/能力",
+      "signals": [
+        "权限/撤权源",
+        "会话/凭据"
+      ],
+      "createTables": [
+        "platform_initialization"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威同步账号/租户/能力与开通；所有旧登录/验证/邀请/操作能力失效；不得复制旧授权扩大权限。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "platform_initialization"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 109,
+      "path": "apps/api/src/main/resources/db/migration/V109__library_permissions.sql",
+      "gitBlob": "d9e58068a2804894d22448144e4c4e15100b7ad7",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "library_permission_rollouts",
+        "library_departments",
+        "library_department_members",
+        "library_policies",
+        "library_grants",
+        "library_change_receipts",
+        "library_events"
+      ],
+      "alterTables": [],
+      "functions": [
+        "library_permissions_enabled",
+        "library_event_immutable",
+        "library_mask",
+        "library_can_manage",
+        "library_project_identity_event",
+        "library_task_materials_readable"
+      ],
+      "triggers": [
+        "library_event_immutable",
+        "library_identity_event"
+      ],
+      "views": [
+        "readable_source_tasks"
+      ],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": true,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 110,
+      "path": "apps/api/src/main/resources/db/migration/V110__material_governance.sql",
+      "gitBlob": "4fbe9c2e54fe340171bf455b83391b95237b6eec",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "权限/撤权源",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "material_governance_reports"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 111,
+      "path": "apps/api/src/main/resources/db/migration/V111__library_moves_and_audit.sql",
+      "gitBlob": "54ef8b296259ca233796c071e60164946966c207",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "library_move_receipts"
+      ],
+      "alterTables": [
+        "identity_audit",
+        "library_events"
+      ],
+      "functions": [
+        "library_projected_mask",
+        "library_mask",
+        "library_project_identity_event"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_lifecycle.py": [
+          "identity_audit"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 112,
+      "path": "apps/api/src/main/resources/db/migration/V112__task_artifact_transfers.sql",
+      "gitBlob": "7fe965da236ea236534f82ccd519191fc5a08644",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "conversation_artifact_transfers"
+      ],
+      "alterTables": [
+        "conversation_artifacts"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "conversation_artifacts"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 113,
+      "path": "apps/api/src/main/resources/db/migration/V113__library_task_source_access.sql",
+      "gitBlob": "87676954770fa2023e7df739066fe2a2cf814364",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [
+        "library_task_readable"
+      ],
+      "triggers": [],
+      "views": [
+        "readable_source_tasks"
+      ],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": true,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 114,
+      "path": "apps/api/src/main/resources/db/migration/V114__deployed_dataset_fields.sql",
+      "gitBlob": "cdaa32728ac951dcefc083cc4241a0d1576bb4c3",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "触发器/函数"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "business_datasets"
+      ],
+      "functions": [
+        "guard_dataset_fields"
+      ],
+      "triggers": [
+        "dataset_fields_guard"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "business_datasets"
+        ],
+        "scripts/local/backup_collection.py": [
+          "business_datasets"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "business_datasets"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 115,
+      "path": "apps/api/src/main/resources/db/migration/V115__library_launch_boundaries.sql",
+      "gitBlob": "662a6096344a899c14997c29175d66cca9828f86",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "library_request_journal"
+      ],
+      "alterTables": [],
+      "functions": [
+        "library_projected_mask",
+        "library_task_versions",
+        "library_file_mask",
+        "library_mask",
+        "library_task_sources_allowed",
+        "library_journal_immutable",
+        "library_effective_projected_mask",
+        "library_task_readable",
+        "company_chunk_eligible",
+        "library_task_materials_readable",
+        "library_dispatch_task_readable"
+      ],
+      "triggers": [
+        "library_journal_immutable"
+      ],
+      "views": [
+        "readable_feedback",
+        "library_legacy_source_tasks",
+        "readable_source_tasks"
+      ],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": true,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 116,
+      "path": "apps/api/src/main/resources/db/migration/V116__wiki_learning_drafts.sql",
+      "gitBlob": "5f4176fb6b6bdef5196607e4a18411c1e97141b7",
+      "group": "G知识/索引/正文派生",
+      "signals": [
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "wiki_learning_drafts"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "正文、引用、索引handle按当前来源/权限/删除同步；旧解析/索引任务不自动执行，远程索引需独立重新授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 117,
+      "path": "apps/api/src/main/resources/db/migration/V117__presentation_confirmation.sql",
+      "gitBlob": "789cf271c30383d41c54649cbe0442c43ed4a89d",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "conversation_presentations"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 118,
+      "path": "apps/api/src/main/resources/db/migration/V118__wiki_articles.sql",
+      "gitBlob": "1efa899b6a7fb65e6af449d28fa62738a7059cc6",
+      "group": "G知识/索引/正文派生",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "会话/凭据",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "wiki_articles",
+        "wiki_article_versions"
+      ],
+      "alterTables": [],
+      "functions": [
+        "scrub_wiki_material"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "正文、引用、索引handle按当前来源/权限/删除同步；旧解析/索引任务不自动执行，远程索引需独立重新授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 119,
+      "path": "apps/api/src/main/resources/db/migration/V119__wiki_graphs.sql",
+      "gitBlob": "c02226ef275565e1339eeed30d50d3cb290a7301",
+      "group": "G知识/索引/正文派生",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "wiki_graphs",
+        "wiki_graph_inputs"
+      ],
+      "alterTables": [],
+      "functions": [
+        "wiki_graph_current"
+      ],
+      "triggers": [],
+      "views": [
+        "readable_source_tasks"
+      ],
+      "requiredRecoveryPolicy": "正文、引用、索引handle按当前来源/权限/删除同步；旧解析/索引任务不自动执行，远程索引需独立重新授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": true,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 120,
+      "path": "apps/api/src/main/resources/db/migration/V120__governance_proposals.sql",
+      "gitBlob": "9320ae8a2942de8d941ac36e8e951d668d99caf1",
+      "group": "G知识/索引/正文派生",
+      "signals": [
+        "触发器/函数",
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "material_governance_proposals",
+        "material_summary_versions"
+      ],
+      "alterTables": [],
+      "functions": [
+        "scrub_governance_proposals"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "正文、引用、索引handle按当前来源/权限/删除同步；旧解析/索引任务不自动执行，远程索引需独立重新授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 121,
+      "path": "apps/api/src/main/resources/db/migration/V121__wiki_insights.sql",
+      "gitBlob": "eba60ec414c060edec21742e818de64070a36514",
+      "group": "G知识/索引/正文派生",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "wiki_insights",
+        "wiki_insight_inputs"
+      ],
+      "alterTables": [],
+      "functions": [
+        "wiki_insight_current"
+      ],
+      "triggers": [],
+      "views": [
+        "readable_source_tasks"
+      ],
+      "requiredRecoveryPolicy": "正文、引用、索引handle按当前来源/权限/删除同步；旧解析/索引任务不自动执行，远程索引需独立重新授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": true,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 122,
+      "path": "apps/api/src/main/resources/db/migration/V122__tenant_scene_bridge.sql",
+      "gitBlob": "9e1754119a1f06fcfddfc77f7113a7f39e0fd421",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "正文/派生物",
+        "队列/租约/执行",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "scene_bindings",
+        "scene_asset_links",
+        "scene_processing_runs"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 123,
+      "path": "apps/api/src/main/resources/db/migration/V123__scene_source_revisions.sql",
+      "gitBlob": "547eaf36aa30e1632e03311cd9db71eeda4f85af",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "scene_asset_revisions"
+      ],
+      "alterTables": [
+        "scene_asset_links",
+        "scene_bindings"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 124,
+      "path": "apps/api/src/main/resources/db/migration/V124__uploaded_file_tables.sql",
+      "gitBlob": "23e7fc9d90bb4fdc3d8ec0e1f789b97b04fa9e22",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "file_table_sources"
+      ],
+      "alterTables": [],
+      "functions": [
+        "file_dataset_current",
+        "file_dataset_readable",
+        "task_datasets_readable",
+        "scrub_file_tables"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 125,
+      "path": "apps/api/src/main/resources/db/migration/V125__platform_engine_retries.sql",
+      "gitBlob": "b466dd9838782f7a4bdb52554f0a6797be27559a",
+      "group": "I原生会话/凭据/插件/调度/重试",
+      "signals": [
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "platform_engine_retries"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "撤销旧grant/附件访问令牌/会话与待执行操作；保留可审计回执但不重放；插件/技能/日程重新按当前授权核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 126,
+      "path": "apps/api/src/main/resources/db/migration/V126__durable_engine_receipts.sql",
+      "gitBlob": "16810c87aae17bab7df5d654ddea871d920b6fc2",
+      "group": "I原生会话/凭据/插件/调度/重试",
+      "signals": [
+        "触发器/函数",
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "engine_execution_receipts"
+      ],
+      "alterTables": [],
+      "functions": [
+        "task_retry_is_safe"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "撤销旧grant/附件访问令牌/会话与待执行操作；保留可审计回执但不重放；插件/技能/日程重新按当前授权核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 127,
+      "path": "apps/api/src/main/resources/db/migration/V127__scene_governance_gate.sql",
+      "gitBlob": "395c693e2e9a52194eb1f180aaaa740a65f06622",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "scene_bindings"
+      ],
+      "functions": [
+        "scene_table_scope",
+        "scene_asset_readable",
+        "library_file_mask",
+        "file_dataset_readable",
+        "library_mask"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 128,
+      "path": "apps/api/src/main/resources/db/migration/V128__scene_metric_catalog.sql",
+      "gitBlob": "e03a3c2fe17a07ae304555b599b062299ee7e5a1",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "scene_metrics",
+        "scene_metric_versions",
+        "scene_metric_events",
+        "task_metric_reads"
+      ],
+      "alterTables": [
+        "scene_metrics"
+      ],
+      "functions": [
+        "task_metric_dependencies",
+        "task_datasets_readable",
+        "fence_metric_publication"
+      ],
+      "triggers": [
+        "scene_metric_publication_fence"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 129,
+      "path": "apps/api/src/main/resources/db/migration/V129__metric_generation_execution.sql",
+      "gitBlob": "28ae87be3183d8579bf9397402983a21b8d66f6a",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "metric_generation_settings",
+        "metric_generation_keys",
+        "metric_calculation_receipts",
+        "metric_briefing_receipts"
+      ],
+      "alterTables": [
+        "scene_metric_versions"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 130,
+      "path": "apps/api/src/main/resources/db/migration/V130__metric_delegated_definition.sql",
+      "gitBlob": "b9057738f095d3bb51c5959148765c443f04941e",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [],
+      "createTables": [],
+      "alterTables": [
+        "metric_generation_settings"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": []
+    },
+    {
+      "version": 131,
+      "path": "apps/api/src/main/resources/db/migration/V131__metric_generation_cursor.sql",
+      "gitBlob": "824ddf105ce231b56af3d584611cf38e1c115b6f",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "metric_generation_settings"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 132,
+      "path": "apps/api/src/main/resources/db/migration/V132__governed_fusion_task_plans.sql",
+      "gitBlob": "7697f2ba86700d675011152094fc1354f35ae97f",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "governed_fusion_task_plans",
+        "governed_fusion_receipts"
+      ],
+      "alterTables": [],
+      "functions": [
+        "guard_governed_fusion_plan"
+      ],
+      "triggers": [
+        "governed_fusion_plan_guard"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 133,
+      "path": "apps/api/src/main/resources/db/migration/V133__fusion_relation_schema_identity.sql",
+      "gitBlob": "0fac678e1a08aea5797dbef5a07fb5813970ef7e",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [
+        "scene_table_scope"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 134,
+      "path": "apps/api/src/main/resources/db/migration/V134__bound_task_source_permission_checks.sql",
+      "gitBlob": "ef9025a80b4070ec3a9061e92d37e41b7fcf4109",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [
+        "library_task_sources_allowed"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 135,
+      "path": "apps/api/src/main/resources/db/migration/V135__customer_username_login.sql",
+      "gitBlob": "fec0210c3dc47784bf57917d838bed8487b2ff60",
+      "group": "A身份/租户/会话/能力",
+      "signals": [
+        "会话/凭据"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "accounts"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威同步账号/租户/能力与开通；所有旧登录/验证/邀请/操作能力失效；不得复制旧授权扩大权限。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "accounts"
+        ],
+        "scripts/local/backup_experience.py": [
+          "accounts"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "accounts"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 136,
+      "path": "apps/api/src/main/resources/db/migration/V136__external_briefing_bootstrap.sql",
+      "gitBlob": "c97ec1a8cb2db00decaf7a2cc59f50754dfbdc44",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "briefing_bootstrap_receipts"
+      ],
+      "alterTables": [
+        "conversation_attempts"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "conversation_attempts"
+        ],
+        "scripts/local/backup_collection.py": [
+          "conversation_attempts"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 137,
+      "path": "apps/api/src/main/resources/db/migration/V137__briefing_bootstrap_handoff.sql",
+      "gitBlob": "8cc5e17a033614dac71e02e3bf9f07586533ce5b",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "会话/凭据"
+      ],
+      "createTables": [
+        "briefing_bootstrap_scopes"
+      ],
+      "alterTables": [
+        "conversation_tasks"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "conversation_tasks"
+        ],
+        "scripts/local/backup_collection.py": [
+          "conversation_tasks"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "conversation_tasks"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 138,
+      "path": "apps/api/src/main/resources/db/migration/V138__scene_dataset_version_continuity.sql",
+      "gitBlob": "02d7592d62f6edea373299c31a6897415f2332e6",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [
+        "scene_dataset_available"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 139,
+      "path": "apps/api/src/main/resources/db/migration/V139__governed_history_continuity.sql",
+      "gitBlob": "69dfcc097209058331335918de1ceec2ebbca258",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [
+        "scene_asset_readable"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 149,
+      "path": "apps/api/src/main/resources/db/migration-common/V149__unified_development_baseline.sql",
+      "gitBlob": "afec56677ed4b8dfce70b227068c27bc5dc6617c",
+      "group": "J谱系/结构补丁",
+      "signals": [
+        "权限/撤权源"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "精确同版本重建结构；不得用追加指纹或改checksum替代恢复语义审查。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 150,
+      "path": "apps/api/src/main/resources/db/migration-common/V150__weknora_index.sql",
+      "gitBlob": "912ab529c79a71d540661b8c1eeee578a4472a2d",
+      "group": "G知识/索引/正文派生",
+      "signals": [
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "会话/凭据",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "knowledge_index_targets",
+        "knowledge_remote_index"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "正文、引用、索引handle按当前来源/权限/删除同步；旧解析/索引任务不自动执行，远程索引需独立重新授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 151,
+      "path": "apps/api/src/main/resources/db/migration-common/V151__background_knowledge_dependencies.sql",
+      "gitBlob": "30e41c4aa8a892ee35376973454ec140530de5e5",
+      "group": "G知识/索引/正文派生",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [
+        "background_version_current",
+        "metric_background_current",
+        "task_datasets_readable",
+        "fence_background_metric_tasks"
+      ],
+      "triggers": [
+        "background_metric_fence"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "正文、引用、索引handle按当前来源/权限/删除同步；旧解析/索引任务不自动执行，远程索引需独立重新授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 152,
+      "path": "apps/api/src/main/resources/db/migration-common/V152__work_audience.sql",
+      "gitBlob": "ecbceec5bf83c240afd36dc79c013cf726195c9d",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "work_role_profiles",
+        "task_audience_snapshots"
+      ],
+      "alterTables": [
+        "briefing_generation_batches"
+      ],
+      "functions": [
+        "work_audience_key",
+        "task_audience_current"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "briefing_generation_batches"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 153,
+      "path": "apps/api/src/main/resources/db/migration-common/V153__scene_publication.sql",
+      "gitBlob": "568f8e4709a897933cb6cb6a5771840cdc29671d",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "权限/撤权源",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "scene_publication_configs"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 154,
+      "path": "apps/api/src/main/resources/db/migration-common/V154__scene_resource_routing.sql",
+      "gitBlob": "0fbf77a7ce2c26e490d171584df309cf4a7c2cde",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "scene_routing_configs"
+      ],
+      "alterTables": [],
+      "functions": [
+        "scene_asset_readable"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 155,
+      "path": "apps/api/src/main/resources/db/migration-common/V155__task_reconciliation_receipts.sql",
+      "gitBlob": "b0cc9ad9182f73327e1e4f4616850b3b1444b9d6",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "权限/撤权源",
+        "正文/派生物"
+      ],
+      "createTables": [
+        "task_reconciliation_receipts"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 156,
+      "path": "apps/api/src/main/resources/db/migration-common/V156__member_governance_goals.sql",
+      "gitBlob": "76057a61b1f974929d86cef324d6ff9bcad280af",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "权限/撤权源",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "work_role_profiles"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 157,
+      "path": "apps/api/src/main/resources/db/migration-common/V157__briefing_editorial_plans.sql",
+      "gitBlob": "fa7fe92647d536aeaa97a3c5535791832479f76d",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "briefing_editorial_batches",
+        "briefing_editorial_tasks"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 158,
+      "path": "apps/api/src/main/resources/db/migration-common/V158__briefing_batch_topic_capacity.sql",
+      "gitBlob": "8fe24cfb12912cd3788d3cbad74ac4f31a72b78c",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [],
+      "createTables": [],
+      "alterTables": [
+        "briefing_topic_selections"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": []
+    },
+    {
+      "version": 159,
+      "path": "apps/api/src/main/resources/db/migration-common/V159__bounded_scene_permission_candidates.sql",
+      "gitBlob": "299cc55db982dbf0481b0139e061008dff76fd39",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [
+        "scene_asset_readable"
+      ],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 160,
+      "path": "apps/api/src/main/resources/db/migration-common/V160__native_governance_release.sql",
+      "gitBlob": "edb14609740d2dc77b4d5922b8ac83a0da85f55b",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "native_governance_releases"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 161,
+      "path": "apps/api/src/main/resources/db/migration-common/V161__native_material_release.sql",
+      "gitBlob": "a2b93adc5273aa06ffee79b443b9b2600d4757f6",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "native_material_releases"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 162,
+      "path": "apps/api/src/main/resources/db/migration-common/V162__durable_governance_jobs.sql",
+      "gitBlob": "085d666a3427c5454a32b099e2f38c624e30064e",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "governance_model_jobs",
+        "governance_model_events"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 163,
+      "path": "apps/api/src/main/resources/db/migration-common/V163__shared_library_creation.sql",
+      "gitBlob": "31ce291d4ec37649ea3bbcd311938f86f109fec7",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "workspaces"
+      ],
+      "functions": [
+        "library_workspace_permissions_enabled",
+        "library_any_permissions_enabled",
+        "library_material_has_scoped_sources",
+        "library_task_has_scoped_sources",
+        "library_experience_permissions_enabled"
+      ],
+      "triggers": [],
+      "views": [
+        "readable_feedback"
+      ],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": true,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "workspaces"
+        ],
+        "scripts/local/backup_experience.py": [
+          "workspaces"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "workspaces"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 164,
+      "path": "apps/api/src/main/resources/db/migration-common/V164__governance_model_input_history.sql",
+      "gitBlob": "d36aba5f249a6caef6fe2d8d04788959535ccc62",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "governance_model_input_history"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 165,
+      "path": "apps/api/src/main/resources/db/migration-common/V165__governance_native_dispatch.sql",
+      "gitBlob": "e7ba910b411e077e8fc34471039f9d0910b98eb3",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "正文/派生物",
+        "队列/租约/执行",
+        "会话/凭据",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "governance_model_dispatch",
+        "governance_knowledge_drafts"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 166,
+      "path": "apps/api/src/main/resources/db/migration-common/V166__shared_library_deletion_sources.sql",
+      "gitBlob": "ba47ae008c1c1eca914e87443f08938b5dcf6305",
+      "group": "B权限/受众/撤权/生命周期",
+      "signals": [
+        "权限/撤权源",
+        "队列/租约/执行",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [
+        "readable_feedback"
+      ],
+      "requiredRecoveryPolicy": "取当前权威成员/策略/受众/归档/撤权和删除事实裁剪；权限/清除依赖必须闭包核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": true,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 167,
+      "path": "apps/api/src/main/resources/db/migration-common/V167__engine_diagnostic_archives.sql",
+      "gitBlob": "de2aed73a6e1a4e66376643ef5801daa0f04fa96",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "正文/派生物",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "engine_diagnostic_archives"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [
+        "engine_unarchived_tasks",
+        "engine_unarchived_knowledge",
+        "engine_unarchived_company_items",
+        "engine_unarchived_company_attempts",
+        "engine_unarchived_scenes"
+      ],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 168,
+      "path": "apps/api/src/main/resources/db/migration-common/V168__native_governance_diagnostic_archives.sql",
+      "gitBlob": "ae8900c2645b9ab80e4154d2fa90791c31fe942f",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "正文/派生物",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "engine_diagnostic_archives"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [
+        "engine_unarchived_governance_jobs"
+      ],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": true,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 169,
+      "path": "apps/api/src/main/resources/db/migration-common/V169__governance_usage_receipts.sql",
+      "gitBlob": "9bb0e8db9e9ad58ce8d55a0d8078fff6e567c1a6",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "队列/租约/执行",
+        "会话/凭据",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "governance_model_usage"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 170,
+      "path": "apps/api/src/main/resources/db/migration-common/V170__collection_snapshot_receipts.sql",
+      "gitBlob": "06c6408c9a2c72f5a0c4065c5812c44edc90606b",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "权限/撤权源",
+        "正文/派生物",
+        "会话/凭据",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "collection_snapshot_receipts"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 171,
+      "path": "apps/api/src/main/resources/db/migration-common/V171__native_conversation_sessions.sql",
+      "gitBlob": "533dfc0b2cb5a9d1d8d7e669792b2a87caab594d",
+      "group": "I原生会话/凭据/插件/调度/重试",
+      "signals": [
+        "权限/撤权源",
+        "正文/派生物",
+        "会话/凭据",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "native_conversations",
+        "native_conversation_grants",
+        "native_conversation_sources",
+        "native_conversation_history",
+        "native_conversation_artifacts",
+        "native_conversation_publications"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "撤销旧grant/附件访问令牌/会话与待执行操作；保留可审计回执但不重放；插件/技能/日程重新按当前授权核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 172,
+      "path": "apps/api/src/main/resources/db/migration-common/V172__tool_context_argument_rejections.sql",
+      "gitBlob": "a0a43d113ed126c1322a45e1ed579831abe4020f",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "权限/撤权源",
+        "外部对象/路由"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "conversation_tool_receipts"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 173,
+      "path": "apps/api/src/main/resources/db/migration-common/V173__collection_source_contracts.sql",
+      "gitBlob": "77be2a69e72ae7405a34f11445536916b28afa45",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "正文/派生物"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "collection_snapshot_receipts"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 174,
+      "path": "apps/api/src/main/resources/db/migration-common/V174__automatic_dataset_knowledge.sql",
+      "gitBlob": "79b7ad05d488e6e4175d161ec35a064eb9aef866",
+      "group": "G知识/索引/正文派生",
+      "signals": [
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "dataset_knowledge_publications"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "正文、引用、索引handle按当前来源/权限/删除同步；旧解析/索引任务不自动执行，远程索引需独立重新授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 175,
+      "path": "apps/api/src/main/resources/db/migration-common/V175__collection_delivery_waits.sql",
+      "gitBlob": "07015ee242a1f4a37b53606093262ec1fc07d310",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "collection_delivery_waits",
+        "source_contract_publications"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 176,
+      "path": "apps/api/src/main/resources/db/migration-common/V176__dataset_business_knowledge.sql",
+      "gitBlob": "d72c631f4e8a84978f8ef9432feb6a4d0c0197f5",
+      "group": "G知识/索引/正文派生",
+      "signals": [
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "dataset_business_knowledge"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "正文、引用、索引handle按当前来源/权限/删除同步；旧解析/索引任务不自动执行，远程索引需独立重新授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 177,
+      "path": "apps/api/src/main/resources/db/migration-common/V177__collection_diagnostic_archives.sql",
+      "gitBlob": "3ce47f58c921af2e8edd0bba4d96dc169303be9a",
+      "group": "H场景/路由/指标/治理执行",
+      "signals": [
+        "正文/派生物",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "engine_diagnostic_archives"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [
+        "engine_unarchived_collections"
+      ],
+      "requiredRecoveryPolicy": "当前权威场景绑定、发布/路由、指标版本和来源合同裁剪；外部路由/执行口与凭据不得从快照自授权；调度停用。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 178,
+      "path": "apps/api/src/main/resources/db/migration-common/V178__native_conversation_stream.sql",
+      "gitBlob": "d8a5af596ee8b05c7de26cc60591fca4a2efaf1e",
+      "group": "I原生会话/凭据/插件/调度/重试",
+      "signals": [
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "native_conversation_events",
+        "native_conversation_operations"
+      ],
+      "alterTables": [
+        "feedback_entries"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "撤销旧grant/附件访问令牌/会话与待执行操作；保留可审计回执但不重放；插件/技能/日程重新按当前授权核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "feedback_entries"
+        ],
+        "scripts/local/backup_lifecycle.py": [
+          "feedback_entries"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 179,
+      "path": "apps/api/src/main/resources/db/migration-common/V179__native_latest_status.sql",
+      "gitBlob": "7b1dfc77fa017c50ec01ec7bce46a8bad4b3b80d",
+      "group": "I原生会话/凭据/插件/调度/重试",
+      "signals": [
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "native_conversation_status"
+      ],
+      "alterTables": [
+        "native_conversations"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "撤销旧grant/附件访问令牌/会话与待执行操作；保留可审计回执但不重放；插件/技能/日程重新按当前授权核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 180,
+      "path": "apps/api/src/main/resources/db/migration-common/V180__native_conversation_metadata.sql",
+      "gitBlob": "fccd5cd59eb7159d6465362d0557dc4eff1446b3",
+      "group": "I原生会话/凭据/插件/调度/重试",
+      "signals": [
+        "队列/租约/执行"
+      ],
+      "createTables": [
+        "native_conversation_metadata"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "撤销旧grant/附件访问令牌/会话与待执行操作；保留可审计回执但不重放；插件/技能/日程重新按当前授权核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 181,
+      "path": "apps/api/src/main/resources/db/migration-common/V181__native_enterprise_skills.sql",
+      "gitBlob": "e4d441a2bc72c75e05f2b19fd1c60ebf952eeb13",
+      "group": "I原生会话/凭据/插件/调度/重试",
+      "signals": [
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "native_enterprise_skills"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "撤销旧grant/附件访问令牌/会话与待执行操作；保留可审计回执但不重放；插件/技能/日程重新按当前授权核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 182,
+      "path": "apps/api/src/main/resources/db/migration-common/V182__native_conversation_attachments.sql",
+      "gitBlob": "57e1d6c9df46c54ead050919382596784f051952",
+      "group": "I原生会话/凭据/插件/调度/重试",
+      "signals": [
+        "正文/派生物",
+        "外部对象/路由"
+      ],
+      "createTables": [
+        "native_conversation_attachments"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "撤销旧grant/附件访问令牌/会话与待执行操作；保留可审计回执但不重放；插件/技能/日程重新按当前授权核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 183,
+      "path": "apps/api/src/main/resources/db/migration-common/V183__native_schedules.sql",
+      "gitBlob": "a6712aeab4364cc4948e3495c32ae4a5c1570896",
+      "group": "I原生会话/凭据/插件/调度/重试",
+      "signals": [
+        "队列/租约/执行"
+      ],
+      "createTables": [
+        "native_schedules",
+        "native_schedule_runs"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "撤销旧grant/附件访问令牌/会话与待执行操作；保留可审计回执但不重放；插件/技能/日程重新按当前授权核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 184,
+      "path": "apps/api/src/main/resources/db/migration-common/V184__native_plugin_policy.sql",
+      "gitBlob": "92c964c7842e15890b3f93ec0244078e80b4246e",
+      "group": "I原生会话/凭据/插件/调度/重试",
+      "signals": [
+        "队列/租约/执行",
+        "外部对象/路由",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "native_plugin_policy"
+      ],
+      "alterTables": [
+        "native_schedule_runs"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "撤销旧grant/附件访问令牌/会话与待执行操作；保留可审计回执但不重放；插件/技能/日程重新按当前授权核验。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "外部对象/路由：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 185,
+      "path": "apps/api/src/main/resources/db/migration-common/V185__dataset_evidence_receipts.sql",
+      "gitBlob": "e0a4b46e6a202997150e213114a0470622ca3b54",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "触发器/函数",
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "dataset_evidence_receipts"
+      ],
+      "alterTables": [],
+      "functions": [
+        "scrub_dataset_evidence_receipts"
+      ],
+      "triggers": [
+        "dataset_evidence_scrub"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 186,
+      "path": "apps/api/src/main/resources/db/migration-common/V186__knowledge_pipeline_progress.sql",
+      "gitBlob": "21a3179cba9d19d5861875f488b6e71c15385076",
+      "group": "G知识/索引/正文派生",
+      "signals": [
+        "正文/派生物",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "knowledge_pipeline_progress"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "正文、引用、索引handle按当前来源/权限/删除同步；旧解析/索引任务不自动执行，远程索引需独立重新授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 187,
+      "path": "apps/api/src/main/resources/db/migration-common/V187__company_discovery_per_run.sql",
+      "gitBlob": "84fb2342da2753367f71fdc9797511bcb234f27d",
+      "group": "D企业资料/推断/后台调度",
+      "signals": [
+        "权限/撤权源",
+        "正文/派生物",
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [
+        "company_analysis_discovery_chunks"
+      ],
+      "requiredRecoveryPolicy": "当前来源与正文清除联动；队列/推断任务暂停，不把旧建议或调度槽作为重新执行授权。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 188,
+      "path": "apps/api/src/main/resources/db/migration-common/V188__briefing_idle_scheduling.sql",
+      "gitBlob": "41d9aa3c6ac1db239197e5ad8178b12f9940df79",
+      "group": "F会话/画报/偏好/执行租约",
+      "signals": [
+        "队列/租约/执行",
+        "当前权威/审计"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "briefing_generation_policies"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧会话/正文/偏好按当前来源裁剪；任务/日程/重试/批次暂停，旧执行/确认收据不得复活工作。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "briefing_generation_policies"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "队列/租约/执行：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 189,
+      "path": "apps/api/src/main/resources/db/migration-common/V189__dataset_content_fingerprint.sql",
+      "gitBlob": "87166cf1dfcb0a7580656f6b83807470cd12ca32",
+      "group": "C集合/数据集/来源收据",
+      "signals": [
+        "正文/派生物"
+      ],
+      "createTables": [],
+      "alterTables": [
+        "dataset_evidence_receipts"
+      ],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "旧运行停用、租约清空；当前来源合同/字段/快照/删除状态重核，外部导出与交付收据不可自动重放。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "正文/派生物：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 190,
+      "path": "apps/api/src/main/resources/db/migration-common/V190__agent_admin_identity_sessions.sql",
+      "gitBlob": "c461ba18516b419a107ef7583dd4e2522a66c376",
+      "group": "A身份/租户/会话/能力",
+      "signals": [
+        "触发器/函数",
+        "权限/撤权源",
+        "会话/凭据",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "agent_platform_accounts",
+        "agent_platform_sessions"
+      ],
+      "alterTables": [
+        "platform_roles"
+      ],
+      "functions": [
+        "revoke_agent_role_sessions",
+        "revoke_agent_credential_sessions",
+        "revoke_agent_account_sessions"
+      ],
+      "triggers": [
+        "agent_role_session_revocation",
+        "agent_credential_session_revocation",
+        "agent_account_session_revocation"
+      ],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威同步账号/租户/能力与开通；所有旧登录/验证/邀请/操作能力失效；不得复制旧授权扩大权限。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {
+        "scripts/local/backup_recovery.py": [
+          "platform_roles"
+        ]
+      },
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "触发器/函数：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "会话/凭据：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    },
+    {
+      "version": 191,
+      "path": "apps/api/src/main/resources/db/migration-common/V191__platform_capability_registry.sql",
+      "gitBlob": "408d6828a0ab8c4ba7f1a6a4b239b3036f327c30",
+      "group": "A身份/租户/会话/能力",
+      "signals": [],
+      "createTables": [
+        "qo_capability"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威同步账号/租户/能力与开通；所有旧登录/验证/邀请/操作能力失效；不得复制旧授权扩大权限。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": []
+    },
+    {
+      "version": 193,
+      "path": "apps/api/src/main/resources/db/migration-common/V193__qo_capability_tenant_grant.sql",
+      "gitBlob": "a828106d10f2dd061f053e1d02433c08cc411bbc",
+      "group": "A身份/租户/会话/能力",
+      "signals": [
+        "权限/撤权源",
+        "当前权威/审计"
+      ],
+      "createTables": [
+        "qo_capability_tenant_grant"
+      ],
+      "alterTables": [],
+      "functions": [],
+      "triggers": [],
+      "views": [],
+      "requiredRecoveryPolicy": "当前权威同步账号/租户/能力与开通；所有旧登录/验证/邀请/操作能力失效；不得复制旧授权扩大权限。",
+      "activation": "BLOCKED_PENDING_MODULE_REVIEW_AND_DYNAMIC_EVIDENCE",
+      "sqlInventoryMethod": "Literal CREATE/ALTER/FUNCTION/TRIGGER/VIEW extraction, not a SQL parser; dynamic DDL must be reviewed separately.",
+      "containsDynamicDDL": false,
+      "adapterExplicitMentions": {},
+      "adapterMentionIsNotSemanticCoverage": true,
+      "review": "INVENTORIED_NOT_APPROVED",
+      "pendingChecks": [
+        "权限/撤权源：按当前权威/隔离/清除矩阵核验；未测不放行",
+        "当前权威/审计：按当前权威/隔离/清除矩阵核验；未测不放行"
+      ]
+    }
+  ]
+}

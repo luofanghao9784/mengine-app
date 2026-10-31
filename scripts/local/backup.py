@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 import trial
 
@@ -217,17 +218,34 @@ def offline_database(root, initialize=False):
                         fail('临时数据库未能正常停止；已保留数据库目录，请检查此本地环境后再重试。')
 
 
-def facts(sql):
-    check_migrations(sql)
-    tables = sql("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename").splitlines()
+def facts(sql, observe=None):
+    """Return the complete original fingerprints; optional diagnostics never authorize restore."""
+    def measured(phase, operation, table=None):
+        started = time.monotonic()
+        try:
+            value = operation()
+        except BaseException as error:
+            if observe:
+                observe({'phase': phase, 'table': table, 'seconds': time.monotonic()-started,
+                         'ok': False, 'errorType': type(error).__name__})
+            raise
+        if observe:
+            event = {'phase': phase, 'table': table, 'seconds': time.monotonic()-started, 'ok': True}
+            if phase == 'table_count':
+                event['rows'] = value
+            observe(event)
+        return value
+    measured('migration_history', lambda: check_migrations(sql))
+    tables = measured('table_list', lambda: sql("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename")).splitlines()
     result = {}
     for table in tables:
         if table in TRANSIENT:
             continue
         if not re.fullmatch('[a-z_][a-z0-9_]*', table):
             fail('数据库包含不支持的表标识。')
-        checksum = sql(f'COPY (SELECT to_jsonb(t)::text FROM public.{table} t ORDER BY to_jsonb(t)::text) TO STDOUT', True)
-        result[table] = {'rows': int(sql(f'SELECT count(*) FROM public.{table}')), 'sha256': checksum}
+        checksum = measured('table_copy', lambda: sql(f'COPY (SELECT to_jsonb(t)::text FROM public.{table} t ORDER BY to_jsonb(t)::text) TO STDOUT', True), table)
+        count = measured('table_count', lambda: int(sql(f'SELECT count(*) FROM public.{table}')), table)
+        result[table] = {'rows': count, 'sha256': checksum}
     return result
 
 
