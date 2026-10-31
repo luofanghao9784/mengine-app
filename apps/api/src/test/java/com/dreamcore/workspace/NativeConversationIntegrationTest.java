@@ -14,7 +14,25 @@ import static org.junit.jupiter.api.Assertions.*;
 class NativeConversationIntegrationTest {
  @org.springframework.test.context.DynamicPropertySource
  static void isolateDatabase(org.springframework.test.context.DynamicPropertyRegistry registry) {
-  IsolatedTestDatabase.register(registry);
+  IsolatedTestDatabase.registerOwned(registry);
+ }
+ @Autowired org.springframework.context.ApplicationContext application;
+ @BeforeEach void verifyDatabaseBoundary(){
+  String database=db.queryForObject("SELECT current_database()",String.class);
+  assertTrue(database.startsWith("dreamcore_isolated_test_"),"Native fixture must use an isolated database");
+  var knowledge=application.getBean(com.dreamcore.workspace.knowledge.KnowledgeService.class);
+  var worker=application.getBean(com.dreamcore.workspace.knowledge.KnowledgeWorker.class);
+  Object actualWorker=org.springframework.test.util.AopTestUtils.getUltimateTargetObject(worker);
+  assertSame(knowledge,org.springframework.test.util.ReflectionTestUtils.getField(actualWorker,"service"),
+   "worker must use the context KnowledgeService");
+  for(Object service:List.of(nativeSessions,materials,knowledge)){
+   Object targetService=org.springframework.test.util.AopTestUtils.getUltimateTargetObject(service);
+   var actual=(JdbcTemplate)org.springframework.test.util.ReflectionTestUtils.getField(targetService,"db");
+   assertNotNull(actual);
+   assertSame(db.getDataSource(),actual.getDataSource(),"fixture services must share the isolated datasource");
+   assertEquals(database,actual.queryForObject("SELECT current_database()",String.class));
+  }
+  System.out.println("CT076_DATABASE_BOUNDARY_OK database="+database+" native/material/knowledge/worker=same");
  }
  @BeforeAll static void requireBuiltEngine(){NativeEnginePrerequisites.verify(NativeEnginePrerequisites.root());}
  @Autowired NativeConversationService nativeSessions;@Autowired MaterialService materials;@Autowired ConversationService conversations;@Autowired JdbcTemplate db;

@@ -1,0 +1,257 @@
+--- a/scripts/with-test-postgres.py
++++ b/scripts/with-test-postgres.py
+@@ -30,6 +30,7 @@
+         root = pathlib.Path(temp)
+         data = root / "data"
+         password = secrets.token_urlsafe(32)
++        owner_token = secrets.token_hex(32)
+         secret = root / "password"
+         secret.write_text(password)
+         secret.chmod(0o600)
+@@ -40,10 +41,11 @@
+             subprocess.run([initdb, "-D", str(data), "-U", "dreamcore_test", "--pwfile", str(secret), "--auth=scram-sha-256", "--encoding=UTF8", "--locale=C"], check=True, stdout=log, stderr=log)
+             started = False
+             try:
+-                subprocess.run([pg_ctl, "-D", str(data), "-l", str(root / "postgres.log"), "-o", f"-h 127.0.0.1 -p {port} -k {root}", "-w", "start"], check=True, stdout=log, stderr=log)
++                subprocess.run([pg_ctl, "-D", str(data), "-l", str(root / "postgres.log"), "-o", f"-h 127.0.0.1 -p {port} -k {root} -c dreamcore.test_owner={owner_token}", "-w", "start"], check=True, stdout=log, stderr=log)
+                 started = True
+                 subprocess.run([psql, "-h", "127.0.0.1", "-p", str(port), "-U", "dreamcore_test", "-d", "postgres", "-c", "CREATE DATABASE dreamcore_test"], env={**os.environ, "PGPASSWORD": password}, check=True, stdout=log, stderr=log)
+                 env = {**{k: v for k, v in os.environ.items() if not k.startswith("AGENT_")}, "DATABASE_URL": f"jdbc:postgresql://127.0.0.1:{port}/dreamcore_test", "DATABASE_USER": "dreamcore_test", "DATABASE_PASSWORD": password,
++                       "DREAMCORE_TEST_PG_OWNER": owner_token, "DREAMCORE_TEST_PG_DATA_DIRECTORY": str(data.resolve()),
+                        "SPRING_PROFILES_ACTIVE": "local", "MATERIAL_STORAGE_ROOT": str(root / "objects"), "INVITATION_DELIVERY": "local", "INVITATION_OUTBOX": str(root / "invitations")}
+                 print("Running against an isolated temporary PostgreSQL database.", flush=True)
+                 result = subprocess.run(sys.argv[1:], env=env)
+--- a/apps/api/src/test/java/com/dreamcore/workspace/IsolatedTestDatabase.java
++++ b/apps/api/src/test/java/com/dreamcore/workspace/IsolatedTestDatabase.java
+@@ -9,18 +9,36 @@
+ final class IsolatedTestDatabase {
+     private IsolatedTestDatabase() {}
+ 
+-    static void register(DynamicPropertyRegistry registry) {
++    static void register(DynamicPropertyRegistry registry) { register(registry, false); }
++
++    static void registerOwned(DynamicPropertyRegistry registry) { register(registry, true); }
++
++    private static void register(DynamicPropertyRegistry registry, boolean requireOwner) {
+         String base=System.getenv("DATABASE_URL"),user=System.getenv("DATABASE_USER"),password=System.getenv("DATABASE_PASSWORD");
+         // Only the repository-owned disposable cluster may create test databases. Never fall back to a live database.
+         if(base==null || !base.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/dreamcore_test")
+-            || !"dreamcore_test".equals(user) || password==null) {
++            || !"dreamcore_test".equals(user) || password==null || password.isBlank()) {
+             throw new IllegalStateException("Isolated integration tests require scripts/with-test-postgres.py");
++        }
++        String owner=System.getenv("DREAMCORE_TEST_PG_OWNER");
++        String directory=System.getenv("DREAMCORE_TEST_PG_DATA_DIRECTORY");
++        if(requireOwner && (owner==null || !owner.matches("[0-9a-f]{64}")
++            || directory==null || !java.nio.file.Path.of(directory).isAbsolute())) {
++            throw new IllegalStateException("Isolated integration tests require scripts/with-test-postgres.py (ownership proof missing)");
+         }
+         String database="dreamcore_isolated_test_"+UUID.randomUUID().toString().replace("-","");
+         try(var connection=DriverManager.getConnection(base,user,password);var statement=connection.createStatement()) {
+             try(var identity=statement.executeQuery("SELECT current_database(),current_user")) {
+                 if(!identity.next() || !"dreamcore_test".equals(identity.getString(1)) || !"dreamcore_test".equals(identity.getString(2))) {
+                     throw new IllegalStateException("Disposable test database identity did not match");
++                }
++            }
++            if(requireOwner) {
++                try(var proof=statement.executeQuery("SELECT current_setting('dreamcore.test_owner',true),current_setting('data_directory')")) {
++                    if(!proof.next() || !owner.equals(proof.getString(1))
++                        || !java.nio.file.Path.of(directory).normalize().equals(java.nio.file.Path.of(proof.getString(2)).normalize())) {
++                        throw new IllegalStateException("Disposable test database ownership did not match");
++                    }
+                 }
+             }
+             statement.execute("CREATE DATABASE "+database);
+--- a/apps/api/src/test/java/com/dreamcore/workspace/NativeConversationIntegrationTest.java
++++ b/apps/api/src/test/java/com/dreamcore/workspace/NativeConversationIntegrationTest.java
+@@ -14,7 +14,25 @@
+ class NativeConversationIntegrationTest {
+  @org.springframework.test.context.DynamicPropertySource
+  static void isolateDatabase(org.springframework.test.context.DynamicPropertyRegistry registry) {
+-  IsolatedTestDatabase.register(registry);
++  IsolatedTestDatabase.registerOwned(registry);
++ }
++ @Autowired org.springframework.context.ApplicationContext application;
++ @BeforeEach void verifyDatabaseBoundary(){
++  String database=db.queryForObject("SELECT current_database()",String.class);
++  assertTrue(database.startsWith("dreamcore_isolated_test_"),"Native fixture must use an isolated database");
++  var knowledge=application.getBean(com.dreamcore.workspace.knowledge.KnowledgeService.class);
++  var worker=application.getBean(com.dreamcore.workspace.knowledge.KnowledgeWorker.class);
++  Object actualWorker=org.springframework.test.util.AopTestUtils.getUltimateTargetObject(worker);
++  assertSame(knowledge,org.springframework.test.util.ReflectionTestUtils.getField(actualWorker,"service"),
++   "worker must use the context KnowledgeService");
++  for(Object service:List.of(nativeSessions,materials,knowledge)){
++   Object targetService=org.springframework.test.util.AopTestUtils.getUltimateTargetObject(service);
++   var actual=(JdbcTemplate)org.springframework.test.util.ReflectionTestUtils.getField(targetService,"db");
++   assertNotNull(actual);
++   assertSame(db.getDataSource(),actual.getDataSource(),"fixture services must share the isolated datasource");
++   assertEquals(database,actual.queryForObject("SELECT current_database()",String.class));
++  }
++  System.out.println("CT076_DATABASE_BOUNDARY_OK database="+database+" native/material/knowledge/worker=same");
+  }
+  @BeforeAll static void requireBuiltEngine(){NativeEnginePrerequisites.verify(NativeEnginePrerequisites.root());}
+  @Autowired NativeConversationService nativeSessions;@Autowired MaterialService materials;@Autowired ConversationService conversations;@Autowired JdbcTemplate db;
+--- /dev/null
++++ b/docs/codex-tasks/CT-076-verify-pairs.py
+@@ -0,0 +1,161 @@
++#!/usr/bin/env python3
++"""CT-076 selected cross-JVM pairs. Run only in an authorized disposable cloud clone."""
++import argparse, hashlib, json, os, pathlib, re, shutil, subprocess, sys
++import xml.etree.ElementTree as ET
++
++SOURCE = "3e6bdc740955b06ce6f5b250b43fb600d359104a"
++N = "NativeConversationIntegrationTest#crossSpaceReferenceReadsBoundVersionAndStillEnforcesOwnerPermissions"
++K = "KnowledgeIntegrationTest#ordinaryHistoricalUploadStillGetsItsParse"
++T = "TableCalculationIntegrationTest#sourceAndCapabilityMustBelongToCurrentSpaceAndAttemptAndToolMustBeStarted"
++PAIRS = {"native-knowledge": [N,K], "knowledge-native": [K,N],
++         "native-table": [N,T], "table-native": [T,N]}
++TRACKED = "apps/api/src/test/java/com/dreamcore/workspace/NativeConversationIntegrationTest.java"
++
++def git(*args):
++    return subprocess.check_output(["git",*args],text=True).strip()
++
++def save(path, value):
++    path.write_text(json.dumps(value,ensure_ascii=False,indent=2)+"\n")
++
++def snapshot():
++    url=os.environ.get("DATABASE_URL","")
++    match=re.fullmatch(r"jdbc:postgresql://127\.0\.0\.1:([0-9]+)/dreamcore_test",url)
++    if not match or os.environ.get("DATABASE_USER")!="dreamcore_test":
++        raise RuntimeError("wrapper-owned database required")
++    def query(sql):
++        psql=str(pathlib.Path(os.environ["POSTGRES_BIN"])/"psql") if os.environ.get("POSTGRES_BIN") else "psql"
++        env={**os.environ,"PGPASSWORD":os.environ["DATABASE_PASSWORD"]}
++        return subprocess.check_output([psql,"-X","-qAt","-v","ON_ERROR_STOP=1",
++            "-h","127.0.0.1","-p",match[1],"-U","dreamcore_test","-d","dreamcore_test",
++            "-c",sql],env=env,text=True).strip()
++    if query("SELECT current_database() || ':' || current_user")!="dreamcore_test:dreamcore_test":
++        raise RuntimeError("database identity mismatch")
++    exists=query("SELECT to_regclass('public.knowledge_runs') IS NOT NULL")=="t"
++    pending=int(query("SELECT count(*) FROM knowledge_runs WHERE status IN ('QUEUED','RUNNING')")) if exists else 0
++    return {"sharedPending":pending, "isolatedDatabases":int(query(
++        "SELECT count(*) FROM pg_database WHERE datname LIKE 'dreamcore_isolated_test_%'"))}
++
++def run_case(selector, step, settings, env=None):
++    step.mkdir(parents=True,exist_ok=False)
++    suffix="ct076-"+step.parent.name+"-"+step.name
++    argv=["./apps/api/mvnw"]
++    if settings: argv+=["-s",settings]
++    argv+=["-B","-f","apps/api/pom.xml","-Dtest="+selector,
++           "-Dsurefire.reportNameSuffix="+suffix,"test"]
++    with (step/"maven.log").open("w") as log:
++        result=subprocess.run(argv,env=env,stdout=log,stderr=subprocess.STDOUT)
++    reports=list(pathlib.Path("apps/api/target/surefire-reports").glob("TEST-*"+suffix+"*.xml"))
++    suites=[]
++    for report in reports:
++        shutil.copy2(report,step/report.name)
++        xml=ET.parse(report).getroot()
++        suites.append({key:xml.get(key) for key in ("name","tests","failures","errors","skipped")})
++    record={"selector":selector,"argv":argv,"exit":result.returncode,"surefire":suites}
++    save(step/"result.json",record)
++    return record
++
++def main():
++    p=argparse.ArgumentParser()
++    p.add_argument("--repo",required=True)
++    p.add_argument("--out",required=True)
++    p.add_argument("--phase",choices=["red","green"],required=True)
++    p.add_argument("--settings")
++    p.add_argument("--child",choices=list(PAIRS))
++    p.add_argument("--negative",choices=["token","directory","empty-password"])
++    args=p.parse_args()
++    repo=pathlib.Path(args.repo).resolve()
++    preview=pathlib.Path("/home/user/mengine-preview/repo")
++    if repo==preview or preview in repo.parents:
++        raise RuntimeError("preview repository must remain untouched")
++    os.chdir(repo)
++    out=pathlib.Path(args.out).resolve()
++    if args.negative:
++        before=snapshot()
++        env=dict(os.environ)
++        if args.negative=="token": env["DREAMCORE_TEST_PG_OWNER"]="0"*64
++        elif args.negative=="directory": env["DREAMCORE_TEST_PG_DATA_DIRECTORY"]="/not-wrapper-owned"
++        else: env["DATABASE_PASSWORD"]=""
++        record=run_case(N,out/"case",args.settings,env)
++        text=(out/"case"/"maven.log").read_text()
++        after=snapshot()
++        expected=("ownership did not match" in text if args.negative in ("token","directory")
++                  else "Isolated integration tests require scripts/with-test-postgres.py" in text)
++        valid=record["exit"]!=0 and expected and before==after
++        save(out/"negative.json",{"exit":record["exit"],"before":before,"after":after,
++             "guardRejectedBeforeDatabaseCreation":valid})
++        sys.exit(0 if valid else 1)
++    if args.child:
++        records=[]
++        for i,selector in enumerate(PAIRS[args.child]):
++            before=snapshot()
++            record=run_case(selector,out/str(i+1),args.settings)
++            record.update(before=before,after=snapshot())
++            record["oneSelectedTest"]=sum(int(s["tests"] or 0) for s in record["surefire"])==1
++            if args.phase=="green" and selector==N:
++                record["isolationVerified"]=(
++                    record["after"]["sharedPending"]==before["sharedPending"]
++                    and record["after"]["isolatedDatabases"]>before["isolatedDatabases"])
++            save(out/str(i+1)/"result.json",record)
++            records.append(record)
++        save(out/"pair.json",records)
++        sys.exit(0 if all(r["exit"]==0 and r["oneSelectedTest"]
++                         and r.get("isolationVerified",True) for r in records) else 1)
++    out.mkdir(parents=True,exist_ok=False)
++    # Exact starting commit or a committed descendant; record the complete diff.
++    subprocess.run(["git","merge-base","--is-ancestor",SOURCE,"HEAD"],check=True)
++    diff=subprocess.check_output(["git","diff",SOURCE,"--"],text=True)
++    names=git("diff","--name-only",SOURCE,"--").splitlines()
++    required={TRACKED,"scripts/with-test-postgres.py",
++              "apps/api/src/test/java/com/dreamcore/workspace/IsolatedTestDatabase.java"}
++    valid=(not names) if args.phase=="red" else (
++        required.issubset(names) and all(n in required or n.startswith("docs/codex-tasks/CT-076-") for n in names))
++    if not valid:
++        raise RuntimeError("unexpected source diff outside CT-076 test infrastructure")
++    (out/"source.diff").write_text(diff)
++    save(out/"source.json",{"source":SOURCE,"head":git("rev-parse","HEAD"),
++        "tree":git("rev-parse","HEAD^{tree}"),"phase":args.phase,
++        "diffSha256":hashlib.sha256(diff.encode()).hexdigest(),
++        "trackedStatus":git("status","--porcelain","--untracked-files=no")})
++    overview={}
++    for label in PAIRS:
++        target=out/label
++        target.mkdir()
++        argv=[sys.executable,"scripts/with-test-postgres.py",sys.executable,
++              str(pathlib.Path(__file__).resolve()),"--repo",str(repo),
++              "--out",str(target),"--phase",args.phase,"--child",label]
++        if args.settings: argv+=["--settings",args.settings]
++        with (target/"wrapper.log").open("w") as log:
++            code=subprocess.run(argv,stdout=log,stderr=subprocess.STDOUT).returncode
++        overview[label]=code
++    if args.phase=="green":
++        for label,url in [("negative-no-wrapper",None),
++                          ("negative-non-wrapper-url","jdbc:postgresql://192.0.2.1:9/not_wrapper")]:
++            env={k:v for k,v in os.environ.items() if k not in
++                 ("DATABASE_URL","DATABASE_USER","DATABASE_PASSWORD","DREAMCORE_TEST_PG_OWNER","DREAMCORE_TEST_PG_DATA_DIRECTORY")}
++            if url:
++                env.update(DATABASE_URL=url,DATABASE_USER="not_wrapper",
++                           DATABASE_PASSWORD="synthetic-negative-not-a-secret")
++            record=run_case(N,out/label,args.settings,env)
++            text=(out/label/"maven.log").read_text()
++            valid=record["exit"]!=0 and "Isolated integration tests require scripts/with-test-postgres.py" in text
++            record["expectedGuardFailure"]=valid
++            save(out/label/"result.json",record)
++            overview[label]=0 if valid else 1
++    if args.phase=="green":
++        for mode in ("token","directory","empty-password"):
++            target=out/("negative-"+mode)
++            target.mkdir()
++            argv=[sys.executable,"scripts/with-test-postgres.py",sys.executable,
++                  str(pathlib.Path(__file__).resolve()),"--repo",str(repo),"--out",str(target),
++                  "--phase","green","--negative",mode]
++            if args.settings: argv+=["--settings",args.settings]
++            with (target/"wrapper.log").open("w") as log:
++                overview["negative-"+mode]=subprocess.run(argv,stdout=log,stderr=subprocess.STDOUT).returncode
++    save(out/"overview.json",overview)
++    expected={"native-knowledge":1,"knowledge-native":0,"native-table":1,"table-native":0}
++    ok=(overview==expected) if args.phase=="red" else all(v==0 for v in overview.values())
++    sys.exit(0 if ok else 1)
++
++if __name__=="__main__":
++    main()
++

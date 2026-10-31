@@ -30,6 +30,7 @@ def main():
         root = pathlib.Path(temp)
         data = root / "data"
         password = secrets.token_urlsafe(32)
+        owner_token = secrets.token_hex(32)
         secret = root / "password"
         secret.write_text(password)
         secret.chmod(0o600)
@@ -40,10 +41,11 @@ def main():
             subprocess.run([initdb, "-D", str(data), "-U", "dreamcore_test", "--pwfile", str(secret), "--auth=scram-sha-256", "--encoding=UTF8", "--locale=C"], check=True, stdout=log, stderr=log)
             started = False
             try:
-                subprocess.run([pg_ctl, "-D", str(data), "-l", str(root / "postgres.log"), "-o", f"-h 127.0.0.1 -p {port} -k {root}", "-w", "start"], check=True, stdout=log, stderr=log)
+                subprocess.run([pg_ctl, "-D", str(data), "-l", str(root / "postgres.log"), "-o", f"-h 127.0.0.1 -p {port} -k {root} -c dreamcore.test_owner={owner_token}", "-w", "start"], check=True, stdout=log, stderr=log)
                 started = True
                 subprocess.run([psql, "-h", "127.0.0.1", "-p", str(port), "-U", "dreamcore_test", "-d", "postgres", "-c", "CREATE DATABASE dreamcore_test"], env={**os.environ, "PGPASSWORD": password}, check=True, stdout=log, stderr=log)
                 env = {**{k: v for k, v in os.environ.items() if not k.startswith("AGENT_")}, "DATABASE_URL": f"jdbc:postgresql://127.0.0.1:{port}/dreamcore_test", "DATABASE_USER": "dreamcore_test", "DATABASE_PASSWORD": password,
+                       "DREAMCORE_TEST_PG_OWNER": owner_token, "DREAMCORE_TEST_PG_DATA_DIRECTORY": str(data.resolve()),
                        "SPRING_PROFILES_ACTIVE": "local", "MATERIAL_STORAGE_ROOT": str(root / "objects"), "INVITATION_DELIVERY": "local", "INVITATION_OUTBOX": str(root / "invitations")}
                 print("Running against an isolated temporary PostgreSQL database.", flush=True)
                 result = subprocess.run(sys.argv[1:], env=env)
