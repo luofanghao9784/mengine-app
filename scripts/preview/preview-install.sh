@@ -12,7 +12,7 @@ bash "$(dirname "$0")/preview-doctor.sh" || { [ "$DRY_RUN" = 1 ] && log "[dry-ru
 detect_java || true; detect_pg_bin || true
 head="$(cd "$REPO" && git rev-parse HEAD)"
 stamp="$STATE/build-commit"
-if [ "$FORCE" = 0 ] && [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$head" ] && [ -f "$REPO/apps/api/target/workspace-api-0.1.0-SNAPSHOT.jar" ] && [ -f "$REPO/dist/index.html" ]; then
+if [ "$FORCE" = 0 ] && [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$head" ] && [ -f "$REPO/apps/api/target/workspace-api-0.1.0-SNAPSHOT.jar" ] && [ -f "$REPO/engine/dist/main.js" ] && [ -f "$REPO/dist/workspace/index.html" ]; then
   log "构建产物与 HEAD $head 一致，跳过构建"
 elif [ "$FORCE" = 0 ] && [ -f "$REPO/apps/api/target/workspace-api-0.1.0-SNAPSHOT.jar" ] && [ -f "$REPO/engine/dist/main.js" ] && [ -z "$(cd "$REPO" && git status --porcelain --untracked-files=no)" ] && [ "${PREVIEW_TRUST_EXISTING_BUILD:-0}" = 1 ]; then
   log "PREVIEW_TRUST_EXISTING_BUILD=1：复用已有构建产物（共享电脑自测用，避免改写共享工作树）"
