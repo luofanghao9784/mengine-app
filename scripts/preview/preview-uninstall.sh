@@ -16,4 +16,4 @@ fi
 [ "$YES" = 1 ] || { log "未带 --yes：只打印将删除的内容"; DRY_RUN=1; }
 for d in "$INSTANCE" "$SECRETS" "$LOGS" "$STATE"; do run rm -rf "$d"; done
 [ "$KEEP" = 0 ] && run rm -rf "$BACKUPS"
-log "卸载完成（未卸载任何 brew 包；备份保留于 $BACKUPS，除非 --purge-backups）"
+log "卸载完成（未卸载任何 brew 包；备份保留于 ${BACKUPS}，除非 --purge-backups）"

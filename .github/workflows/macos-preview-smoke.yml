@@ -34,7 +34,7 @@ jobs:
           bash scripts/preview/preview-install.sh --dry-run
           bash scripts/preview/preview-install.sh
       - name: install 幂等（第二次应跳过构建）
-        run: bash scripts/preview/preview-install.sh | tee /dev/stderr | grep -q '跳过构建'
+        run: bash scripts/preview/preview-install.sh | tee /dev/stderr | grep -F '跳过构建'
       - name: start
         run: bash scripts/preview/preview-start.sh
       - name: health
