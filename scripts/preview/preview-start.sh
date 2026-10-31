@@ -3,7 +3,7 @@
 # shellcheck disable=SC2015  # A && B || C 用于日志分支，B 为 log 恒成功
 set -euo pipefail
 . "$(dirname "$0")/preview-common.sh" "$@"
-for a in "$@"; do case "$a" in --live|--enable-live|--automatic-work) die "预览禁止真实模型参数 $a（签字条件③）";; esac; done
+for a in "$@"; do case "$a" in --live|--enable-live|--automatic-work) die "预览禁止真实模型参数 ${a}（签字条件③）";; esac; done
 # 签字条件②：start 前复跑穿透检测（doctor 仅告警）；命中即 die——穿透可将 127.0.0.1 转出
 tun="$(ps -axo args= 2>/dev/null | grep -Ei '^([^ ]*/)?(ngrok|cloudflared|frpc|frps|zrok|bore|localtunnel|lt|inlets|sshuttle)( |$)|^([^ ]*/)?ssh .*-R ' | grep -v grep || true)"
 [ -z "$tun" ] || die "发现穿透/转发进程（签字条件②），请关闭后再 start"

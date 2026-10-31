@@ -8,7 +8,7 @@ st="$(trial status)"; echo "$st" | grep -q '"state": "ready"' || die "预览未�
 web="$(echo "$st" | python3 -c 'import json,sys;print(json.load(sys.stdin)["webUrl"])')"; api="$(port_of api)"
 fail=0; warn=0
 code() { curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$1" || echo 000; }
-chk() { c="$(code "$2")"; if [ "$c" = "$3" ]; then echo "  [OK]  $1 $2 → $c"; else echo "  [FAIL] $1 $2 → $c（期望 $3）"; fail=1; fi; }
+chk() { c="$(code "$2")"; if [ "$c" = "$3" ]; then echo "  [OK]  $1 $2 → $c"; else echo "  [FAIL] $1 $2 → ${c}（期望 $3）"; fail=1; fi; }
 echo "== 入口 =="
 chk workspace "$web/workspace/" 200; chk tenant-admin "$web/tenant-admin/" 200; chk platform-admin "$web/platform-admin/" 200
 if [ -f "$REPO/agent-admin/index.html" ]; then chk agent-admin "$web/agent-admin/" 200; chk agent-admin-api "$web/api/agent-admin/v1/" 401
