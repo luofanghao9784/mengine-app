@@ -115,15 +115,26 @@ try:
             subprocess.run=oldrun
     assert not (root/'postgres/postmaster.pid').exists()
 except BaseException as error:
+    code=1
     events.append({'phase':'failure','errorType':type(error).__name__})
 finally:
     signal.alarm(0); signal.signal(signal.SIGALRM,oldhandler)
     subprocess.run=oldrun
-    status=oldrun([backup.pg('pg_ctl'),'-D',str(root/'postgres'),'status'],env=trial.clean_environment(),capture_output=True,timeout=10)
-    stopped=status.returncode==3 and not (root/'postgres/postmaster.pid').exists()
-    clean=not subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],text=True).strip()
+    stopped=False; clean=False; status_exit=None
+    try:
+        status=oldrun([backup.pg('pg_ctl'),'-D',str(root/'postgres'),'status'],env=trial.clean_environment(),capture_output=True,timeout=10)
+        status_exit=status.returncode
+        stopped=status_exit==3 and not (root/'postgres/postmaster.pid').exists()
+    except BaseException as error:
+        code=1
+        events.append({'phase':'final_status_failure','errorType':type(error).__name__})
+    try:
+        clean=not subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],text=True).strip()
+    except BaseException as error:
+        code=1
+        events.append({'phase':'final_git_failure','errorType':type(error).__name__})
     if not stopped or not clean: code=1
-    report={'source':expected,'exit':code,'events':events,'stopped':stopped,'statusExit':status.returncode,'cleanAfter':clean,'fullRestoreVerified':False,'activationAllowed':False}
+    report={'source':expected,'exit':code,'events':events,'stopped':stopped,'statusExit':status_exit,'cleanAfter':clean,'fullRestoreVerified':False,'activationAllowed':False}
     (root/'nonempty-evidence.json').write_text(json.dumps(report,indent=2))
 raise SystemExit(code)
 ```
@@ -131,3 +142,7 @@ raise SystemExit(code)
 清理：finally恢复原subprocess与alarm，原offline_database退出负责停库/清socket；必须同时postmaster.pid不存在、pg_ctl status3。保留新合成目录和0600证据，不能删源或强删运行目录；停库失败立即阻断并报DQ，不自行kill或重跑。最终记录完整命令argv、源码SHA/干净状态、PG版本、所有phase秒数与exit；不用聊天输出数据库/环境秘密。
 
 判定：三档COPY随数据量上升且COUNT/连接控制稳定，才支持数据处理成本假设；COPY/COUNT与SELECT1均慢则先定位客户端/环境，不能宣布SQL排序根因；任一失败保留最后phase并停止，不加预算。全部很快只排除这一小剂量样本，不排除真实宽表或原整体多阶段累计。下一步只在原日志/manifest取回后，按实际最后表及数据量选择一个真实schema的合成代表表；不得无依据重跑297表。旧原始日志缺失仍单独保留，不能用本样本补造原现场。
+
+## 本次驱动失败检查
+
+仅执行Python模拟，不启动PG。检查从本执行单提取实际外层try/except/finally的AST，仅将测量体替换为成功code=0，注入上下文/状态/git失败；不复制另一个最终处理实现。三项检查进程整体exit0，表示拒绝期望通过：context_exit输出exit1/failure且stopped=true、cleanAfter=true；status_probe输出exit1/final_status_failure且报告存在；git_probe输出exit1/final_git_failure且报告存在。均未产生PG或完整恢复通过证据。完整复现检查见同目录R18-R26-driver-failure-check.md。
