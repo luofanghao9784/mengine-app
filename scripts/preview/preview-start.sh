@@ -15,9 +15,10 @@ if [ "$DRY_RUN" = 1 ]; then
   log "[dry-run] 等待 status=ready（最长 180s）；随后 ensure_ro_role $RO_ROLE"; exit 0
 fi
 # DQ：parser 显式开关，首版默认 off；PREVIEW_PARSER=1 才开。PREVIEW_PHONE_LOCAL=1 传 --phone-local（种子脚本需要）。
-PARSER_ARGS=(--parser off); [ "${PREVIEW_PARSER:-0}" = 1 ] && PARSER_ARGS=(--parser on)
-PHONE_ARGS=(); [ "${PREVIEW_PHONE_LOCAL:-0}" = 1 ] && PHONE_ARGS=(--phone-local)
-nohup python3 "$REPO/scripts/local/trial.py" start --directory "$INSTANCE" "${PARSER_ARGS[@]}" "${PHONE_ARGS[@]}" >> "$LOGS/trial-supervisor.log" 2>&1 &
+START_ARGS=(--parser off); [ "${PREVIEW_PARSER:-0}" = 1 ] && START_ARGS=(--parser on)
+[ "${PREVIEW_PHONE_LOCAL:-0}" = 1 ] && START_ARGS+=(--phone-local)
+log "启动 shell: Bash ${BASH_VERSION}"
+nohup python3 "$REPO/scripts/local/trial.py" start --directory "$INSTANCE" "${START_ARGS[@]}" >> "$LOGS/trial-supervisor.log" 2>&1 &
 echo $! > "$STATE/supervisor.pid"; chmod 600 "$STATE/supervisor.pid"
 i=0; while [ $i -lt 180 ]; do
   if trial status 2>/dev/null | grep -q '"state": "ready"'; then break; fi
