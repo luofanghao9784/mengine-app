@@ -8,7 +8,7 @@
  import uuid
  import trial
  
-@@ -217,17 +218,34 @@
+@@ -217,17 +218,38 @@
                          fail('临时数据库未能正常停止；已保留数据库目录，请检查此本地环境后再重试。')
  
  
@@ -23,8 +23,12 @@
 +            value = operation()
 +        except BaseException as error:
 +            if observe:
-+                observe({'phase': phase, 'table': table, 'seconds': time.monotonic()-started,
-+                         'ok': False, 'errorType': type(error).__name__})
++                try:
++                    observe({'phase': phase, 'table': table, 'seconds': time.monotonic()-started,
++                             'ok': False, 'errorType': type(error).__name__})
++                except BaseException:
++                    # Diagnostic callback failure/budget must never replace the SQL failure.
++                    pass
 +            raise
 +        if observe:
 +            event = {'phase': phase, 'table': table, 'seconds': time.monotonic()-started, 'ok': True}
@@ -50,7 +54,7 @@
  
 --- /dev/null
 +++ b/docs/codex-tasks/R18-R26-profile-facts.py
-@@ -0,0 +1,123 @@
+@@ -0,0 +1,125 @@
 +#!/usr/bin/env python3
 +"""Synthetic PG18 cost sample only. Never activates, reconciles, or updates coverage."""
 +import argparse, hashlib, json, os, pathlib, re, secrets, subprocess, sys, tempfile, time
@@ -147,6 +151,8 @@
 +                def observe(event):
 +                    nonlocal completed
 +                    emit(event)
++                    if not event["ok"]:
++                        return  # The original SQL exception must propagate, even after the budget.
 +                    if event["phase"]=="table_count" and event["ok"]:
 +                        completed+=1
 +                        if completed>=args.max_tables:
@@ -176,7 +182,7 @@
 +    sys.exit(main())
 --- /dev/null
 +++ b/tests/local/backup_facts_diagnostics_test.py
-@@ -0,0 +1,40 @@
+@@ -0,0 +1,54 @@
 +"""Diagnostic observer must not weaken backup fingerprints; no PostgreSQL is simulated as passing."""
 +import pathlib,sys,unittest
 +sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[2]/"scripts/local"))
@@ -217,3 +223,17 @@
 +        def stop(event):
 +            if event["phase"]=="table_count":raise RuntimeError("diagnostic budget")
 +        with self.assertRaisesRegex(RuntimeError,"diagnostic budget"):backup.facts(self.sql,stop)
++
++    def test_sql_failure_at_budget_boundary_keeps_original_exception(self):
++        class BudgetStop(Exception): pass
++        failure=ValueError("synthetic SQL failure")
++        original=self.sql
++        def sql(query,fingerprint=False):
++            if query.startswith("COPY"):raise failure
++            return original(query,fingerprint)
++        def exhausted_observer(event):
++            if not event["ok"]:raise BudgetStop("budget also exhausted")
++        with self.assertRaises(ValueError) as raised:
++            backup.facts(sql,exhausted_observer)
++        self.assertIs(failure,raised.exception)
++        self.assertFalse(any(q.startswith("SELECT count(*)") for q,_ in self.calls))

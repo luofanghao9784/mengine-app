@@ -13,7 +13,7 @@
 1. 逐文件读取默认178份迁移SQL（migration134 + common44）。coverage49份文件名及其源码SHA256全部匹配。差额129 = V55–V139的85份 + common44。不是序号连续性推断。
 2. [逐迁移分类表](R18-R26-migration-classification.md)和[完整JSON](R18-R26-migration-classification.json)：每项列版本/路径/Git blob、字面新增和变更表/函数/视图/触发器、恢复边界信号、现有适配模块的显式对象引用、候选处理原则。分类是盘点，非语义批准。动态DDL及传递依赖不得靠字符串匹配放行。
 3. 最小代码差异仅给 backup.facts 增加可选observer；默认行为、每表COPY排序字节及SHA256、COUNT、历史核验、返回dict均保留。COPY失败/observer预算停止继续抛异常，绝不返回部分成功。restore原调用未传observer，所有门禁不动。
-4. 新增3项纯单元检查实际退出0：结果与查询顺序一致；COPY失败不再COUNT且不泄露错误正文；observer中止不返回部分结果。它们是回调契约检查，不是模拟PG通过，更不是恢复验收。
+4. 新增4项纯单元检查实际退出0：结果与查询顺序一致；COPY失败不再COUNT且不泄露错误正文；observer中止不返回部分结果；SQL失败恰逢回调预算耗尽仍保留原SQL异常。它们是回调契约检查，不是模拟PG通过，更不是恢复验收。
 5. [真实PG18有界探针](R18-R26-profile-facts.py)及[完整最小补丁](R18-R26-facts-observer.patch)已提供；Python语法和补丁应用检查已过。
 
 ## 成本证据与缺项
@@ -56,6 +56,7 @@ python3 -m unittest discover -s tests/local -p backup_facts_diagnostics_test.py 
 ## 后续模块顺序及独立审查边界
 
 所有129项在完成对应正负测试前维持BLOCKED。已有适配的部分也需要与新增结构逐项复核。
+0. **全程执行封闭合同先行且持续有效**：在所有模块适配期间，全部worker/调度/重试/外部调用入口都保持关闭，不能等第五步才封闭；任何未知模块继续拒绝激活。
 1. 认证/租户/密钥边界：V55–57、V103–108、V135、V190–193。所有realm旧session/CSRF/邀请/验证码/grant失效；账户、租户、能力开通仅按当前外部权威裁剪；外部独立签名密钥不可从bundle复原为信任根。先审V190第四端会话及V193企业能力源，不能仅新增几条DELETE后放行整库。
 2. 授权/删除与材料闭包：library/受众/归档/撤权、材料版本/原件/知识及远程索引；当前PURGED/撤回、blob删除证据必须优先，未知对象整次激活拒绝。
 3. 经验祖先、派生正文与场景来源：逐版本裁剪原始和传递来源，不因快照旧状态恢复已停用祖先。
@@ -63,5 +64,11 @@ python3 -m unittest discover -s tests/local -p backup_facts_diagnostics_test.py 
 5. 所有后台执行端口：collection、governance、company、briefing、native schedules及重试/回执。RUNNING按副作用不确定处理，不把旧READY/QUEUED/receipt当作重放授权；明确所有可执行状态封闭及租约失效。
 6. 最后才审精确schema/catalog/JAR组合与coverage收录；不运行backup_coverage.py录指纹来绕过前五步。显式activate须再次取当前权威并通过独立审查/正负矩阵。
 
-本首批只讨论“原权威源保留”的恢复。源已丢失时无法用恢复副本给自己授权，现路径保持拒绝；灾备独立授权/审计/密钥托管另立边界，不自动进入本补丁。
+本首批只讨论“原权威源保留”的恢复。保留必须是独立可验证、足够新鲜且可取得当前撤权/删除事实的权威源，不能仅凭目录存在。源已丢失时无法用恢复副本给自己授权，现路径保持拒绝；灾备独立授权/审计/密钥托管另立边界，不自动进入本补丁。
 安全审查重点仅认证realm、租户/能力、外部密钥/源身份及执行端口；架构审查此次诊断patch无门禁弱化、129分类依赖顺序和后续最小模块边界。都不代写整套业务恢复、不Approve自己的实现。
+
+## 非作者审查后的诊断修正
+
+架构发现失败事件回调可能在预算同时耗尽时抛出SampleComplete覆盖SQL异常。已双重修正：facts失败路径中的observer异常不替代原SQL异常；探针收到ok=false只记录而不触发正常预算结束。补针对性纯单元检查，保留错误且不再COUNT。此修正没有PG18实测，不把退出0当恢复通过。
+
+安全审查明确：第四端agent_platform_sessions/独立凭据、V193当前企业能力关系、V171 grants/V183 ACTIVE/READY运行封闭均仍未适配；不能靠现有撤权触发器或仅停止conversation_tasks替代。全部继续被coverage拒绝，未出现已证实的激活越权。源丢失/源不可验证/当前证据不足仍拒绝。本次静态审查没有逐项完成178 SQL的恢复语义认证。

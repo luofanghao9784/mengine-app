@@ -94,6 +94,8 @@ def main():
                 def observe(event):
                     nonlocal completed
                     emit(event)
+                    if not event["ok"]:
+                        return  # The original SQL exception must propagate, even after the budget.
                     if event["phase"]=="table_count" and event["ok"]:
                         completed+=1
                         if completed>=args.max_tables:

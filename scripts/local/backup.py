@@ -226,8 +226,12 @@ def facts(sql, observe=None):
             value = operation()
         except BaseException as error:
             if observe:
-                observe({'phase': phase, 'table': table, 'seconds': time.monotonic()-started,
-                         'ok': False, 'errorType': type(error).__name__})
+                try:
+                    observe({'phase': phase, 'table': table, 'seconds': time.monotonic()-started,
+                             'ok': False, 'errorType': type(error).__name__})
+                except BaseException:
+                    # Diagnostic callback failure/budget must never replace the SQL failure.
+                    pass
             raise
         if observe:
             event = {'phase': phase, 'table': table, 'seconds': time.monotonic()-started, 'ok': True}

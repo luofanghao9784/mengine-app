@@ -4,5 +4,7 @@
   "coveredExactSha256": 49,
   "missing": 129,
   "unitExit": 0,
-  "realPg18Executed": false
+  "realPg18Executed": false,
+  "unitTests": 4,
+  "failureAtBudgetBoundaryCovered": true
 }

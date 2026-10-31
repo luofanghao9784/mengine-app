@@ -38,3 +38,17 @@ class FactsDiagnosticsTest(unittest.TestCase):
         def stop(event):
             if event["phase"]=="table_count":raise RuntimeError("diagnostic budget")
         with self.assertRaisesRegex(RuntimeError,"diagnostic budget"):backup.facts(self.sql,stop)
+
+    def test_sql_failure_at_budget_boundary_keeps_original_exception(self):
+        class BudgetStop(Exception): pass
+        failure=ValueError("synthetic SQL failure")
+        original=self.sql
+        def sql(query,fingerprint=False):
+            if query.startswith("COPY"):raise failure
+            return original(query,fingerprint)
+        def exhausted_observer(event):
+            if not event["ok"]:raise BudgetStop("budget also exhausted")
+        with self.assertRaises(ValueError) as raised:
+            backup.facts(sql,exhausted_observer)
+        self.assertIs(failure,raised.exception)
+        self.assertFalse(any(q.startswith("SELECT count(*)") for q,_ in self.calls))
