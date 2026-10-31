@@ -93,10 +93,10 @@
   @Autowired NativeConversationService nativeSessions;@Autowired MaterialService materials;@Autowired ConversationService conversations;@Autowired JdbcTemplate db;
 --- /dev/null
 +++ b/docs/codex-tasks/CT-076-verify-pairs.py
-@@ -0,0 +1,161 @@
+@@ -0,0 +1,186 @@
 +#!/usr/bin/env python3
 +"""CT-076 selected cross-JVM pairs. Run only in an authorized disposable cloud clone."""
-+import argparse, hashlib, json, os, pathlib, re, shutil, subprocess, sys
++import argparse, hashlib, json, os, pathlib, re, shutil, subprocess, sys, time, uuid
 +import xml.etree.ElementTree as ET
 +
 +SOURCE = "3e6bdc740955b06ce6f5b250b43fb600d359104a"
@@ -131,22 +131,41 @@
 +    return {"sharedPending":pending, "isolatedDatabases":int(query(
 +        "SELECT count(*) FROM pg_database WHERE datname LIKE 'dreamcore_isolated_test_%'"))}
 +
-+def run_case(selector, step, settings, env=None):
++def run_case(selector, step, settings, expected_head, env=None):
++    if git("rev-parse","HEAD")!=expected_head or git("status","--porcelain","--untracked-files=normal"):
++        raise RuntimeError("source changed before selected method")
 +    step.mkdir(parents=True,exist_ok=False)
-+    suffix="ct076-"+step.parent.name+"-"+step.name
++    suffix="ct076-"+uuid.uuid4().hex
 +    argv=["./apps/api/mvnw"]
 +    if settings: argv+=["-s",settings]
 +    argv+=["-B","-f","apps/api/pom.xml","-Dtest="+selector,
 +           "-Dsurefire.reportNameSuffix="+suffix,"test"]
++    started_ns=time.time_ns()
 +    with (step/"maven.log").open("w") as log:
 +        result=subprocess.run(argv,env=env,stdout=log,stderr=subprocess.STDOUT)
 +    reports=list(pathlib.Path("apps/api/target/surefire-reports").glob("TEST-*"+suffix+"*.xml"))
 +    suites=[]
++    cases=[]
++    fresh=True
 +    for report in reports:
++        fresh=fresh and report.stat().st_mtime_ns>=started_ns
 +        shutil.copy2(report,step/report.name)
 +        xml=ET.parse(report).getroot()
 +        suites.append({key:xml.get(key) for key in ("name","tests","failures","errors","skipped")})
-+    record={"selector":selector,"argv":argv,"exit":result.returncode,"surefire":suites}
++        cases.extend({"name":c.get("name"),"classname":c.get("classname"),
++                      "skipped":c.find("skipped") is not None} for c in xml.findall("testcase"))
++    source_unchanged=(git("rev-parse","HEAD")==expected_head and not git("status","--porcelain","--untracked-files=normal"))
++    cls,method=selector.split("#",1)
++    expected_class="com.dreamcore.workspace."+cls
++    selected=(len(cases)==1 and cases[0]["name"]==method
++              and cases[0]["classname"] in (expected_class,expected_class+"-"+suffix)
++              and not cases[0]["skipped"] and fresh and source_unchanged
++              and sum(int(s["tests"] or 0) for s in suites)==1
++              and all(int(s["skipped"] or 0)==0 for s in suites))
++    record={"selector":selector,"argv":argv,"exit":result.returncode,"surefire":suites,
++            "testcases":cases,"freshReports":fresh and bool(reports),
++            "sourceUnchanged":source_unchanged,"expectedHead":expected_head,
++            "oneSelectedTest":selected,"reportSuffix":suffix}
 +    save(step/"result.json",record)
 +    return record
 +
@@ -156,6 +175,7 @@
 +    p.add_argument("--out",required=True)
 +    p.add_argument("--phase",choices=["red","green"],required=True)
 +    p.add_argument("--settings")
++    p.add_argument("--expected-head",required=True)
 +    p.add_argument("--child",choices=list(PAIRS))
 +    p.add_argument("--negative",choices=["token","directory","empty-password"])
 +    args=p.parse_args()
@@ -165,13 +185,19 @@
 +        raise RuntimeError("preview repository must remain untouched")
 +    os.chdir(repo)
 +    out=pathlib.Path(args.out).resolve()
++    if out==repo or repo in out.parents:
++        raise RuntimeError("evidence output must be outside the source checkout")
++    if not re.fullmatch("[0-9a-f]{40}",args.expected_head) or git("rev-parse","HEAD")!=args.expected_head:
++        raise RuntimeError("HEAD does not equal --expected-head")
++    if git("status","--porcelain","--untracked-files=normal"):
++        raise RuntimeError("source checkout must be clean, including untracked files")
 +    if args.negative:
 +        before=snapshot()
 +        env=dict(os.environ)
 +        if args.negative=="token": env["DREAMCORE_TEST_PG_OWNER"]="0"*64
 +        elif args.negative=="directory": env["DREAMCORE_TEST_PG_DATA_DIRECTORY"]="/not-wrapper-owned"
 +        else: env["DATABASE_PASSWORD"]=""
-+        record=run_case(N,out/"case",args.settings,env)
++        record=run_case(N,out/"case",args.settings,args.expected_head,env)
 +        text=(out/"case"/"maven.log").read_text()
 +        after=snapshot()
 +        expected=("ownership did not match" in text if args.negative in ("token","directory")
@@ -184,9 +210,8 @@
 +        records=[]
 +        for i,selector in enumerate(PAIRS[args.child]):
 +            before=snapshot()
-+            record=run_case(selector,out/str(i+1),args.settings)
++            record=run_case(selector,out/str(i+1),args.settings,args.expected_head)
 +            record.update(before=before,after=snapshot())
-+            record["oneSelectedTest"]=sum(int(s["tests"] or 0) for s in record["surefire"])==1
 +            if args.phase=="green" and selector==N:
 +                record["isolationVerified"]=(
 +                    record["after"]["sharedPending"]==before["sharedPending"]
@@ -211,14 +236,15 @@
 +    save(out/"source.json",{"source":SOURCE,"head":git("rev-parse","HEAD"),
 +        "tree":git("rev-parse","HEAD^{tree}"),"phase":args.phase,
 +        "diffSha256":hashlib.sha256(diff.encode()).hexdigest(),
-+        "trackedStatus":git("status","--porcelain","--untracked-files=no")})
++        "trackedStatus":git("status","--porcelain","--untracked-files=normal"),
++        "expectedHead":args.expected_head})
 +    overview={}
 +    for label in PAIRS:
 +        target=out/label
 +        target.mkdir()
 +        argv=[sys.executable,"scripts/with-test-postgres.py",sys.executable,
 +              str(pathlib.Path(__file__).resolve()),"--repo",str(repo),
-+              "--out",str(target),"--phase",args.phase,"--child",label]
++              "--out",str(target),"--phase",args.phase,"--child",label,"--expected-head",args.expected_head]
 +        if args.settings: argv+=["--settings",args.settings]
 +        with (target/"wrapper.log").open("w") as log:
 +            code=subprocess.run(argv,stdout=log,stderr=subprocess.STDOUT).returncode
@@ -231,7 +257,7 @@
 +            if url:
 +                env.update(DATABASE_URL=url,DATABASE_USER="not_wrapper",
 +                           DATABASE_PASSWORD="synthetic-negative-not-a-secret")
-+            record=run_case(N,out/label,args.settings,env)
++            record=run_case(N,out/label,args.settings,args.expected_head,env)
 +            text=(out/label/"maven.log").read_text()
 +            valid=record["exit"]!=0 and "Isolated integration tests require scripts/with-test-postgres.py" in text
 +            record["expectedGuardFailure"]=valid
@@ -243,7 +269,7 @@
 +            target.mkdir()
 +            argv=[sys.executable,"scripts/with-test-postgres.py",sys.executable,
 +                  str(pathlib.Path(__file__).resolve()),"--repo",str(repo),"--out",str(target),
-+                  "--phase","green","--negative",mode]
++                  "--phase","green","--negative",mode,"--expected-head",args.expected_head]
 +            if args.settings: argv+=["--settings",args.settings]
 +            with (target/"wrapper.log").open("w") as log:
 +                overview["negative-"+mode]=subprocess.run(argv,stdout=log,stderr=subprocess.STDOUT).returncode
@@ -254,4 +280,3 @@
 +
 +if __name__=="__main__":
 +    main()
-+

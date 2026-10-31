@@ -32,6 +32,7 @@ python3 docs/codex-tasks/CT-076-verify-pairs.py \
   --repo /独立云端副本绝对路径 \
   --out /新的云端证据目录 \
   --phase green \
+  --expected-head <本次交接固定完整40位SHA> \
   --settings /执行岗自己的Maven配置绝对路径
 ~~~
 
@@ -65,3 +66,9 @@ python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml \
 ~~~
 
 本轮没有启动此命令，没有触碰 PID20678。
+
+## 验证驱动证据收紧
+
+驱动必须显式传入 --expected-head 完整40位SHA，启动各子序列时检查 HEAD 严格匹配且工作区（含未跟踪文件）干净；结果目录须在checkout外。每次 Maven 使用随机唯一报告后缀，并核对报告时间晚于该次启动、XML仅含指定classname及method、tests=1且skipped=0，不能只看总数。保留原始XML/退出码。新增校验未实际运行项目测试。
+
+本次只修改证据脚本/交接/完整patch镜像；Native、helper、wrapper的实现blob相对于60caaa183e08bcd7a8e6b3dc7153c23bf504bfb2未变。若60caaa版本已有在途或已完成测试，不重复启动：保留该SHA的原始结果，并独立核实它们的真实HEAD/干净状态/报告新鲜度/目标方法/跳过计数；不能事后虚构当时未记录的源码身份。后续新运行才使用本提交严格驱动和相应 --expected-head。
