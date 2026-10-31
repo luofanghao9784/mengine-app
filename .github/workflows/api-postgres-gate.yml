@@ -2,25 +2,12 @@
 # 命令与 package.json 的 test:api 相同：scripts/with-test-postgres.py 自己 initdb/start/stop。
 # 不使用服务容器里的常驻 Postgres，也不跑 model:smoke、test:model-smoke、test:ppt:live
 # 或任何需要真实模型密钥的步骤。
-# CT-030：on.pull_request 只有 paths。未命中正向路径则 skipped。
+# main PR 始终运行实际门禁，避免必需检查因 paths 过滤缺失。
 name: API · Postgres gate
 
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'apps/api/**'
-      - 'scripts/with-test-postgres.py'
-      - 'scripts/local/**'
-      - '.github/workflows/api-postgres-gate.yml'
-      - 'apps/api/pom.xml'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'engine/package.json'
-      - 'engine/package-lock.json'
-      - '!docs/**'
-      - '!*.md'
-      - '!**/*.md'
 
 # contents:read 供 checkout；actions:write 供 setup-java 的 Maven 缓存与 setup-node 的 npm 缓存。
 # 显式 permissions 会覆盖默认令牌权限，少了 actions:write 时缓存步骤会 403 并挡住门禁。
@@ -78,6 +65,7 @@ jobs:
           # poppler-utils 提供 /usr/bin/{pdfinfo,pdftotext,pdftoppm}；tesseract-ocr 提供 /usr/bin/tesseract。
           # 解析器实际读取的 chi_sim/eng 在下一步 setup.py 写入的 TESSDATA_PREFIX，不读发行版 tessdata。
           sudo apt-get install -y \
+            build-essential \
             postgresql-18 \
             bubblewrap \
             poppler-utils \
@@ -397,6 +385,21 @@ jobs:
           test -d engine/node_modules/@deepseek-ai/dsh-schedule
 
       # 供 NativeSchedules / Presentation / BriefingFaceAlignment 等测试使用本地引擎产物（engine/dist）；只构建，不连 live 模型。
+      - name: Setup pnpm for wiki
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+
+      - name: Install wiki bridge dependencies
+        working-directory: integrations/mengine-wiki
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          test -f node_modules/tsx/dist/cli.mjs
+          node node_modules/tsx/dist/cli.mjs --version
+          node --input-type=module -e 'import Database from "better-sqlite3"; const db = new Database(":memory:"); if (db.prepare("SELECT 1 AS n").get().n !== 1) process.exit(1); db.close();'
+
       - name: Build engine
         run: |
           set -euo pipefail

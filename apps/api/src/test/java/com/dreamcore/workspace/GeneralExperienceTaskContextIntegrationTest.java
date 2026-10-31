@@ -73,12 +73,53 @@ class GeneralExperienceTaskContextIntegrationTest {
   for(String secret:List.of(tenant.toString(),space.toString(),owner.toString(),task.toString(),source.versionId().toString(),"private-prompt","private-reply","sourceId","runId"))assertFalse((found.toString()+detail).contains(secret),secret);
   assertEquals(0,db.queryForObject("SELECT count(*) FROM task_context_materials WHERE task_id=?",Integer.class,t.id()));assertEquals(1,db.queryForObject("SELECT count(*) FROM task_general_experience_reads WHERE task_id=?",Integer.class,t.id()));assertEquals("1.0",agents.check(t.id(),t.token()).get("generalExperienceVersion"));
  }
+ void givePagedFixtureLease(ConversationService.Job job){
+  assertEquals(clientTenant,job.tenant());
+  assertEquals(clientActor,job.actor());
+  assertEquals(clientSpace,job.space());
+  int changed=db.update("""
+   UPDATE conversation_tasks
+   SET lease_until=clock_timestamp()+interval '10 minutes'
+   WHERE id=? AND tenant_id=? AND workspace_id=?
+     AND conversation_id=? AND requested_by=? AND lease_token=?
+     AND status='RUNNING' AND mode='AGENT'
+     AND execution_class='verification'
+     AND lease_until>clock_timestamp()
+   """,job.id(),clientTenant,clientSpace,job.conversation(),clientActor,job.token());
+  assertEquals(1,changed,"分页夹具必须属于当前消费者且仍持有有效租约；禁止复活过期任务");
+ }
  @Test void completePagedReadIsRequiredForIdempotentAdoptionAndNeverProvesBusinessSuccess(){
-  seed();var m=method();var longMethod=new ExperienceGeneralizationRuntime.Method(m.title(),m.summary(),java.util.stream.IntStream.range(0,10).mapToObj(n->("步骤"+n)+"方".repeat(790)).toList(),m.applicable(),m.excluded(),m.tags(),m.basis());var r=publish(longMethod);var t=working();UUID key=UUID.randomUUID();
+  seed();var m=method();var longMethod=new ExperienceGeneralizationRuntime.Method(m.title(),m.summary(),java.util.stream.IntStream.range(0,10).mapToObj(n->("步骤"+n)+"方".repeat(790)).toList(),m.applicable(),m.excluded(),m.tags(),m.basis());var r=publish(longMethod);var t=working();givePagedFixtureLease(t);UUID key=UUID.randomUUID();
+  long started=System.nanoTime();String phase="initial-adoption";try{
   denied(409,()->use(t,r,key,"DIRECT"));search(t);denied(409,()->use(t,r,key,"DIRECT"));assertFalse(use(t,r,UUID.randomUUID(),"UNKNOWN").get("selectionRecorded").asBoolean());
-  var steps=new ArrayList<String>();for(int offset:List.of(0,3,6,9)){var page=read(t,r,offset);page.get("steps").forEach(v->steps.add(v.asString()));if(offset<9)denied(409,()->use(t,r,key,"DIRECT"));}
-  assertEquals(longMethod.steps(),steps);var receipt=use(t,r,key,"ADAPTED");assertTrue(receipt.get("selectionRecorded").asBoolean());assertFalse(receipt.get("businessActionPerformed").asBoolean());assertEquals("UNKNOWN",receipt.get("applicationOutcome").asString());assertEquals("MODEL_REPORTED",receipt.get("assessmentSource").asString());assertEquals(receipt,use(t,r,key,"ADAPTED"));denied(409,()->use(t,r,key,"DIRECT"));
-  denied(400,()->call(t,request("general_experience_use",r,null,UUID.randomUUID(),"ADAPTED","满足条件","")));assertEquals(2,db.queryForObject("SELECT count(*) FROM task_general_experience_reviews WHERE task_id=?",Integer.class,t.id()));
+  phase="paged-read";var steps=new ArrayList<String>();for(int offset:List.of(0,3,6,9)){var page=read(t,r,offset);page.get("steps").forEach(v->steps.add(v.asString()));if(offset<9)denied(409,()->use(t,r,key,"DIRECT"));}
+  phase="adoption-and-idempotency";assertEquals(longMethod.steps(),steps);var receipt=use(t,r,key,"ADAPTED");assertTrue(receipt.get("selectionRecorded").asBoolean());assertFalse(receipt.get("businessActionPerformed").asBoolean());assertEquals("UNKNOWN",receipt.get("applicationOutcome").asString());assertEquals("MODEL_REPORTED",receipt.get("assessmentSource").asString());assertEquals(receipt,use(t,r,key,"ADAPTED"));denied(409,()->use(t,r,key,"DIRECT"));
+  phase="invalid-adoption";denied(400,()->call(t,request("general_experience_use",r,null,UUID.randomUUID(),"ADAPTED","满足条件","")));assertEquals(2,db.queryForObject("SELECT count(*) FROM task_general_experience_reviews WHERE task_id=?",Integer.class,t.id()));
+  }finally{
+   System.out.printf("PAGED_FIXTURE phase=%s elapsed_ms=%d lease_valid=%s%n",phase,
+    (System.nanoTime()-started)/1000000,
+    db.queryForObject("SELECT lease_until>clock_timestamp() FROM conversation_tasks WHERE id=?",Boolean.class,t.id()));
+  }
+ }
+ @Test void expiredConsumerLeaseCannotAdoptGeneralExperience(){
+  seed();var r=publish(method());var t=working();
+  assertEquals(clientTenant,t.tenant());
+  assertEquals(clientActor,t.actor());
+  assertEquals(clientSpace,t.space());
+  // Complete the short read first: expiry must reject an otherwise eligible adoption.
+  read(t,r,0);
+  assertEquals(1,db.update("""
+   UPDATE conversation_tasks
+   SET lease_until=clock_timestamp()-interval '1 second'
+   WHERE id=? AND tenant_id=? AND workspace_id=?
+     AND conversation_id=? AND requested_by=? AND lease_token=?
+     AND status='RUNNING' AND mode='AGENT' AND execution_class='verification'
+   """,t.id(),clientTenant,clientSpace,t.conversation(),clientActor,t.token()));
+  assertFalse(db.queryForObject("SELECT lease_until>clock_timestamp() FROM conversation_tasks WHERE id=?",Boolean.class,t.id()));
+  var error=assertThrows(IdentityException.class,()->use(t,r,UUID.randomUUID(),"DIRECT"));
+  assertEquals(403,error.status);
+  assertEquals("TASK_ACCESS_DENIED",error.code);
+  assertEquals(0,db.queryForObject("SELECT count(*) FROM task_general_experience_reviews WHERE task_id=?",Integer.class,t.id()));
  }
  @Test void selectedOnlyTasksAndWrongVersionsCannotReadOrRegisterAdoption(){
   seed();var r=publish(method());var t=working();db.update("UPDATE conversation_tasks SET source_scope='SELECTED' WHERE id=?",t.id());assertEquals("SELECTED_ONLY",search(t).get("reason").asString());assertTrue(read(t,r,0).get("unavailable").asBoolean());assertTrue(use(t,r,UUID.randomUUID(),"DIRECT").get("unavailable").asBoolean());assertEquals(0,db.queryForObject("SELECT count(*) FROM task_general_experience_reads WHERE task_id=?",Integer.class,t.id()));
