@@ -127,7 +127,7 @@ test('智能服务在原生服务不可用时仍显示已开通读失败空态',
   await expect(page.getByRole('heading', { name: '已开通', exact: true })).toBeVisible();
   await expect(page.getByText('总部开通给本企业的 AI 功能会出现在这里。', { exact: true })).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: '暂时不能查看已开通功能（后台开通中）', exact: true }),
+    page.getByRole('heading', { name: '暂时无法读取已开通功能，请稍后重试', exact: true }),
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: '智能服务', exact: true, level: 2 })).toBeVisible();
   expect(requests.every((r) => r.method === 'GET' && !r.path.includes('/agent-admin/'))).toBe(true);
@@ -156,8 +156,8 @@ for (const mode of ['anonymous', 'no-member', 'wrong-tenant'] as const) {
 for (const [name, reply, title] of [
   ['200 空列表', { items: [] }, '还没有已开通的 AI 功能'],
   ['404', { status: 404 }, '暂时不能查看已开通功能'],
-  ['500', { status: 500 }, '暂时不能查看已开通功能（后台开通中）'],
-  ['网络错误', { networkError: true }, '暂时不能查看已开通功能（后台开通中）'],
+  ['500', { status: 500 }, '暂时无法读取已开通功能，请稍后重试'],
+  ['网络错误', { networkError: true }, '暂时无法读取已开通功能，请稍后重试'],
 ] as const) {
   test(`已开通区分 ${name}，工作台隐藏入口并拒绝直链`, async ({ page }) => {
     const { requests } = await fixture(page, 'member', reply);
