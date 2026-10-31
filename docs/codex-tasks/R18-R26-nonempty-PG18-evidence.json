@@ -1,0 +1,416 @@
+{
+  "documentCommit": "57ed2b47659c627eb8358d2ebed9d0bd1dbeac86",
+  "documentTree": "c8275d238739b3d168eb17429b4264bd4bcce5c9",
+  "documents": {
+    "R18-R26-timeout-next-step.md": {
+      "sha256": "02b64591ed37ff5d3eb6cdb184e18f15b42979117d26153058ddf7d8c1e02cde",
+      "gitBlob": "8fa955a906ea902cf23572fdfce1df607ab1ab8d"
+    },
+    "R18-R26-driver-failure-check.md": {
+      "sha256": "ad5e50ef55b331fffe7c874c2b24a6c0f61d84266479eca45e65050ae570ff12",
+      "gitBlob": "3cf3f0d97c7b3df70ef4d8829053a8a190c28c66"
+    }
+  },
+  "extractedCodeSHA256": "9527776e34f6a0007b1605c4bb99cf79ab46d3b8561dae6f486ab1a371531665",
+  "matchesFailureCheckSnapshot": true,
+  "sourceHead": "f142c9d6b871ebedac133569fc51cb961bbd940f",
+  "sourceTree": "c30bfa8a7779b71cee3cd8516c04acfbd63fa941",
+  "cleanBefore": true,
+  "cwd": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-f142-validation/source",
+  "entryArgv": [
+    "python3",
+    "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-nonempty-57ed-validation/private/nonempty.py",
+    "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-nonempty-57ed-validation/private/sample-new"
+  ],
+  "wrapperArgv": [
+    "r18-r26-nonempty-57ed-validation/execute-once.py"
+  ],
+  "observation": "Transparent subprocess.run timings only: no argument/result/exception changes; no SQL text, row bodies, passwords or data hashes recorded.",
+  "exit": 0,
+  "seconds": 1.4367729550067452,
+  "postmasterPidAbsent": true,
+  "tcpDisabled": true,
+  "socketDirectoryRemoved": true,
+  "cleanAfter": true,
+  "driverEvidenceExists": true,
+  "driverEvidence": {
+    "source": "f142c9d6b871ebedac133569fc51cb961bbd940f",
+    "exit": 0,
+    "events": [
+      {
+        "phase": "fixture_table",
+        "seconds": 0.024335036003321875,
+        "ok": true,
+        "rows": null
+      },
+      {
+        "phase": "fixture_insert_1",
+        "seconds": 0.019458723996649496,
+        "ok": true,
+        "rows": 1
+      },
+      {
+        "phase": "copy_1",
+        "seconds": 0.03278728300210787,
+        "ok": true,
+        "rows": 1
+      },
+      {
+        "phase": "count_1",
+        "seconds": 0.018910572995082475,
+        "ok": true,
+        "rows": 1
+      },
+      {
+        "phase": "fixture_insert_128",
+        "seconds": 0.02313475599657977,
+        "ok": true,
+        "rows": 128
+      },
+      {
+        "phase": "copy_128",
+        "seconds": 0.0339336339966394,
+        "ok": true,
+        "rows": 128
+      },
+      {
+        "phase": "count_128",
+        "seconds": 0.017542303998197895,
+        "ok": true,
+        "rows": 128
+      },
+      {
+        "phase": "fixture_insert_1024",
+        "seconds": 0.05312410899932729,
+        "ok": true,
+        "rows": 1024
+      },
+      {
+        "phase": "copy_1024",
+        "seconds": 0.07562176400097087,
+        "ok": true,
+        "rows": 1024
+      },
+      {
+        "phase": "count_1024",
+        "seconds": 0.019067095003265422,
+        "ok": true,
+        "rows": 1024
+      },
+      {
+        "phase": "connection_control_0",
+        "seconds": 0.020472921001783106,
+        "ok": true,
+        "rows": null
+      },
+      {
+        "phase": "connection_control_1",
+        "seconds": 0.018286197999259457,
+        "ok": true,
+        "rows": null
+      },
+      {
+        "phase": "connection_control_2",
+        "seconds": 0.01881519299786305,
+        "ok": true,
+        "rows": null
+      }
+    ],
+    "stopped": true,
+    "statusExit": 3,
+    "cleanAfter": true,
+    "fullRestoreVerified": false,
+    "activationAllowed": false
+  },
+  "extractedCodeUnchanged": true,
+  "failureCheckComparison": {
+    "outerWhitespaceNormalized": true,
+    "ASTIdentical": true
+  },
+  "childProcessEvents": [
+    {
+      "command": "git",
+      "operation": null,
+      "seconds": 0.001941301001352258,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": null,
+      "pgOptions": null,
+      "connectTimeout": null,
+      "utc": "2026-10-31T05:28:38.675453+00:00"
+    },
+    {
+      "command": "git",
+      "operation": null,
+      "seconds": 0.009531850999337621,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": null,
+      "pgOptions": null,
+      "connectTimeout": null,
+      "utc": "2026-10-31T05:28:38.685337+00:00"
+    },
+    {
+      "command": "initdb",
+      "operation": "version",
+      "seconds": 0.006798850001359824,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": null,
+      "pgOptions": null,
+      "connectTimeout": null,
+      "utc": "2026-10-31T05:28:38.742418+00:00",
+      "version": "initdb (PostgreSQL) 18.6 (Debian 18.6-1.pgdg12+2)"
+    },
+    {
+      "command": "initdb",
+      "operation": null,
+      "seconds": 0.6156152089970419,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 120,
+      "pgOptions": null,
+      "connectTimeout": "5",
+      "utc": "2026-10-31T05:28:39.358349+00:00",
+      "dataDirectory": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-nonempty-57ed-validation/private/sample-new/postgres"
+    },
+    {
+      "command": "pg_ctl",
+      "operation": null,
+      "seconds": 0.0011443710027378984,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": null,
+      "pgOptions": null,
+      "connectTimeout": null,
+      "utc": "2026-10-31T05:28:39.359990+00:00"
+    },
+    {
+      "command": "pg_ctl",
+      "operation": "start",
+      "seconds": 0.11413832800462842,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 120,
+      "pgOptions": null,
+      "connectTimeout": "5",
+      "utc": "2026-10-31T05:28:39.474301+00:00",
+      "dataDirectory": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-nonempty-57ed-validation/private/sample-new/postgres"
+    },
+    {
+      "command": "psql",
+      "operation": "version",
+      "seconds": 0.006846284995845053,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": null,
+      "pgOptions": null,
+      "connectTimeout": null,
+      "utc": "2026-10-31T05:28:39.481507+00:00",
+      "version": "psql (PostgreSQL) 18.6 (Debian 18.6-1.pgdg12+2)"
+    },
+    {
+      "command": "psql",
+      "operation": "create_database",
+      "seconds": 0.11406573899876093,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 120,
+      "pgOptions": null,
+      "connectTimeout": "5",
+      "utc": "2026-10-31T05:28:39.595803+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "fixture_table",
+      "seconds": 0.02408468299836386,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 5,
+      "pgOptions": "-c statement_timeout=3500",
+      "connectTimeout": "3",
+      "utc": "2026-10-31T05:28:39.620244+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "fixture_insert",
+      "seconds": 0.019247856995207258,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 5,
+      "pgOptions": "-c statement_timeout=3500",
+      "connectTimeout": "3",
+      "utc": "2026-10-31T05:28:39.639729+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "copy",
+      "seconds": 0.0319589580030879,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 5,
+      "pgOptions": "-c statement_timeout=3500",
+      "connectTimeout": "3",
+      "utc": "2026-10-31T05:28:39.671949+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "count",
+      "seconds": 0.018618775000504684,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 5,
+      "pgOptions": "-c statement_timeout=3500",
+      "connectTimeout": "3",
+      "utc": "2026-10-31T05:28:39.691433+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "fixture_insert",
+      "seconds": 0.02291156399587635,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 5,
+      "pgOptions": "-c statement_timeout=3500",
+      "connectTimeout": "3",
+      "utc": "2026-10-31T05:28:39.714576+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "copy",
+      "seconds": 0.03174533599667484,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 5,
+      "pgOptions": "-c statement_timeout=3500",
+      "connectTimeout": "3",
+      "utc": "2026-10-31T05:28:39.746593+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "count",
+      "seconds": 0.017264520000026096,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 5,
+      "pgOptions": "-c statement_timeout=3500",
+      "connectTimeout": "3",
+      "utc": "2026-10-31T05:28:39.766041+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "fixture_insert",
+      "seconds": 0.052808304004429374,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 5,
+      "pgOptions": "-c statement_timeout=3500",
+      "connectTimeout": "3",
+      "utc": "2026-10-31T05:28:39.819131+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "copy",
+      "seconds": 0.06393763099913485,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 5,
+      "pgOptions": "-c statement_timeout=3500",
+      "connectTimeout": "3",
+      "utc": "2026-10-31T05:28:39.883427+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "count",
+      "seconds": 0.018820500001311302,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 5,
+      "pgOptions": "-c statement_timeout=3500",
+      "connectTimeout": "3",
+      "utc": "2026-10-31T05:28:39.913925+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "connection_control",
+      "seconds": 0.02019724499405129,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 5,
+      "pgOptions": "-c statement_timeout=3500",
+      "connectTimeout": "3",
+      "utc": "2026-10-31T05:28:39.934353+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "connection_control",
+      "seconds": 0.01805456299916841,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 5,
+      "pgOptions": "-c statement_timeout=3500",
+      "connectTimeout": "3",
+      "utc": "2026-10-31T05:28:39.952699+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "connection_control",
+      "seconds": 0.01860010699601844,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 5,
+      "pgOptions": "-c statement_timeout=3500",
+      "connectTimeout": "3",
+      "utc": "2026-10-31T05:28:39.971523+00:00"
+    },
+    {
+      "command": "pg_ctl",
+      "operation": "stop",
+      "seconds": 0.11404364899499342,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": 120,
+      "pgOptions": null,
+      "connectTimeout": "5",
+      "utc": "2026-10-31T05:28:40.085812+00:00",
+      "dataDirectory": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-nonempty-57ed-validation/private/sample-new/postgres"
+    },
+    {
+      "command": "pg_ctl",
+      "operation": "status",
+      "seconds": 0.0014233670008252375,
+      "exit": 3,
+      "errorType": null,
+      "subprocessTimeout": 10,
+      "pgOptions": null,
+      "connectTimeout": null,
+      "utc": "2026-10-31T05:28:40.087801+00:00",
+      "dataDirectory": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-nonempty-57ed-validation/private/sample-new/postgres"
+    },
+    {
+      "command": "git",
+      "operation": null,
+      "seconds": 0.00882386200100882,
+      "exit": 0,
+      "errorType": null,
+      "subprocessTimeout": null,
+      "pgOptions": null,
+      "connectTimeout": null,
+      "utc": "2026-10-31T05:28:40.096793+00:00"
+    }
+  ],
+  "phaseCumulativeSeconds": 0.375489589991048,
+  "fileModes": {
+    "private": "0o700",
+    "private/nonempty.py": "0o600",
+    "private/sample-new": "0o700",
+    "private/sample-new/nonempty-evidence.json": "0o600",
+    "private/sample-new/database.json": "0o600"
+  },
+  "onceOnly": true,
+  "oldTestClassTimeoutRootCauseProven": false,
+  "executedTimingWrapper": {
+    "sha256": "391319c7ae2cda075f08f412218942dcd7268548639b86bd5e484df4794d4436",
+    "source": "from pathlib import Path\nimport datetime,json,os,runpy,shlex,subprocess,sys,time\n\np=Path(__file__).resolve().parent;repo=p.parent/'r18-r26-f142-validation/source';private=p/'private';root=private/'sample-new'\nruntime=p.parent/'context-validation/runtime';os.umask(0o077);sys.dont_write_bytecode=True\nos.environ['POSTGRES_BIN']=str(runtime/'pg/usr/lib/postgresql/18/bin')\nos.environ['LD_LIBRARY_PATH']=str(runtime/'pg/usr/lib/x86_64-linux-gnu')\nos.environ['PYTHONDONTWRITEBYTECODE']='1'\nmetadata=json.loads((p/'extraction-verification.json').read_text())\nentry=[str(private/'nonempty.py'),str(root)]\nmetadata['entryArgv']=['python3',*entry];metadata['wrapperArgv']=sys.argv[:]\nmetadata['observation']='Transparent subprocess.run timings only: no argument/result/exception changes; no SQL text, row bodies, passwords or data hashes recorded.'\noldrun=subprocess.run\ndef timed_run(args,*a,**kw):\n    name=Path(str(args[0])).name\n    operation='version' if '--version' in args else None\n    if name=='pg_ctl':operation=next((x for x in args if x in ['start','stop','status']),None)\n    if name=='psql' and '-c' in args:\n        query=args[args.index('-c')+1]\n        operation=next((label for prefix,label in [('CREATE TABLE','fixture_table'),('INSERT INTO','fixture_insert'),('COPY','copy'),('SELECT count(*)','count'),('SELECT 1','connection_control'),('CREATE DATABASE','create_database')] if query.startswith(prefix)),'other')\n    started=time.monotonic();result=None;error=None\n    try:\n        result=oldrun(args,*a,**kw);return result\n    except BaseException as e:error=type(e).__name__;raise\n    finally:\n        env=kw.get('env',{})\n        event={'command':name,'operation':operation,'seconds':time.monotonic()-started,'exit':None if result is None else result.returncode,'errorType':error,'subprocessTimeout':kw.get('timeout'),'pgOptions':env.get('PGOPTIONS'),'connectTimeout':env.get('PGCONNECT_TIMEOUT'),'utc':datetime.datetime.now(datetime.timezone.utc).isoformat()}\n        if '-D' in args:event['dataDirectory']=str(args[args.index('-D')+1])\n        if result is not None and operation=='version':event['version']=result.stdout.decode().strip() if isinstance(result.stdout,bytes) else str(result.stdout).strip()\n        with (p/'child-events.jsonl').open('a') as f:f.write(json.dumps(event)+'\\n')\nos.chdir(repo);sys.argv=entry\nstarted=time.monotonic();code=1\ntry:\n    subprocess.run=timed_run\n    runpy.run_path(entry[0],run_name='__main__')\nexcept SystemExit as e:code=e.code if isinstance(e.code,int) else 1\nexcept BaseException as e:metadata['outerErrorType']=type(e).__name__\nfinally:\n    subprocess.run=oldrun\n    metadata.update(exit=code,seconds=time.monotonic()-started)\n    pid=root/'postgres/postmaster.pid';metadata['postmasterPidAbsent']=not pid.exists()\n    options=root/'postgres/postmaster.opts'\n    if options.exists():\n        args=shlex.split(options.read_text())\n        metadata['tcpDisabled']=args[args.index('-h')+1]==''\n        metadata['socketDirectoryRemoved']=not Path(args[args.index('-k')+1]).exists()\n    metadata['cleanAfter']=not subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],cwd=repo,text=True).strip()\n    evidence=root/'nonempty-evidence.json'\n    metadata['driverEvidenceExists']=evidence.exists()\n    if evidence.exists():metadata['driverEvidence']=json.loads(evidence.read_text())\n    metadata['extractedCodeUnchanged']=(private/'nonempty.py').read_text()==(private/'R18-R26-timeout-next-step.md').read_text().split('```python\\n')[-1].split('\\n```')[0]\n    (p/'execution-result.json').write_text(json.dumps(metadata,indent=2))\nprint(json.dumps({'exit':code,'seconds':metadata['seconds'],'pidAbsent':metadata['postmasterPidAbsent'],'socketDirectoryRemoved':metadata.get('socketDirectoryRemoved'),'cleanAfter':metadata['cleanAfter'],'evidenceExists':metadata['driverEvidenceExists']}))\nraise SystemExit(code)\n"
+  }
+}
