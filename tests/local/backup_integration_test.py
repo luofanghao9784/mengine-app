@@ -36,7 +36,7 @@ class RealBackupTest(unittest.TestCase):
         with backup.offline_database(self.source, True) as (run, args, sql):
             sql('CREATE TABLE flyway_schema_history(installed_rank integer PRIMARY KEY,version varchar(50),description varchar(200),type varchar(20),script varchar(1000),checksum integer,installed_by varchar(100),installed_on timestamptz DEFAULT now(),execution_time integer,success boolean)')
             for number, migration in enumerate(backup.migrations(), 1):
-                path = trial.WORKSPACE / 'apps/api/src/main/resources/db/migration' / migration['script']
+                path = next(path for path in trial.api_migration_files() if path.name == migration['script'])
                 run([backup.pg('psql'), '-X', *args, '-v', 'ON_ERROR_STOP=1', '-f', str(path)])
                 sql(f"INSERT INTO flyway_schema_history(installed_rank,version,script,success) VALUES({number},'{migration['version']}','{migration['script']}',true)")
             self.seed(sql)
