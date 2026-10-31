@@ -54,4 +54,4 @@ export function useOpenedCapabilities(scope: string, enabled = true): OpenedCapa
 export const openedCapabilitiesFailureTitle = (error: unknown) =>
   error instanceof IdentityError && error.status === 404
     ? '暂时不能查看已开通功能'
-    : '暂时不能查看已开通功能（后台开通中）';
+    : '暂时无法读取已开通功能，请稍后重试';
