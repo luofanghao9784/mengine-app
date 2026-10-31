@@ -1,0 +1,69 @@
+{
+  "head": "d79e27a89dcc237b4fa881523581cf877551f1c6",
+  "events": [
+    {
+      "time": "2026-10-31T02:58:34.747Z",
+      "input": {
+        "materialText": "问题：恢复真实请求后的最终核对"
+      },
+      "status": 201,
+      "response": {
+        "taskId": "137161ff-ea3f-4159-8792-31b818074582",
+        "status": "COMPLETED",
+        "result": {
+          "verdict": "ISSUES_FOUND",
+          "issues": [
+            {
+              "message": "恢复真实请求后的最终核对"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "clicks": [
+    {
+      "trusted": true,
+      "time": 804401.7000000002,
+      "disabled": false
+    },
+    {
+      "trusted": true,
+      "time": 804600.5999999996,
+      "disabled": false
+    },
+    {
+      "type": "click",
+      "trusted": true,
+      "time": 804603,
+      "disabled": false
+    },
+    {
+      "trusted": true,
+      "time": 804700.7000000002,
+      "disabled": true
+    },
+    {
+      "trusted": true,
+      "time": 804800.9000000004,
+      "disabled": true
+    }
+  ],
+  "viewport": [
+    1440,
+    900
+  ],
+  "result": "恢复真实请求后的最终核对",
+  "disabled": false,
+  "note": "5 real mouse clicks via mounted cloud shell xdotool repeat=5 delay=100ms; real POST response held in browser 4 seconds",
+  "db": {
+    "taskId": "137161ff-ea3f-4159-8792-31b818074582",
+    "rowCount": 1,
+    "status": "COMPLETED"
+  },
+  "limitations": [
+    "shell sent 5 mouse clicks 100ms apart; recorder observed 4 trusted pointerdown events and 1 trusted click",
+    "initial slow remote clicks are excluded from this rapid burst",
+    "response delay is browser controlled; underlying POST and DB insert are real"
+  ]
+}
