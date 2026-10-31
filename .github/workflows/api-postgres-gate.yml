@@ -2,25 +2,12 @@
 # 命令与 package.json 的 test:api 相同：scripts/with-test-postgres.py 自己 initdb/start/stop。
 # 不使用服务容器里的常驻 Postgres，也不跑 model:smoke、test:model-smoke、test:ppt:live
 # 或任何需要真实模型密钥的步骤。
-# CT-030：on.pull_request 只有 paths。未命中正向路径则 skipped。
+# main PR 始终运行实际门禁，避免必需检查因 paths 过滤缺失。
 name: API · Postgres gate
 
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'apps/api/**'
-      - 'scripts/with-test-postgres.py'
-      - 'scripts/local/**'
-      - '.github/workflows/api-postgres-gate.yml'
-      - 'apps/api/pom.xml'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'engine/package.json'
-      - 'engine/package-lock.json'
-      - '!docs/**'
-      - '!*.md'
-      - '!**/*.md'
 
 # contents:read 供 checkout；actions:write 供 setup-java 的 Maven 缓存与 setup-node 的 npm 缓存。
 # 显式 permissions 会覆盖默认令牌权限，少了 actions:write 时缓存步骤会 403 并挡住门禁。
