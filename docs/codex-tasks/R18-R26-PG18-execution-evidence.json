@@ -1,0 +1,769 @@
+{
+  "head": "f142c9d6b871ebedac133569fc51cb961bbd940f",
+  "parent": "d34525c31d0a90c7429d626963153b53d6b5b214",
+  "tree": "c30bfa8a7779b71cee3cd8516c04acfbd63fa941",
+  "cleanAfter": true,
+  "runtime": "PostgreSQL18.6, existing authorized cloud CLI; no desktop/preview/local Mac use",
+  "execution": {
+    "head": "f142c9d6b871ebedac133569fc51cb961bbd940f",
+    "tree": "c30bfa8a7779b71cee3cd8516c04acfbd63fa941",
+    "cleanBefore": true,
+    "entryArgv": [
+      "python3",
+      "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-f142-validation/source/docs/codex-tasks/R18-R26-profile-facts.py",
+      "--expected-head",
+      "f142c9d6b871ebedac133569fc51cb961bbd940f",
+      "--root",
+      "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-f142-validation/owned-synthetic/sample-001",
+      "--max-tables",
+      "8",
+      "--seconds",
+      "30"
+    ],
+    "wrapperArgv": [
+      "r18-r26-f142-validation/execute-probe.py"
+    ],
+    "cwd": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-f142-validation/source",
+    "syntheticOnly": true,
+    "activationAllowed": false,
+    "instrumentation": "Read-only subprocess timing wrapper; forwards original arguments/results/exceptions. Records command basename/operation, not SQL text or secrets.",
+    "exit": 0,
+    "seconds": 5.627907340996899,
+    "cleanupChecks": {
+      "synthetic-source": {
+        "directoryExists": true,
+        "postmasterPidExists": false,
+        "pgCtlStatusExit": 3,
+        "pgCtlStatusOutput": "pg_ctl: no server running\n"
+      },
+      "synthetic-restored": {
+        "directoryExists": true,
+        "postmasterPidExists": false,
+        "pgCtlStatusExit": 3,
+        "pgCtlStatusOutput": "pg_ctl: no server running\n"
+      }
+    },
+    "cleanAfter": true
+  },
+  "rawSanitizedProfile": [
+    {
+      "activationAllowed": false,
+      "head": "f142c9d6b871ebedac133569fc51cb961bbd940f",
+      "phase": "identity",
+      "synthetic": true
+    },
+    {
+      "ok": true,
+      "phase": "probe_initdb",
+      "seconds": 0.006972384006076027
+    },
+    {
+      "ok": true,
+      "phase": "probe_pg_ctl",
+      "seconds": 0.0012220040007377975
+    },
+    {
+      "ok": true,
+      "phase": "probe_psql",
+      "seconds": 0.0054618440044578165
+    },
+    {
+      "ok": true,
+      "phase": "probe_pg_dump",
+      "seconds": 0.0064582329941913486
+    },
+    {
+      "ok": true,
+      "phase": "probe_pg_restore",
+      "seconds": 0.005621325995889492
+    },
+    {
+      "ok": true,
+      "phase": "migrations",
+      "seconds": 1.0171665450034197
+    },
+    {
+      "ok": true,
+      "phase": "pg_dump",
+      "seconds": 0.26510670100105926
+    },
+    {
+      "ok": true,
+      "phase": "pg_restore",
+      "seconds": 1.1222262020019116
+    },
+    {
+      "ok": true,
+      "phase": "migration_history",
+      "seconds": 0.03677917000459274,
+      "table": null
+    },
+    {
+      "ok": true,
+      "phase": "table_list",
+      "seconds": 0.03215255599934608,
+      "table": null
+    },
+    {
+      "ok": true,
+      "phase": "table_copy",
+      "seconds": 0.032267563001369126,
+      "table": "accounts"
+    },
+    {
+      "ok": true,
+      "phase": "table_count",
+      "rows": 0,
+      "seconds": 0.03219263500068337,
+      "table": "accounts"
+    },
+    {
+      "ok": true,
+      "phase": "table_copy",
+      "seconds": 0.03223297299700789,
+      "table": "adjustment_task_dependencies"
+    },
+    {
+      "ok": true,
+      "phase": "table_count",
+      "rows": 0,
+      "seconds": 0.03220243099349318,
+      "table": "adjustment_task_dependencies"
+    },
+    {
+      "ok": true,
+      "phase": "table_copy",
+      "seconds": 0.03232613299769582,
+      "table": "agent_attempt_usage"
+    },
+    {
+      "ok": true,
+      "phase": "table_count",
+      "rows": 0,
+      "seconds": 0.03232024300086778,
+      "table": "agent_attempt_usage"
+    },
+    {
+      "ok": true,
+      "phase": "table_copy",
+      "seconds": 0.032355764000385534,
+      "table": "agent_model_requests"
+    },
+    {
+      "ok": true,
+      "phase": "table_count",
+      "rows": 0,
+      "seconds": 0.03230441400228301,
+      "table": "agent_model_requests"
+    },
+    {
+      "ok": true,
+      "phase": "table_copy",
+      "seconds": 0.032195046995184384,
+      "table": "agent_platform_accounts"
+    },
+    {
+      "ok": true,
+      "phase": "table_count",
+      "rows": 0,
+      "seconds": 0.0320432179942145,
+      "table": "agent_platform_accounts"
+    },
+    {
+      "ok": true,
+      "phase": "table_copy",
+      "seconds": 0.032238926003628876,
+      "table": "agent_platform_sessions"
+    },
+    {
+      "ok": true,
+      "phase": "table_count",
+      "rows": 0,
+      "seconds": 0.03219587999774376,
+      "table": "agent_platform_sessions"
+    },
+    {
+      "ok": true,
+      "phase": "table_copy",
+      "seconds": 0.03225164399918867,
+      "table": "analysis_computation_receipts"
+    },
+    {
+      "ok": true,
+      "phase": "table_count",
+      "rows": 0,
+      "seconds": 0.032108610997966025,
+      "table": "analysis_computation_receipts"
+    },
+    {
+      "ok": true,
+      "phase": "table_copy",
+      "seconds": 0.03224039600172546,
+      "table": "analysis_material_observations"
+    },
+    {
+      "ok": true,
+      "phase": "table_count",
+      "rows": 0,
+      "seconds": 0.03223129300022265,
+      "table": "analysis_material_observations"
+    },
+    {
+      "activationAllowed": false,
+      "completedTables": 8,
+      "fullIntegrityVerified": false,
+      "phase": "bounded_sample_end",
+      "seconds": 0.5859388780008885
+    },
+    {
+      "phase": "clusters_stopped",
+      "sourcePidAbsent": true,
+      "targetPidAbsent": true
+    }
+  ],
+  "childProcessEvents": [
+    {
+      "command": "git",
+      "operation": null,
+      "dataDirectory": null,
+      "seconds": 0.0018298950017197058,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:12.831997+00:00"
+    },
+    {
+      "command": "git",
+      "operation": null,
+      "dataDirectory": null,
+      "seconds": 0.008599032000347506,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:12.840846+00:00"
+    },
+    {
+      "command": "initdb",
+      "operation": "version",
+      "dataDirectory": null,
+      "seconds": 0.006623952998779714,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:12.848182+00:00"
+    },
+    {
+      "command": "pg_ctl",
+      "operation": "version",
+      "dataDirectory": null,
+      "seconds": 0.0010239900002488866,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:12.849557+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "version",
+      "dataDirectory": null,
+      "seconds": 0.005225095999776386,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:12.855035+00:00"
+    },
+    {
+      "command": "pg_dump",
+      "operation": "version",
+      "dataDirectory": null,
+      "seconds": 0.006229884995264001,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:12.861496+00:00"
+    },
+    {
+      "command": "pg_restore",
+      "operation": "version",
+      "dataDirectory": null,
+      "seconds": 0.005393496001488529,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:12.867146+00:00"
+    },
+    {
+      "command": "initdb",
+      "operation": null,
+      "dataDirectory": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-f142-validation/owned-synthetic/sample-001/synthetic-source/postgres",
+      "seconds": 0.6153091160012991,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:13.483750+00:00"
+    },
+    {
+      "command": "pg_ctl",
+      "operation": "start",
+      "dataDirectory": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-f142-validation/owned-synthetic/sample-001/synthetic-source/postgres",
+      "seconds": 0.1142643329949351,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:13.598449+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "other-sql",
+      "dataDirectory": null,
+      "seconds": 0.11412549600208877,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:13.712828+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "other-sql",
+      "dataDirectory": null,
+      "seconds": 0.023057537000568118,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:13.736147+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "migration-files",
+      "dataDirectory": null,
+      "seconds": 1.0165465930040227,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:14.754627+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "other-sql",
+      "dataDirectory": null,
+      "seconds": 0.021224137999524828,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:14.776736+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "other-sql",
+      "dataDirectory": null,
+      "seconds": 0.02203931500116596,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:14.799064+00:00"
+    },
+    {
+      "command": "pg_dump",
+      "operation": null,
+      "dataDirectory": null,
+      "seconds": 0.2647822750004707,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:15.071898+00:00"
+    },
+    {
+      "command": "pg_ctl",
+      "operation": "stop",
+      "dataDirectory": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-f142-validation/owned-synthetic/sample-001/synthetic-source/postgres",
+      "seconds": 0.21451797999907285,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:15.286835+00:00"
+    },
+    {
+      "command": "initdb",
+      "operation": null,
+      "dataDirectory": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-f142-validation/owned-synthetic/sample-001/synthetic-restored/postgres",
+      "seconds": 0.9664064680036972,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:16.254165+00:00"
+    },
+    {
+      "command": "pg_ctl",
+      "operation": "start",
+      "dataDirectory": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-f142-validation/owned-synthetic/sample-001/synthetic-restored/postgres",
+      "seconds": 0.11414405999676092,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:16.368744+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "other-sql",
+      "dataDirectory": null,
+      "seconds": 0.11423171299975365,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:16.483256+00:00"
+    },
+    {
+      "command": "pg_restore",
+      "operation": null,
+      "dataDirectory": null,
+      "seconds": 1.121868303998781,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:17.605429+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "other-sql",
+      "dataDirectory": null,
+      "seconds": 0.03196389200456906,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:17.638186+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "other-sql",
+      "dataDirectory": null,
+      "seconds": 0.0317981839980348,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:17.674818+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "copy",
+      "dataDirectory": null,
+      "seconds": 0.031834071000048425,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:17.707292+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "count",
+      "dataDirectory": null,
+      "seconds": 0.03181493999727536,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:17.739595+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "copy",
+      "dataDirectory": null,
+      "seconds": 0.03186827999888919,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:17.771864+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "count",
+      "dataDirectory": null,
+      "seconds": 0.03180690999579383,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:17.804086+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "copy",
+      "dataDirectory": null,
+      "seconds": 0.03193497499887599,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:17.836474+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "count",
+      "dataDirectory": null,
+      "seconds": 0.031928844000503886,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:17.868827+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "copy",
+      "dataDirectory": null,
+      "seconds": 0.03192863000003854,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:17.901224+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "count",
+      "dataDirectory": null,
+      "seconds": 0.03190993099997286,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:17.933567+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "copy",
+      "dataDirectory": null,
+      "seconds": 0.03185699800087605,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:17.965853+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "count",
+      "dataDirectory": null,
+      "seconds": 0.03171829900384182,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:17.997934+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "copy",
+      "dataDirectory": null,
+      "seconds": 0.03185350900457706,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:18.030168+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "count",
+      "dataDirectory": null,
+      "seconds": 0.03182033300254261,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:18.062399+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "copy",
+      "dataDirectory": null,
+      "seconds": 0.03188301699992735,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:18.094731+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "count",
+      "dataDirectory": null,
+      "seconds": 0.03177543399942806,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:18.126881+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "copy",
+      "dataDirectory": null,
+      "seconds": 0.03181182000116678,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:18.159088+00:00"
+    },
+    {
+      "command": "psql",
+      "operation": "count",
+      "dataDirectory": null,
+      "seconds": 0.03188553200016031,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:18.191433+00:00"
+    },
+    {
+      "command": "pg_ctl",
+      "operation": "stop",
+      "dataDirectory": "/data/.openmausbot/task-workspaces/5d214d51-f70a-4414-a47a-2875fe562364/dc3deb62-952c-4ef5-b8f2-03d18a6b87b7/r18-r26-f142-validation/owned-synthetic/sample-001/synthetic-restored/postgres",
+      "seconds": 0.21436543799791252,
+      "exit": 0,
+      "errorType": null,
+      "utc": "2026-10-31T05:13:18.406187+00:00"
+    }
+  ],
+  "tableSamples": [
+    {
+      "table": "accounts",
+      "copySeconds": 0.032267563001369126,
+      "countSeconds": 0.03219263500068337,
+      "rows": 0
+    },
+    {
+      "table": "adjustment_task_dependencies",
+      "copySeconds": 0.03223297299700789,
+      "countSeconds": 0.03220243099349318,
+      "rows": 0
+    },
+    {
+      "table": "agent_attempt_usage",
+      "copySeconds": 0.03232613299769582,
+      "countSeconds": 0.03232024300086778,
+      "rows": 0
+    },
+    {
+      "table": "agent_model_requests",
+      "copySeconds": 0.032355764000385534,
+      "countSeconds": 0.03230441400228301,
+      "rows": 0
+    },
+    {
+      "table": "agent_platform_accounts",
+      "copySeconds": 0.032195046995184384,
+      "countSeconds": 0.0320432179942145,
+      "rows": 0
+    },
+    {
+      "table": "agent_platform_sessions",
+      "copySeconds": 0.032238926003628876,
+      "countSeconds": 0.03219587999774376,
+      "rows": 0
+    },
+    {
+      "table": "analysis_computation_receipts",
+      "copySeconds": 0.03225164399918867,
+      "countSeconds": 0.032108610997966025,
+      "rows": 0
+    },
+    {
+      "table": "analysis_material_observations",
+      "copySeconds": 0.03224039600172546,
+      "countSeconds": 0.03223129300022265,
+      "rows": 0
+    }
+  ],
+  "liveSQLNegativeChecks": {
+    "head": "f142c9d6b871ebedac133569fc51cb961bbd940f",
+    "seconds": 0.38368745600018883,
+    "checks": [
+      {
+        "mode": "actual_profile_observer_budget_expired",
+        "seconds": 0.06081430599442683,
+        "realPGChild": {
+          "exit": 1,
+          "seconds": 0.017656358002568595,
+          "sqlState42703": true
+        },
+        "originalExceptionIdentityPreserved": true,
+        "caughtType": "CalledProcessError",
+        "partialFactsReturned": false,
+        "normalBudgetCompletion": false,
+        "observerEvents": [
+          {
+            "phase": "migration_history",
+            "table": null,
+            "seconds": 0.023865266994107515,
+            "ok": true
+          },
+          {
+            "phase": "table_list",
+            "table": null,
+            "seconds": 0.01885850599501282,
+            "ok": true
+          },
+          {
+            "phase": "table_copy",
+            "table": "accounts",
+            "seconds": 0.01789526300126454,
+            "ok": false,
+            "errorType": "CalledProcessError"
+          }
+        ],
+        "copyAttempts": 1,
+        "countCalls": 0
+      },
+      {
+        "mode": "observer_raises_at_sql_failure",
+        "seconds": 0.05786943699786207,
+        "realPGChild": {
+          "exit": 1,
+          "seconds": 0.016562618999159895,
+          "sqlState42703": true
+        },
+        "originalExceptionIdentityPreserved": true,
+        "caughtType": "CalledProcessError",
+        "partialFactsReturned": false,
+        "normalBudgetCompletion": false,
+        "observerEvents": [
+          {
+            "phase": "migration_history",
+            "table": null,
+            "seconds": 0.022154448997753207,
+            "ok": true
+          },
+          {
+            "phase": "table_list",
+            "table": null,
+            "seconds": 0.01883880700188456,
+            "ok": true
+          },
+          {
+            "phase": "table_copy",
+            "table": "accounts",
+            "seconds": 0.01679357099783374,
+            "ok": false,
+            "errorType": "CalledProcessError"
+          }
+        ],
+        "copyAttempts": 1,
+        "countCalls": 0
+      }
+    ],
+    "cleanup": {
+      "postmasterPidExists": false,
+      "pgCtlStatusExit": 3,
+      "pgCtlStatusOutput": "pg_ctl: no server running\n"
+    },
+    "manifestEligibleTableCount": 297,
+    "lastSampledTable": "analysis_material_observations",
+    "nextUnmeasuredOperation": {
+      "phase": "table_copy",
+      "table": "analysis_material_versions"
+    },
+    "actualObserverSourceSHA256": "bd3c8441eb34f289761e618b24563f093181bb7a7e8da386280e2b2951703387",
+    "scope": "Two intentional real SQL failures in this run-owned synthetic restored target, no migration/dump/restore repeat. Budget expiry is controlled injection; source observer body extracted unchanged from fixed SHA. No full integrity or activation claim."
+  },
+  "finalCleanup": {
+    "synthetic-source": {
+      "systemIdentifier": "7702695679450386645",
+      "pgControlDataExit": 0,
+      "pidAbsent": true,
+      "pgCtlStatusExit": 3,
+      "pgCtlStatusOutput": "pg_ctl: no server running\n",
+      "tcpDisabled": true,
+      "privateSocketDirectoryRemoved": true,
+      "directoryMode": "0o700",
+      "databaseConfigMode": "0o600"
+    },
+    "synthetic-restored": {
+      "systemIdentifier": "7702695689955213564",
+      "pgControlDataExit": 0,
+      "pidAbsent": true,
+      "pgCtlStatusExit": 3,
+      "pgCtlStatusOutput": "pg_ctl: no server running\n",
+      "tcpDisabled": true,
+      "privateSocketDirectoryRemoved": true,
+      "directoryMode": "0o700",
+      "databaseConfigMode": "0o600"
+    },
+    "evidencePermissions": {
+      "profile.jsonl": "0o600",
+      "sql-private-errors.log": "0o600",
+      "synthetic.dump": "0o600"
+    }
+  },
+  "fullRestoreAccepted": false,
+  "fullIntegrityVerified": false,
+  "activationAllowed": false,
+  "coverageChanged": false,
+  "authorityScope": "Synthetic newly created source/target only; no application, workers, signing bundle, restore/create/reconcile/activate entrypoint or existing database accessed.",
+  "harnessCorrection": {
+    "initialHarnessExit": 1,
+    "reason": "The QA harness incorrectly required psql -c SQL errors to exit 3. Real SQLSTATE42703 was recorded; actual psql exit was nonzero. No product failure conclusion assigned.",
+    "correctedHarnessExit": 0,
+    "criterion": "Real child exit !=0 plus SQLSTATE42703; same exception object propagated, no COUNT or partial return.",
+    "repeatScope": "Only the two intended SQL-error contract checks; no migration/dump/restore repeat."
+  },
+  "executedHelperSources": {
+    "execute-probe.py": {
+      "sha256": "5c0f1c15b6d85ee631991a6e254f1ac514016d6d59dc8dc10a147c836e56ab88",
+      "content": "from pathlib import Path\nimport datetime,json,os,runpy,subprocess,sys,time\n\np=Path(__file__).resolve().parent;repo=p/'source';runtime=p.parent/'context-validation/runtime'\nos.umask(0o077)\nowned=p/'owned-synthetic';owned.mkdir(mode=0o700,exist_ok=False)\nos.environ['POSTGRES_BIN']=str(runtime/'pg/usr/lib/postgresql/18/bin')\nos.environ['LD_LIBRARY_PATH']=str(runtime/'pg/usr/lib/x86_64-linux-gnu')\nos.environ['PYTHONDONTWRITEBYTECODE']='1'\nsys.dont_write_bytecode=True\nhead=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip()\ntree=subprocess.check_output(['git','rev-parse','HEAD^{tree}'],cwd=repo,text=True).strip()\nstatus=subprocess.check_output(['git','status','--porcelain'],cwd=repo,text=True)\nassert head=='f142c9d6b871ebedac133569fc51cb961bbd940f' and not status\nargv=[str(repo/'docs/codex-tasks/R18-R26-profile-facts.py'),'--expected-head',head,'--root',str(owned/'sample-001'),'--max-tables','8','--seconds','30']\nmetadata={'head':head,'tree':tree,'cleanBefore':not status,'entryArgv':['python3',*argv],'wrapperArgv':sys.argv[:],'cwd':str(repo),'syntheticOnly':True,'activationAllowed':False,'instrumentation':'Read-only subprocess timing wrapper; forwards original arguments/results/exceptions. Records command basename/operation, not SQL text or secrets.'}\n(p/'execution-metadata.json').write_text(json.dumps(metadata,indent=2))\noriginal_run=subprocess.run\n\ndef measured_run(args,*positional,**kwargs):\n    name=Path(str(args[0])).name if isinstance(args,(list,tuple)) else 'shell'\n    operation=None\n    if name=='pg_ctl':operation=next((x for x in args if x in ['start','stop','status']),None)\n    if name=='psql':\n        if '-f' in args:operation='migration-files'\n        elif '-c' in args:\n            query=args[args.index('-c')+1]\n            operation='copy' if query.startswith('COPY') else 'count' if query.startswith('SELECT count(*)') else 'other-sql'\n    if '--version' in args:operation='version'\n    data_directory=None\n    if '-D' in args:data_directory=str(args[args.index('-D')+1])\n    start=time.monotonic();result=None;error=None\n    try:\n        result=original_run(args,*positional,**kwargs);return result\n    except BaseException as exc:\n        error=type(exc).__name__;raise\n    finally:\n        event={'command':name,'operation':operation,'dataDirectory':data_directory,'seconds':time.monotonic()-start,'exit':None if result is None else result.returncode,'errorType':error,'utc':datetime.datetime.now(datetime.timezone.utc).isoformat()}\n        with (p/'child-process-events.jsonl').open('a') as f:f.write(json.dumps(event)+'\\n')\n\nsubprocess.run=measured_run\nsys.argv=argv\nstarted=time.monotonic();code=1\ntry:\n    runpy.run_path(argv[0],run_name='__main__')\nexcept SystemExit as result:\n    code=result.code if isinstance(result.code,int) else 1\nfinally:\n    subprocess.run=original_run\n    metadata.update(exit=code,seconds=time.monotonic()-started)\n    checks={}\n    for name in ['synthetic-source','synthetic-restored']:\n        root=owned/'sample-001'/name\n        pidfile=root/'postgres/postmaster.pid'\n        command=[os.environ['POSTGRES_BIN']+'/pg_ctl','-D',str(root/'postgres'),'status']\n        result=original_run(command,env=os.environ.copy(),capture_output=True,text=True)\n        checks[name]={'directoryExists':root.is_dir(),'postmasterPidExists':pidfile.exists(),'pgCtlStatusExit':result.returncode,'pgCtlStatusOutput':result.stdout+result.stderr}\n    metadata['cleanupChecks']=checks\n    metadata['cleanAfter']=not subprocess.check_output(['git','status','--porcelain'],cwd=repo,text=True).strip()\n    (p/'execution-result.json').write_text(json.dumps(metadata,indent=2))\nprint(json.dumps({'exit':code,'seconds':metadata['seconds'],'cleanupChecks':checks}))\nraise SystemExit(code)\n"
+    },
+    "live-sql-failure-check.py": {
+      "sha256": "a048a955bfb501972215bd644accadffa7d999f21e9b362dc2447b1092596156",
+      "content": "from pathlib import Path\nimport ast,copy,hashlib,json,os,subprocess,sys,time,types\n\np=Path(__file__).resolve().parent;repo=p/'source';runtime=p.parent/'context-validation/runtime'\nos.umask(0o077);sys.dont_write_bytecode=True\nos.environ['POSTGRES_BIN']=str(runtime/'pg/usr/lib/postgresql/18/bin')\nos.environ['LD_LIBRARY_PATH']=str(runtime/'pg/usr/lib/x86_64-linux-gnu')\nsys.path.insert(0,str(repo/'scripts/local'))\nimport backup,trial\nassert subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip()=='f142c9d6b871ebedac133569fc51cb961bbd940f'\ntarget=p/'owned-synthetic/sample-001/synthetic-restored'\nassert not (target/'postgres/postmaster.pid').exists()\nprofile=repo/'docs/codex-tasks/R18-R26-profile-facts.py'\nsyntax=ast.parse(profile.read_text())\nobserve_node=next(x for x in ast.walk(syntax) if isinstance(x,ast.FunctionDef) and x.name=='observe')\nfactory=ast.parse('''def make_observe(events):\n    completed=0\n    profile_started=time.monotonic()\n    args=types.SimpleNamespace(max_tables=8,seconds=30)\n    def emit(event):events.append(event)\n    def expire():\n        nonlocal profile_started\n        profile_started=time.monotonic()-31\n    return observe,expire\n''')\nfactory.body[0].body.insert(-1,copy.deepcopy(observe_node))\nast.fix_missing_locations(factory)\nclass SampleComplete(Exception):pass\nclass ObserverBudgetStop(Exception):pass\nscope={'time':time,'types':types,'SampleComplete':SampleComplete}\nexec(compile(factory,str(profile)+'::actual_observe','exec'),scope)\nstarted=time.monotonic();results=[];all_tables=[]\nwith backup.offline_database(target) as (run,connection,sql):\n    all_tables=[x for x in sql(\"SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename\").splitlines() if x not in backup.TRANSIENT]\n    # Only inspect this invocation's new synthetic target; no existing trial or production DB.\n    for mode in ['actual_profile_observer_budget_expired','observer_raises_at_sql_failure']:\n        events=[];counts={'copyAttempts':0,'countCalls':0};original=[None];child_info={}\n        actual_observe,expire=scope['make_observe'](events)\n        def adapter(query,fingerprint=False):\n            if query.startswith('SELECT count(*)'):counts['countCalls']+=1\n            if fingerprint:\n                counts['copyAttempts']+=1\n                expire() # Exercise the fixed observer with its 30s budget already elapsed.\n                failing_query='COPY (SELECT r18_r26_intentionally_missing_column FROM public.accounts) TO STDOUT'\n                env={**trial.clean_environment(),'PGPASSWORD':trial.private_read(target/'database.json')['password'],'PGCONNECT_TIMEOUT':'3','PGOPTIONS':'-c statement_timeout=3500'}\n                command=[backup.pg('psql'),'-X',*connection,'-qAt','-v','ON_ERROR_STOP=1','-v','VERBOSITY=sqlstate','-c',failing_query]\n                child_started=time.monotonic()\n                result=subprocess.run(command,env=env,capture_output=True,timeout=5)\n                private=p/(mode+'-private-stderr.log');private.write_bytes(result.stderr);private.chmod(0o600)\n                child_info.update(exit=result.returncode,seconds=time.monotonic()-child_started,sqlState42703=b'42703' in result.stderr)\n                try:result.check_returncode()\n                except subprocess.CalledProcessError as error:\n                    original[0]=error;raise\n                raise AssertionError('The real PostgreSQL error was not raised')\n            return sql(query,fingerprint)\n        def adversarial_observe(event):\n            events.append(event)\n            if not event['ok']:raise ObserverBudgetStop()\n        case_started=time.monotonic();caught=None;partial_return=False\n        try:\n            backup.facts(adapter,actual_observe if mode.startswith('actual_') else adversarial_observe)\n            partial_return=True\n        except BaseException as error:caught=error\n        result={'mode':mode,'seconds':time.monotonic()-case_started,'realPGChild':child_info,'originalExceptionIdentityPreserved':caught is original[0] and original[0] is not None,'caughtType':type(caught).__name__,'partialFactsReturned':partial_return,'normalBudgetCompletion':isinstance(caught,SampleComplete),'observerEvents':events,**counts}\n        (p/(mode+'-result.json')).write_text(json.dumps(result,indent=2))\n        assert child_info['exit']!=0 and child_info['sqlState42703']\n        assert result['originalExceptionIdentityPreserved'] and not partial_return and not result['normalBudgetCompletion']\n        assert counts=={'copyAttempts':1,'countCalls':0} and events[-1]['ok'] is False\n        results.append(result)\nstatus=subprocess.run([backup.pg('pg_ctl'),'-D',str(target/'postgres'),'status'],env=trial.clean_environment(),capture_output=True,text=True)\ncleanup={'postmasterPidExists':(target/'postgres/postmaster.pid').exists(),'pgCtlStatusExit':status.returncode,'pgCtlStatusOutput':status.stdout+status.stderr}\nassert not cleanup['postmasterPidExists'] and cleanup['pgCtlStatusExit']==3\nevents=[json.loads(x) for x in (p/'owned-synthetic/sample-001/profile.jsonl').read_text().splitlines()]\nlast=next(e for e in reversed(events) if e['phase']=='table_count')\nnext_table=all_tables[all_tables.index(last['table'])+1] if all_tables.index(last['table'])+1<len(all_tables) else None\nreport={'head':'f142c9d6b871ebedac133569fc51cb961bbd940f','seconds':time.monotonic()-started,'checks':results,'cleanup':cleanup,'manifestEligibleTableCount':len(all_tables),'lastSampledTable':last['table'],'nextUnmeasuredOperation':{'phase':'table_copy','table':next_table},'actualObserverSourceSHA256':hashlib.sha256(ast.get_source_segment(profile.read_text(),observe_node).encode()).hexdigest(),'scope':'Two intentional real SQL failures in this run-owned synthetic restored target, no migration/dump/restore repeat. Budget expiry is controlled injection; source observer body extracted unchanged from fixed SHA. No full integrity or activation claim.'}\n(p/'live-sql-failure-result.json').write_text(json.dumps(report,indent=2))\nprint(json.dumps(report))\n"
+    }
+  }
+}
