@@ -28,7 +28,7 @@ class SafetyTests(unittest.TestCase):
 
     def test_reject_dispatch_import_bypass_budget_and_concurrency(self):
         for key, value in [("dispatchEnabled", True), ("historicalImportEnabled", True),
-                           ("infrastructureMonthlyLimitUSD", 201), ("maxDevelopmentSlots", 3)]:
+                           ("infrastructureMonthlyLimitUSD", 51), ("maxDevelopmentSlots", 3)]:
             with self.subTest(key=key), self.assertRaises(AssertionError):
                 seed.validate({**self.plan, key: value})
         self.plan["adapterConfig"]["dangerouslyBypassApprovalsAndSandbox"] = True

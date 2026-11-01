@@ -1,0 +1,26 @@
+{
+  "base_with_reserve": {
+    "subtotal_cents": 3380,
+    "tax_cents": 0,
+    "reserve_cents": 1620,
+    "total_cents": 5000,
+    "remaining_cents": 0,
+    "within_limit": true
+  },
+  "twenty_percent_tax_scenario": {
+    "subtotal_cents": 3380,
+    "tax_cents": 676,
+    "reserve_cents": 944,
+    "total_cents": 5000,
+    "remaining_cents": 0,
+    "within_limit": true
+  },
+  "one_cent_excess_rejected": {
+    "subtotal_cents": 3380,
+    "tax_cents": 0,
+    "reserve_cents": 1621,
+    "total_cents": 5001,
+    "remaining_cents": -1,
+    "within_limit": false
+  }
+}

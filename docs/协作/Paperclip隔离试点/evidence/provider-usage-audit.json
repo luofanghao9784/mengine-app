@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "companyId": "5923bae1-b181-40f6-b060-e772fef05b8e",
+  "kind": "provider_reported_usage_not_invoice",
+  "subscription": "user_ChatGPT_subscription",
+  "incrementalMeteredApiUSD": null,
+  "subscriptionInvoiceAllocationUSD": null,
+  "totals": {
+    "inputTokens": 118621,
+    "cachedInputTokens": 763392,
+    "outputTokens": 12379
+  },
+  "runs": [
+    {
+      "runId": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+      "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+      "status": "succeeded",
+      "startedAt": "2026-11-01T07:03:01.417Z",
+      "finishedAt": "2026-11-01T07:03:38.681Z",
+      "sessionId": "01a195eb-3cec-7613-91d4-ae13d7f0228a",
+      "binding": "persisted_session_id",
+      "sourceSha256": "6794e1fd0f7bcc7c45b7a6fd8ca901690d258d986c88260e1be91e857b4bc3ab",
+      "storedUsageMatches": false,
+      "pendingBefore": false,
+      "usage": {
+        "inputTokens": 22527,
+        "cachedInputTokens": 84992,
+        "outputTokens": 536
+      },
+      "providerInputTokens": 107519,
+      "reasoningOutputTokens": 62,
+      "model": "gpt-6-astra",
+      "providerResponses": 5,
+      "terminal": "task_complete",
+      "rootTurnId": "01a195eb-3dfa-7c41-a3dc-7e3bbe1127a8"
+    },
+    {
+      "runId": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+      "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+      "status": "succeeded",
+      "startedAt": "2026-11-01T07:03:39.017Z",
+      "finishedAt": "2026-11-01T07:03:59.852Z",
+      "sessionId": "01a195eb-3cec-7613-91d4-ae13d7f0228a",
+      "binding": "persisted_session_id",
+      "sourceSha256": "6794e1fd0f7bcc7c45b7a6fd8ca901690d258d986c88260e1be91e857b4bc3ab",
+      "storedUsageMatches": false,
+      "pendingBefore": false,
+      "usage": {
+        "inputTokens": 11172,
+        "cachedInputTokens": 85888,
+        "outputTokens": 709
+      },
+      "providerInputTokens": 97060,
+      "reasoningOutputTokens": 20,
+      "model": "gpt-6-astra",
+      "providerResponses": 3,
+      "terminal": "task_complete",
+      "rootTurnId": "01a195eb-ca97-7000-83b6-d2be4bc07bc9"
+    },
+    {
+      "runId": "5e3f624a-a984-4f99-bafe-9d26994aa5d3",
+      "status": "cancelled",
+      "notStarted": true
+    },
+    {
+      "runId": "c95c00f0-3617-4e95-b048-76d87d2961ae",
+      "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+      "status": "cancelled",
+      "startedAt": "2026-11-01T07:08:09.294Z",
+      "finishedAt": "2026-11-01T07:09:01.109Z",
+      "sessionId": "01a195ef-e677-7223-a294-1f4170226ea8",
+      "binding": "exact_run_stdout_thread_started",
+      "sourceSha256": "dd8eb4ff0187868b54839cae4fc9d018e2350431c482ae688b1616bf1fba7913",
+      "storedUsageMatches": false,
+      "pendingBefore": true,
+      "usage": {
+        "inputTokens": 11407,
+        "cachedInputTokens": 80000,
+        "outputTokens": 2706
+      },
+      "providerInputTokens": 91407,
+      "reasoningOutputTokens": 23,
+      "model": "gpt-6-astra",
+      "providerResponses": 4,
+      "terminal": "turn_aborted",
+      "rootTurnId": "01a195ef-e70b-7fb0-813c-d98dff307a2a"
+    },
+    {
+      "runId": "16fb118f-47ea-4e5a-b9b5-45ba9dc03f65",
+      "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+      "status": "cancelled",
+      "startedAt": "2026-11-01T07:14:58.292Z",
+      "finishedAt": "2026-11-01T07:15:33.390Z",
+      "sessionId": "01a195f6-2c92-7c52-bb61-34cdffce9f6c",
+      "binding": "persisted_session_id",
+      "sourceSha256": "50b40251246bfa7f0a387378d1f3805deea9bedb752bdda8ae7251c06dcb342d",
+      "storedUsageMatches": false,
+      "pendingBefore": true,
+      "usage": {
+        "inputTokens": 8699,
+        "cachedInputTokens": 88704,
+        "outputTokens": 988
+      },
+      "providerInputTokens": 97403,
+      "reasoningOutputTokens": 13,
+      "model": "gpt-6-astra",
+      "providerResponses": 5,
+      "terminal": "turn_aborted",
+      "rootTurnId": "01a195f6-2d54-78d0-a1c4-e5aa5f84aef1"
+    },
+    {
+      "runId": "e4d6e730-5389-43d6-975d-69699a1417fe",
+      "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+      "status": "cancelled",
+      "startedAt": "2026-11-01T07:21:00.704Z",
+      "finishedAt": "2026-11-01T07:21:35.954Z",
+      "sessionId": "01a195fb-b3de-7fe3-8123-01a5f8d7d84f",
+      "binding": "persisted_session_id",
+      "sourceSha256": "13bf3f57fa3d0026fdfad335504457ea9edf1366e8a3fbd7140c12ad70d1edca",
+      "storedUsageMatches": false,
+      "pendingBefore": true,
+      "usage": {
+        "inputTokens": 21952,
+        "cachedInputTokens": 85504,
+        "outputTokens": 1146
+      },
+      "providerInputTokens": 107456,
+      "reasoningOutputTokens": 59,
+      "model": "gpt-6-astra",
+      "providerResponses": 5,
+      "terminal": "turn_aborted",
+      "rootTurnId": "01a195fb-b4b9-7340-b2e4-e0644b748f4d"
+    },
+    {
+      "runId": "a469f457-bc86-4ed4-adb4-4def64780d12",
+      "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+      "status": "succeeded",
+      "startedAt": "2026-11-01T07:21:36.949Z",
+      "finishedAt": "2026-11-01T07:22:19.639Z",
+      "sessionId": "01a195fc-389b-77e0-be4d-1e188f5b1d3b",
+      "binding": "persisted_session_id",
+      "sourceSha256": "09dcc5d97063040a478c0ed2577ef7808967cdd077abf71e9d0a6a8b2f41874d",
+      "storedUsageMatches": true,
+      "pendingBefore": false,
+      "usage": {
+        "inputTokens": 20923,
+        "cachedInputTokens": 106112,
+        "outputTokens": 1765
+      },
+      "providerInputTokens": 127035,
+      "reasoningOutputTokens": 0,
+      "model": "gpt-6-astra",
+      "providerResponses": 6,
+      "terminal": "task_complete",
+      "rootTurnId": "01a195fc-390f-7590-9c02-17b063ec5c27"
+    },
+    {
+      "runId": "0c023b1d-f9c6-40b7-b51d-56445ebeae62",
+      "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+      "status": "cancelled",
+      "startedAt": "2026-11-01T07:22:12.810Z",
+      "finishedAt": "2026-11-01T07:23:07.331Z",
+      "sessionId": "01a195fc-c4ba-7b41-ac07-1160864b891d",
+      "binding": "persisted_session_id",
+      "sourceSha256": "6512315d5b7dda5f3cf4b0ec0ab9ed2d92627cd245fb7b772d325bb496177e5c",
+      "storedUsageMatches": false,
+      "pendingBefore": true,
+      "usage": {
+        "inputTokens": 10412,
+        "cachedInputTokens": 112512,
+        "outputTokens": 2559
+      },
+      "providerInputTokens": 122924,
+      "reasoningOutputTokens": 12,
+      "model": "gpt-6-astra",
+      "providerResponses": 6,
+      "terminal": "turn_aborted",
+      "rootTurnId": "01a195fc-c531-7f92-970a-0593a7ba9997"
+    },
+    {
+      "runId": "7e65124d-487e-425f-8046-905969c5d92a",
+      "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+      "status": "succeeded",
+      "startedAt": "2026-11-01T07:23:16.921Z",
+      "finishedAt": "2026-11-01T07:24:10.922Z",
+      "sessionId": "01a195fd-bf0c-7db2-a0a4-a150c33664b1",
+      "binding": "persisted_session_id",
+      "sourceSha256": "994fd83621284f029245ff7739e2431a4f09a205dde00d358867047cb54e4fdc",
+      "storedUsageMatches": true,
+      "pendingBefore": false,
+      "usage": {
+        "inputTokens": 11529,
+        "cachedInputTokens": 119680,
+        "outputTokens": 1970
+      },
+      "providerInputTokens": 131209,
+      "reasoningOutputTokens": 8,
+      "model": "gpt-6-astra",
+      "providerResponses": 6,
+      "terminal": "task_complete",
+      "rootTurnId": "01a195fd-bf77-70b3-ab90-2890fd6b338a"
+    }
+  ]
+}

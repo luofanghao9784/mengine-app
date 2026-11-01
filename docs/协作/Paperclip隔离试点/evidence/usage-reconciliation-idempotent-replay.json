@@ -1,0 +1,25 @@
+{
+  "mode": "apply",
+  "companyId": "5923bae1-b181-40f6-b060-e772fef05b8e",
+  "planned": [],
+  "ledgerTotals": {
+    "inputTokens": 118621,
+    "cachedInputTokens": 763392,
+    "outputTokens": 12379
+  },
+  "providerTotals": {
+    "inputTokens": 118621,
+    "cachedInputTokens": 763392,
+    "outputTokens": 12379
+  },
+  "pendingRuns": 0,
+  "eventsBefore": 10,
+  "eventsAfter": 10,
+  "receiptsBefore": 30,
+  "receiptsAfter": 30,
+  "tasksUnchanged": true,
+  "runStatusesUnchanged": true,
+  "originalSettledEventsUnchanged": true,
+  "subscriptionInvoiceAllocationUSD": null,
+  "incrementalApiInvoiceUSD": null
+}

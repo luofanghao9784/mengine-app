@@ -10,7 +10,7 @@
   "dispatchEnabled": false,
   "historicalImportEnabled": false,
   "maxDevelopmentSlots": 2,
-  "infrastructureMonthlyLimitUSD": 200,
+  "infrastructureMonthlyLimitUSD": 50,
   "modelBudgetStatus": "SUBSCRIPTION_AUTHORIZED_FOR_BOUNDED_PILOT_ONLY",
   "roles": [
     {

@@ -17,7 +17,7 @@ class NoRedirect(HTTPRedirectHandler):
 def validate(plan):
     assert plan["dispatchEnabled"] is False
     assert plan["historicalImportEnabled"] is False
-    assert plan["infrastructureMonthlyLimitUSD"] <= 200
+    assert plan["infrastructureMonthlyLimitUSD"] <= 50
     assert plan["maxDevelopmentSlots"] <= 2
     assert plan["upstream"]["version"] == "2026.1023.0"
     assert plan["adapterConfig"]["engine"] == "cli", "ACP does not enforce this CLI profile contract"

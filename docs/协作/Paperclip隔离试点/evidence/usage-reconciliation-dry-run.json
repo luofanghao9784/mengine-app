@@ -1,0 +1,80 @@
+{
+  "mode": "dry-run",
+  "companyId": "5923bae1-b181-40f6-b060-e772fef05b8e",
+  "planned": [
+    {
+      "runId": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+      "action": "append_usage_delta_preserve_settled_receipt",
+      "usage": {
+        "inputTokens": 22058,
+        "cachedInputTokens": 62080,
+        "outputTokens": 422
+      }
+    },
+    {
+      "runId": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+      "action": "append_usage_delta_preserve_settled_receipt",
+      "usage": {
+        "inputTokens": 8906,
+        "cachedInputTokens": 53376,
+        "outputTokens": 634
+      }
+    },
+    {
+      "runId": "c95c00f0-3617-4e95-b048-76d87d2961ae",
+      "action": "native_receipt_and_finalize",
+      "usage": {
+        "inputTokens": 11407,
+        "cachedInputTokens": 80000,
+        "outputTokens": 2706
+      }
+    },
+    {
+      "runId": "16fb118f-47ea-4e5a-b9b5-45ba9dc03f65",
+      "action": "native_receipt_and_finalize",
+      "usage": {
+        "inputTokens": 8699,
+        "cachedInputTokens": 88704,
+        "outputTokens": 988
+      }
+    },
+    {
+      "runId": "e4d6e730-5389-43d6-975d-69699a1417fe",
+      "action": "native_receipt_and_finalize",
+      "usage": {
+        "inputTokens": 21952,
+        "cachedInputTokens": 85504,
+        "outputTokens": 1146
+      }
+    },
+    {
+      "runId": "0c023b1d-f9c6-40b7-b51d-56445ebeae62",
+      "action": "native_receipt_and_finalize",
+      "usage": {
+        "inputTokens": 10412,
+        "cachedInputTokens": 112512,
+        "outputTokens": 2559
+      }
+    }
+  ],
+  "ledgerTotals": {
+    "inputTokens": 35187,
+    "cachedInputTokens": 281216,
+    "outputTokens": 3924
+  },
+  "providerTotals": {
+    "inputTokens": 118621,
+    "cachedInputTokens": 763392,
+    "outputTokens": 12379
+  },
+  "pendingRuns": 4,
+  "eventsBefore": 4,
+  "eventsAfter": 4,
+  "receiptsBefore": 26,
+  "receiptsAfter": 26,
+  "tasksUnchanged": true,
+  "runStatusesUnchanged": true,
+  "originalSettledEventsUnchanged": true,
+  "subscriptionInvoiceAllocationUSD": null,
+  "incrementalApiInvoiceUSD": null
+}

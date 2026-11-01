@@ -1,0 +1,24 @@
+{
+  "/costs/summary": {
+    "companyId": "5923bae1-b181-40f6-b060-e772fef05b8e",
+    "eventCount": 10,
+    "unpricedEventCount": 0,
+    "unknownBillingEventCount": 0,
+    "estimatedEventCount": 0,
+    "pendingRunCount": 0,
+    "pricingComplete": true,
+    "spendCents": 0,
+    "spendCentsExact": "0.0000000",
+    "budgetCents": 0,
+    "utilizationPercent": 0
+  },
+  "/accounting/health": {
+    "companyId": "5923bae1-b181-40f6-b060-e772fef05b8e",
+    "pendingRunCount": 0,
+    "unpricedEventCount": 0,
+    "oldestPendingAt": null,
+    "pendingCancellationCount": 0,
+    "heldReservationCents": "0.0000000",
+    "items": []
+  }
+}
