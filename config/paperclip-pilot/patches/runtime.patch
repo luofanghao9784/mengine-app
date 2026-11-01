@@ -1,0 +1,38 @@
+--- a/server/dist/services/recovery/service.js
++++ b/server/dist/services/recovery/service.js
+@@ -2942 +2942,2 @@
+-            .where(and(isNull(issues.assigneeUserId), inArray(issues.status, ["todo", "in_progress", "in_review"]), or(sql `${issues.assigneeAgentId} is not null`, eq(issues.status, "in_review")), opts?.issueCreatedAtGte
++            .where(and(isNull(issues.assigneeUserId),
++          sql`exists (select 1 from ${companies} where ${companies.id} = ${issues.companyId} and ${companies.status} = 'active')`, inArray(issues.status, ["todo", "in_progress", "in_review"]), or(sql `${issues.assigneeAgentId} is not null`, eq(issues.status, "in_review")), opts?.issueCreatedAtGte
+@@ -3417,0 +3419,31 @@
++                // A first review wake may lose the race with executor lease cleanup.
++                // Recover only the still-current pending stage, with existing queue,
++                // access, budget and execution-admission gates intact.
++                if (!participantLatestRun && agentInvokable) {
++                    if (await hasQueuedIssueWake(issue.companyId, issue.id, participantAgentId) ||
++                        await isInvocationBudgetBlocked(issue, participantAgentId)) {
++                        result.skipped += 1;
++                        continue;
++                    }
++                    const queued = await enqueueStrandedIssueRecovery({
++                        issueId: issue.id,
++                        agentId: participantAgentId,
++                        reason: EXECUTION_REVIEW_PARTICIPANT_RECOVERY_REASON,
++                        retryReason: EXECUTION_REVIEW_PARTICIPANT_RECOVERY_REASON,
++                        source: "issue.initial_execution_review_recovery",
++                        retryOfRunId: null,
++                        extraContext: {
++                            currentStageId: pendingExecutionState.currentStageId,
++                            currentStageType: pendingExecutionState.currentStageType,
++                            reviewRecoveryInstruction: "The initial reviewer wake did not start. Execute only this pending independent review; do not edit source or bypass its decision."
++                        }
++                    });
++                    if (queued) {
++                        result.reviewParticipantRequeued += 1;
++                        result.issueIds.push(issue.id);
++                    } else {
++                        result.skipped += 1;
++                    }
++                    continue;
++                }
++

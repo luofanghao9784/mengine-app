@@ -1,0 +1,72 @@
+[
+  {
+    "id": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+    "identifier": "MEN-5",
+    "title": "[PILOT-100] A 整数成本门禁",
+    "status": "done",
+    "executionState": {
+      "status": "completed",
+      "monitor": null,
+      "reviewRequest": null,
+      "currentStageId": null,
+      "lastDecisionId": "6693af49-ad6b-4a5c-91af-906537e21164",
+      "returnAssignee": {
+        "type": "agent",
+        "userId": null,
+        "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5"
+      },
+      "currentStageType": null,
+      "completedStageIds": [
+        "01d803c0-842b-4103-89ca-438be1e89e39"
+      ],
+      "currentStageIndex": null,
+      "currentParticipant": null,
+      "lastDecisionOutcome": "approved",
+      "changesRequestedCount": 0
+    },
+    "assigneeAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+    "qaComments": [
+      {
+        "id": "65fbfb79-3d03-4e8b-b255-048341d70908",
+        "authorAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+        "createdAt": "2026-11-01T07:22:12.758Z",
+        "body": "Independent QA approved MEN-5. Read budget.py and test_budget.py; no edits. Executed /Library/Developer/CommandLineTools/usr/bin/python3 -B -m unittest discover -v: all 11 tests passed. Additional inline probes against the actual module passed 19 valid/boundary cases and 30 invalid cases, covering bool rejection, negatives, malformed containers/labels/costs/limits, empty input, zero, exact/exceeded caps, and arbitrary-size integer precision. Verified exactly six result fields and correct types/arithmetic, input immutability, and silent import/calls. Source and AST inspection confirmed no imports, external I/O, dependencies, float arithmetic, or CLI side effects. Independent QA gate satisfied for this task; no successor work performed."
+      }
+    ]
+  },
+  {
+    "id": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+    "identifier": "MEN-6",
+    "title": "[PILOT-100] B 税费与预留成本接续",
+    "status": "done",
+    "executionState": {
+      "status": "completed",
+      "monitor": null,
+      "reviewRequest": null,
+      "currentStageId": null,
+      "lastDecisionId": "296bfde1-3c8b-4580-b11d-1f156daa9a7b",
+      "returnAssignee": {
+        "type": "agent",
+        "userId": null,
+        "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5"
+      },
+      "currentStageType": null,
+      "completedStageIds": [
+        "96b080ee-12e6-45b3-ae07-cd2f7a7cf6fe"
+      ],
+      "currentStageIndex": null,
+      "currentParticipant": null,
+      "lastDecisionOutcome": "approved",
+      "changesRequestedCount": 0
+    },
+    "assigneeAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+    "qaComments": [
+      {
+        "id": "137bbe47-018b-47d9-b964-94b846dc3a21",
+        "authorAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+        "createdAt": "2026-11-01T07:24:02.453Z",
+        "body": "Independent QA accepted MEN-6 after reading budget.py and test_budget.py and executing checks against the actual module. Full suite: /Library/Developer/CommandLineTools/usr/bin/python3 -B -m unittest discover -v — 18 tests passed. Additional inline probes passed: 2,341 boundary combinations using fractions.Fraction plus math.ceil as an independent tax oracle, 36 invalid-input probes (including booleans and negatives for costs/limit/tax/reserve), and 4 empty-input/reserve probes. Verified keyword-only zero defaults, exact six keys and types, integer precision, rounding at one-cent boundaries, zero subtotal, exact/exceeded limits including combined tax/reserve, and input immutability. Source inspection found no external I/O or side effects. No files edited. Historical test preservation is supported by the 11 baseline cases currently present and the executor record; no historical diff was accessed. Paperclip skill read was sandbox-denied; followed the explicit pilot API instructions. This is independent executed QA evidence, not reliance on the executor summary."
+      }
+    ]
+  }
+]

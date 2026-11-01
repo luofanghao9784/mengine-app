@@ -1,0 +1,187 @@
+{
+  "companyId": "5923bae1-b181-40f6-b060-e772fef05b8e",
+  "status": "INCOMPLETE",
+  "tasks": [
+    {
+      "id": "e78c69c5-7586-4c95-8ffa-05230a9c2315",
+      "identifier": "MEN-1",
+      "title": "[PILOT-100] A 整数成本门禁"
+    },
+    {
+      "id": "9ac97273-540e-46b6-bc02-d2ddccd709be",
+      "identifier": "MEN-2",
+      "title": "[PILOT-100] B 税费与预留成本接续"
+    }
+  ],
+  "observations": [
+    {
+      "at": 1793516581.4750211,
+      "tasks": [
+        {
+          "id": "e78c69c5-7586-4c95-8ffa-05230a9c2315",
+          "status": "todo",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        },
+        {
+          "id": "9ac97273-540e-46b6-bc02-d2ddccd709be",
+          "status": "todo",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        }
+      ],
+      "runs": [
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "running",
+          "errorCode": null
+        }
+      ]
+    },
+    {
+      "at": 1793516584.526916,
+      "tasks": [
+        {
+          "id": "e78c69c5-7586-4c95-8ffa-05230a9c2315",
+          "status": "in_progress",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        },
+        {
+          "id": "9ac97273-540e-46b6-bc02-d2ddccd709be",
+          "status": "todo",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        }
+      ],
+      "runs": [
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "running",
+          "errorCode": null
+        }
+      ]
+    },
+    {
+      "at": 1793516621.14728,
+      "tasks": [
+        {
+          "id": "e78c69c5-7586-4c95-8ffa-05230a9c2315",
+          "status": "in_progress",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        },
+        {
+          "id": "9ac97273-540e-46b6-bc02-d2ddccd709be",
+          "status": "todo",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        }
+      ],
+      "runs": [
+        {
+          "id": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "running",
+          "errorCode": null
+        },
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ]
+    },
+    {
+      "at": 1793516642.505334,
+      "tasks": [
+        {
+          "id": "e78c69c5-7586-4c95-8ffa-05230a9c2315",
+          "status": "in_progress",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        },
+        {
+          "id": "9ac97273-540e-46b6-bc02-d2ddccd709be",
+          "status": "todo",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        }
+      ],
+      "runs": [
+        {
+          "id": "5e3f624a-a984-4f99-bafe-9d26994aa5d3",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "scheduled_retry",
+          "errorCode": null
+        },
+        {
+          "id": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ]
+    },
+    {
+      "at": 1793516654.73667,
+      "tasks": [
+        {
+          "id": "e78c69c5-7586-4c95-8ffa-05230a9c2315",
+          "status": "in_progress",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        },
+        {
+          "id": "9ac97273-540e-46b6-bc02-d2ddccd709be",
+          "status": "todo",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        }
+      ],
+      "runs": [
+        {
+          "id": "5e3f624a-a984-4f99-bafe-9d26994aa5d3",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "cancelled"
+        },
+        {
+          "id": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ]
+    }
+  ],
+  "historicalTasksImported": false,
+  "cloudOrProductionWrites": false,
+  "modelAuth": "USER_AUTHORIZED_ISOLATED_CHATGPT_SUBSCRIPTION",
+  "initialRunId": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+  "cleanup": [
+    {
+      "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+      "pausedAndCredentialsDetached": true
+    },
+    {
+      "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+      "pausedAndCredentialsDetached": true
+    }
+  ]
+}

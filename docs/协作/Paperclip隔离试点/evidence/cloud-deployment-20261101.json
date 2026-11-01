@@ -1,0 +1,102 @@
+{
+  "cloud-verification": {
+    "checkedAtUtc": "2026-11-01T09:58:42.377426+00:00",
+    "publicUrl": "https://209.97.160.86",
+    "bootIdChanged": true,
+    "services": {
+      "paperclip": "active",
+      "postgresql@18-main": "active",
+      "nginx": "active"
+    },
+    "timers": {
+      "paperclip-cert-renew.timer": {
+        "enabled": "enabled",
+        "active": "active"
+      },
+      "paperclip-backup.timer": {
+        "enabled": "enabled",
+        "active": "active"
+      }
+    },
+    "companyRoles": {
+      "count": 19,
+      "paused": 19
+    },
+    "activeRuns": 0,
+    "historicalTasksImported": 0,
+    "skuCompanyPreserved": true,
+    "humanAdministrators": 1,
+    "signupDisabled": true,
+    "schedulerDisabled": true,
+    "loopbackOnly": true,
+    "controllerEnvHardeningLoadedAfterReboot": true,
+    "nativeBackupFiles": 4,
+    "pairedPrivateFileArchives": 2
+  },
+  "recovery-test": {
+    "status": "PASS",
+    "engine": "pg_dump",
+    "scope": "SAME_HOST_NEW_DATABASE_EXPORTED_SNAPSHOT",
+    "tablesCompared": 277,
+    "allRowsMatch": true,
+    "snapshotConsistentDuringConcurrentActivity": true,
+    "sourceDatabaseOverwritten": false,
+    "restoreDatabase": "paperclip_restore_f438731dddf9",
+    "restoreDatabaseAttachedToService": false,
+    "archiveSha256": "a4db38003025089f1ca9dea09c701af0348fa4f4afd1fc1ae1c57e59f733892d",
+    "archivePublished": false,
+    "crossHostRecovery": "NOT_TESTED"
+  },
+  "company-bootstrap-result": {
+    "status": "PASS",
+    "companyId": "e451d586-1290-4e6c-8a51-ce76bfe79519",
+    "companyName": "梦擎 MENGINE",
+    "companyPrefix": "MEN",
+    "roles": 19,
+    "allPaused": true,
+    "modelCredentialsAttached": false,
+    "historicalTasksImported": 0,
+    "otherCompanyCountPreserved": 1,
+    "existingCompaniesModified": false,
+    "temporaryOperatorKeyRevoked": true,
+    "revokedOperatorKeyRejected": true
+  },
+  "certificate": "issuer=C = US, O = Let's Encrypt, CN = YE2\nnotBefore=Nov  1 08:07:37 2026 GMT\nnotAfter=Nov  8 00:07:36 2026 GMT\nsha256 Fingerprint=43:94:FC:84:92:C6:99:FC:95:8E:00:27:AD:AE:17:51:FC:6B:15:C7:11:55:19:E5:D1:D7:33:6B:A2:AA:A2:8C\nX509v3 Subject Alternative Name: critical\n    IP Address:209.97.160.86",
+  "certificateRenewDryRunPassed": true,
+  "backupService": "Result=success\nExecMainStatus=0",
+  "externalHttps": {
+    "/api/health": 200,
+    "/api/companies": 403,
+    "emptySignupRequest": 400
+  },
+  "localTokenRemediation": {
+    "temporaryTokensRemoved": 2,
+    "oldSignerMatches": [
+      [
+        "PAPERCLIP_AGENT_JWT_SECRET"
+      ],
+      [
+        "PAPERCLIP_AGENT_JWT_SECRET"
+      ]
+    ],
+    "bothSigningKeysRotated": true,
+    "oldTokensMatchNewSigningKeys": false,
+    "localCompanyPaused": true,
+    "activeRuns": 0,
+    "cloudKeysUntouched": true,
+    "restartPending": false,
+    "health": "ok",
+    "oldBearerHttpStatuses": [
+      401,
+      401
+    ]
+  },
+  "controllerEnvCanaryTest": {
+    "status": "PASS",
+    "controllerSecretsRemoved": true,
+    "nonSecretsPreserved": true,
+    "sourceObjectUnchanged": true,
+    "explicitAgentBindingPreserved": true,
+    "modelInvoked": false
+  }
+}

@@ -1,0 +1,532 @@
+# Issue #100: separate pilot entry; original workflows remain owned by #67.
+# Public repository, standard GitHub-hosted runners; no model credentials.
+name: Paperclip pilot CI
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'config/paperclip-pilot/**'
+      - 'scripts/paperclip-pilot/**'
+      - 'docs/协作/Paperclip隔离试点/**'
+      - '.github/workflows/paperclip-pilot-ci.yml'
+permissions:
+  contents: read
+concurrency:
+  group: paperclip-pilot-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  pilot:
+    name: Paperclip · safety and usage accounting
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Safety and provider-usage audit regressions
+        run: python3 -m unittest discover -s scripts/paperclip-pilot -p 'test_*.py' -v
+      - name: Real coding sample regressions
+        run: python3 -m unittest discover -s scripts/paperclip-pilot/sample-budget -p 'test_*.py' -v
+      - name: Verify six gate job definitions exactly match existing workflows
+        run: python3 scripts/paperclip-pilot/verify_ci_jobs.py
+      - name: Render cloud scripts and check syntax without contacting a server
+        run: |
+          python3 scripts/paperclip-pilot/render_cloud.py --ipv4 203.0.113.10 --hostname approved-host --output "$RUNNER_TEMP/paperclip-cloud-render"
+          for file in "$RUNNER_TEMP/paperclip-cloud-render"/*.sh; do bash -n "$file"; done
+          for file in "$RUNNER_TEMP/paperclip-cloud-render"/*.mjs; do node --check "$file"; done
+          python3 -m compileall -q "$RUNNER_TEMP/paperclip-cloud-render"
+      - name: Check reconciliation module syntax
+        run: node --check scripts/paperclip-pilot/reconcile_usage.mjs
+  abc:
+    name: Paperclip · A build · B unit · C e2e frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node from .node-version
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Check Node matches .node-version
+        run: |
+          expected=$(tr -d '[:space:]' < .node-version)
+          expected=${expected#v}
+          actual=$(node -v)
+          echo "node-version file: ${expected}"
+          echo "node -v:           ${actual}"
+          echo "npm -v:            $(npm -v)"
+          [ "${actual}" = "v${expected}" ]
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: A · npm run build
+        run: npm run build
+
+      - name: B · npm test
+        run: npm test
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: C · npm run test:e2e:frontend
+        run: npm run test:e2e:frontend
+        env:
+          CI: "true"
+
+  contracts-engine:
+    name: Paperclip · contracts · engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node from .node-version
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            engine/package-lock.json
+
+      - name: Check Node matches .node-version
+        run: |
+          expected=$(tr -d '[:space:]' < .node-version)
+          expected=${expected#v}
+          actual=$(node -v)
+          echo "node-version file: ${expected}"
+          echo "node -v:           ${actual}"
+          echo "npm -v:            $(npm -v)"
+          [ "${actual}" = "v${expected}" ]
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install engine dependencies
+        run: npm ci --prefix engine
+
+      - name: test:contracts
+        run: npm run test:contracts
+
+      - name: test:engine
+        run: npm run test:engine
+
+  api:
+    # CT-004：按耗时分 4 片并行；每片超时仍为 90 分钟（不调大）。
+    # 慢类耗时据 run 40937260088：PlatformExperienceAdjustment 1589s、GeneralExperienceTaskContext 701s、
+    # PublicationFeedback 648s、FeedbackAdjustment 340s；GeneralExperiencePipeline 当次未跑完，耗时未知。
+    name: Paperclip · with-test-postgres · test:api (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [adjust, context, general, rest]
+    env:
+      CI: "true"
+      POSTGRES_BIN: /usr/lib/postgresql/18/bin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Temurin 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: apps/api/pom.xml
+
+      - name: Install PostgreSQL 18 and parser packages
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates
+          if ! apt-cache show postgresql-18 >/dev/null 2>&1; then
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+              https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            codename="$(awk -F= '$1=="VERSION_CODENAME" { print $2 }' /etc/os-release)"
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${codename}-pgdg main" \
+              | sudo tee /etc/apt/sources.list.d/pgdg.list
+            sudo apt-get update
+          fi
+          # bubblewrap 用发行版包，带上 Ubuntu 的 AppArmor profile。
+          # poppler-utils 提供 /usr/bin/{pdfinfo,pdftotext,pdftoppm}；tesseract-ocr 提供 /usr/bin/tesseract。
+          # 解析器实际读取的 chi_sim/eng 在下一步 setup.py 写入的 TESSDATA_PREFIX，不读发行版 tessdata。
+          sudo apt-get install -y \
+            postgresql-18 \
+            bubblewrap \
+            poppler-utils \
+            tesseract-ocr \
+            tesseract-ocr-eng \
+            tesseract-ocr-chi-sim \
+            python3-venv \
+            python3-pip \
+            dbus-user-session
+          test -x "${POSTGRES_BIN}/initdb"
+          test -x "${POSTGRES_BIN}/pg_ctl"
+          test -x "${POSTGRES_BIN}/psql"
+          "${POSTGRES_BIN}/initdb" --version
+          "${POSTGRES_BIN}/psql" --version
+          # 包脚本可能会拉起本机 5432 集群。测试脚本用独立数据目录和随机端口，这里停掉以免占内存。
+          if pg_lsclusters --no-header 2>/dev/null | grep -q '^18 .* online'; then
+            sudo pg_ctlcluster 18 main stop
+          fi
+          if [ -f /lib/systemd/system/postgresql.service ] || [ -f /usr/lib/systemd/system/postgresql.service ]; then
+            sudo systemctl disable --now postgresql.service
+          fi
+          test -x /usr/bin/bwrap
+          test -x /usr/bin/pdfinfo
+          test -x /usr/bin/pdftotext
+          test -x /usr/bin/pdftoppm
+          test -x /usr/bin/tesseract
+
+      - name: Enable systemd user manager for the parser
+        run: |
+          set -euo pipefail
+          # 与部署记录一致：普通用户 manager 默认没有 CPU delegation 时，linux_worker 会拒绝执行。
+          sudo mkdir -p /etc/systemd/system/user@.service.d
+          sudo tee /etc/systemd/system/user@.service.d/dreamcore-delegate.conf >/dev/null <<'EOF'
+          [Service]
+          Delegate=cpu cpuset io memory pids
+          EOF
+          sudo systemctl daemon-reload
+          sudo loginctl enable-linger "$(id -un)"
+          sudo systemctl restart "user@$(id -u).service"
+          runtime="/run/user/$(id -u)"
+          for _ in $(seq 1 50); do
+            if [ -S "${runtime}/bus" ]; then
+              break
+            fi
+            sleep 0.2
+          done
+          test -S "${runtime}/bus"
+          # Java 启动解析器前会清空环境。linux_sandbox.py 按 /run/user/$UID/bus 找用户总线，不依赖继承变量。
+          echo "XDG_RUNTIME_DIR=${runtime}" >> "${GITHUB_ENV}"
+          echo "DBUS_SESSION_BUS_ADDRESS=unix:path=${runtime}/bus" >> "${GITHUB_ENV}"
+          jobs="${HOME}/parser-jobs"
+          mkdir -p "${jobs}"
+          chmod 700 "${jobs}"
+          # 用户服务看不到 runner 的 PrivateTmp。把 Java 临时目录放到家目录，解析任务目录才能被 systemd-run 读到。
+          echo "JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=${jobs}" >> "${GITHUB_ENV}"
+          # 诊断 A：本步内 GITHUB_ENV 尚未生效，systemctl --user 需要当前 shell 里的总线变量。
+          export XDG_RUNTIME_DIR="${runtime}"
+          export DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime}/bus"
+          echo "===== dreamcore-delegate.conf ====="
+          cat -A /etc/systemd/system/user@.service.d/dreamcore-delegate.conf
+          if ! grep -qx '\[Service\]' /etc/systemd/system/user@.service.d/dreamcore-delegate.conf; then
+            echo "delegate drop-in is missing an exact [Service] line (indent or whitespace pollution)"
+            exit 1
+          fi
+          if ! grep -qx 'Delegate=cpu cpuset io memory pids' /etc/systemd/system/user@.service.d/dreamcore-delegate.conf; then
+            echo "delegate drop-in is missing an exact Delegate=cpu cpuset io memory pids line (indent or whitespace pollution)"
+            exit 1
+          fi
+          test -S "${runtime}/bus"
+          echo "user bus: ${runtime}/bus"
+          if ! manager_version="$(systemctl --user show -p Version --value)"; then
+            echo "systemctl --user cannot connect to the user manager"
+            exit 1
+          fi
+          echo "systemctl --user Version=${manager_version}"
+          dbus_service="$(systemctl --user is-active dbus.service || true)"
+          dbus_socket="$(systemctl --user is-active dbus.socket || true)"
+          echo "dbus.service=${dbus_service}"
+          echo "dbus.socket=${dbus_socket}"
+          if [ "${dbus_service}" != "active" ] && [ "${dbus_socket}" != "active" ]; then
+            echo "user bus unit is not active; need dbus.service or dbus.socket"
+            exit 1
+          fi
+          uid="$(id -u)"
+          cg_rel="$(systemctl show -p ControlGroup --value "user@${uid}.service" || true)"
+          echo "systemctl ControlGroup user@${uid}.service=${cg_rel:-<empty>}"
+          cg_path=""
+          if [ -n "${cg_rel}" ] && [ -f "/sys/fs/cgroup${cg_rel}/cgroup.controllers" ]; then
+            cg_path="/sys/fs/cgroup${cg_rel}"
+          else
+            fallback="/sys/fs/cgroup/user.slice/user-${uid}.slice/user@${uid}.service"
+            echo "fallback cgroup path: ${fallback}"
+            if [ -f "${fallback}/cgroup.controllers" ]; then
+              cg_path="${fallback}"
+            fi
+          fi
+          if [ -z "${cg_path}" ] || [ ! -f "${cg_path}/cgroup.controllers" ]; then
+            echo "could not read cgroup.controllers for user@${uid}.service"
+            find /sys/fs/cgroup/user.slice -name cgroup.controllers -print || true
+            exit 1
+          fi
+          echo "cgroup path: ${cg_path}"
+          echo "cgroup.controllers:"
+          cat "${cg_path}/cgroup.controllers"
+          echo
+          if [ -f "${cg_path}/cgroup.subtree_control" ]; then
+            echo "cgroup.subtree_control:"
+            cat "${cg_path}/cgroup.subtree_control"
+            echo
+          fi
+          controllers="$(cat "${cg_path}/cgroup.controllers")"
+          missing=""
+          for need in cpu memory; do
+            if ! printf '%s\n' "${controllers}" | grep -qw "${need}"; then
+              missing="${missing} ${need}"
+            fi
+          done
+          if [ -n "${missing}" ]; then
+            echo "user@${uid}.service cgroup.controllers is missing:${missing}"
+            exit 1
+          fi
+          echo "delegated controllers present: cpu memory"
+
+      - name: Install parser virtualenv and OCR data
+        run: python3 scripts/knowledge/setup.py
+
+      - name: Satisfy LocalTableCalculator sandbox-exec check
+        run: |
+          set -euo pipefail
+          # available() 只检查 /usr/bin/sandbox-exec 可执行。计算进程启动的是 sandbox.py；
+          # Linux 上 sandbox.py 走 linux_sandbox.py，不会执行这个文件。误调用时直接失败。
+          if [ ! -x /usr/bin/sandbox-exec ]; then
+            sudo tee /usr/bin/sandbox-exec >/dev/null <<'EOF'
+          #!/bin/sh
+          echo "sandbox-exec is macOS-only; Linux isolation is workers/parser/linux_sandbox.py" >&2
+          exit 127
+          EOF
+            sudo chmod 755 /usr/bin/sandbox-exec
+          fi
+          test -x /usr/bin/sandbox-exec
+          test -x workers/parser/.venv/bin/python
+          test -f workers/parser/.local/tessdata/chi_sim.traineddata
+          test -f workers/parser/.local/tessdata/eng.traineddata
+
+      # C1+C3：第二跑 errors 为 bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted。
+      # 只改本 workflow。C1 在该 sysctl 存在时必须写成 0；C3 用与 linux_worker 相同的 --unshare-all 触发 loopback。
+      - name: Relax userns and self-check bwrap loopback
+        run: |
+          set -euo pipefail
+          # C1. Ubuntu/GHA 上这条限制会让 bwrap 在新 netns 里配置 loopback 时收到 EPERM。
+          # key 不存在就提示并继续；存在则必须为 0，设不成即红。
+          userns_key=kernel.apparmor_restrict_unprivileged_userns
+          userns_proc="/proc/sys/${userns_key//./\/}"
+          if [ -e "${userns_proc}" ]; then
+            sudo sysctl -w "${userns_key}=0"
+            userns_value="$(sysctl -n "${userns_key}")"
+            echo "${userns_key}=${userns_value}"
+            if [ "${userns_value}" != "0" ]; then
+              echo "failed to set ${userns_key} to 0"
+              exit 1
+            fi
+          else
+            echo "${userns_key} is absent; continuing"
+          fi
+          # C3. 挂载与 workers/parser/linux_worker.py 一致，仍用 --unshare-all 触发 loopback。
+          bwrap_err="$(mktemp)"
+          bwrap_args=(
+            --unshare-all
+            --unshare-user
+            --unshare-cgroup
+            --die-with-parent
+            --new-session
+            --cap-drop ALL
+          )
+          for directory in /usr /lib /lib64; do
+            if [ -d "${directory}" ]; then
+              bwrap_args+=(--ro-bind "${directory}" "${directory}")
+            fi
+          done
+          if [ -e /etc/ld.so.cache ]; then
+            bwrap_args+=(--ro-bind /etc/ld.so.cache /etc/ld.so.cache)
+          fi
+          bwrap_args+=(--proc /proc --dev /dev /usr/bin/true)
+          if ! /usr/bin/bwrap "${bwrap_args[@]}" >/dev/null 2>"${bwrap_err}"; then
+            echo "===== bwrap stderr ====="
+            cat "${bwrap_err}"
+            echo "===== sysctl ====="
+            for key in kernel.apparmor_restrict_unprivileged_userns kernel.unprivileged_userns_clone; do
+              proc="/proc/sys/${key//./\/}"
+              if [ -r "${proc}" ]; then
+                echo "${key}=$(cat "${proc}")"
+              else
+                echo "${key}: absent"
+              fi
+            done
+            echo "===== apparmor ====="
+            if [ -r /sys/module/apparmor/parameters/enabled ]; then
+              echo -n "apparmor enabled="
+              cat /sys/module/apparmor/parameters/enabled
+            else
+              echo "apparmor enabled parameter: absent"
+            fi
+            if command -v aa-status >/dev/null 2>&1; then
+              aa-status || sudo aa-status || echo "aa-status failed"
+            else
+              echo "aa-status: not installed"
+            fi
+            exit 1
+          fi
+          echo "bwrap loopback self-check ok"
+
+      - name: Probe Linux parser sandbox
+        run: |
+          set -euo pipefail
+          set +e
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess, sys
+          root = pathlib.Path("workers/parser").resolve()
+          job = pathlib.Path.home() / "parser-jobs" / "probe"
+          job.mkdir(parents=True, mode=0o700)
+          (job / "input").write_text("梦核进度\n预算 00123.4500\n", encoding="utf-8")
+          os.chmod(job / "input", 0o400)
+          proc = subprocess.run(
+              [str(root / ".venv/bin/python"), "-I", "-B", str(root / "sandbox.py"), str(job), "txt"],
+              capture_output=True,
+              text=True,
+              env={"PATH": "/opt/homebrew/bin:/usr/bin:/bin"},
+          )
+          sys.stdout.write(proc.stdout)
+          sys.stderr.write(proc.stderr)
+          if proc.returncode != 0:
+              raise SystemExit(proc.returncode)
+          data = json.loads(proc.stdout)
+          chunks = data.get("chunks") or []
+          if data.get("status") != "READY" or not any("预算" in c.get("content", "") for c in chunks):
+              raise SystemExit("parser probe failed: " + json.dumps(data, ensure_ascii=False))
+          print("parser probe ok", data.get("parserVersion"))
+          PY
+          probe_status=$?
+          set -e
+          if [ "${probe_status}" -ne 0 ]; then
+            probe="${HOME}/parser-jobs/probe"
+            echo "===== ${probe}/errors ====="
+            if [ -f "${probe}/errors" ]; then
+              cat "${probe}/errors"
+            else
+              echo "missing: ${probe}/errors"
+            fi
+            echo "===== ${probe}/result ====="
+            if [ -f "${probe}/result" ]; then
+              cat "${probe}/result"
+            else
+              echo "missing: ${probe}/result"
+            fi
+            echo "===== journalctl --user (dreamcore-parser / systemd-run) ====="
+            journal_out="$(mktemp)"
+            journal_err="$(mktemp)"
+            if journalctl --user -n 200 --no-pager >"${journal_out}" 2>"${journal_err}"; then
+              if grep -E 'dreamcore-parser|systemd-run' "${journal_out}"; then
+                true
+              else
+                echo "journalctl --user succeeded but no lines matched dreamcore-parser or systemd-run"
+                echo "----- journalctl stderr -----"
+                cat "${journal_err}"
+                echo "----- last 40 user journal lines -----"
+                tail -n 40 "${journal_out}"
+              fi
+            else
+              echo "journalctl --user failed with exit $?"
+              echo "----- journalctl stderr -----"
+              cat "${journal_err}"
+              if [ -s "${journal_out}" ]; then
+                echo "----- journalctl stdout -----"
+                cat "${journal_out}"
+              fi
+            fi
+            exit "${probe_status}"
+          fi
+
+      # 供 NativeScheduleRules / Preflight。无 live/model。
+      # Node 读仓库根 .node-version（24.20.x），与 NATIVE_SCHEDULE_RULES_UNAVAILABLE 的要求一致。
+      # 不改 working-directory：checkout 后仓库根即可找到 engine/scripts/native-schedule-rules.mjs。
+      - name: Setup Node from .node-version
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: engine/package-lock.json
+
+      - name: Check Node matches .node-version
+        run: |
+          set -euo pipefail
+          # 供 NativeScheduleRules / Preflight。无 live/model。
+          expected=$(tr -d '[:space:]' < .node-version)
+          expected=${expected#v}
+          actual=$(node -v)
+          echo "node-version file: ${expected}"
+          echo "node -v:           ${actual}"
+          echo "npm -v:            $(npm -v)"
+          echo "node path:         $(command -v node)"
+          [ "${actual}" = "v${expected}" ]
+          case "${actual}" in
+            v24.20.*) ;;
+            *)
+              echo "NativeScheduleRules / Preflight requires Node 24.20.x"
+              exit 1
+              ;;
+          esac
+
+      # 供 NativeScheduleRules / Preflight：按锁文件安装 engine/node_modules。无 live/model。
+      - name: Install engine dependencies
+        run: |
+          set -euo pipefail
+          test -f engine/scripts/native-schedule-rules.mjs
+          npm --prefix engine ci
+          test -d engine/node_modules
+          test -d engine/node_modules/@deepseek-ai/dsh-schedule
+
+      # 供 NativeSchedules / Presentation / BriefingFaceAlignment 等测试使用本地引擎产物（engine/dist）；只构建，不连 live 模型。
+      - name: Build engine
+        run: |
+          set -euo pipefail
+          npm run build:engine
+          test -f engine/dist/runtime/agent-task.js || { echo "::error::engine/dist/runtime/agent-task.js missing after build:engine"; exit 1; }
+
+      # 分片清单只在这里定义一次；rest 片用排除法跑其余全部，保证每个测试类恰好落在一片。
+      - name: Resolve test shard
+        id: shard
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          adjust="PlatformExperienceAdjustmentIntegrationTest"
+          context="GeneralExperienceTaskContextIntegrationTest,PublicationFeedbackIntegrationTest"
+          general="GeneralExperiencePipelineIntegrationTest,GeneralExperienceLibraryIntegrationTest,GeneralExperienceSuggestionIntegrationTest,FeedbackAdjustmentIntegrationTest"
+          explicit="${adjust},${context},${general}"
+          # 校验：显式类不重复，且每个类在 apps/api/src/test 下恰有一个源文件。
+          dup=$(tr ',' '\n' <<<"${explicit}" | sort | uniq -d)
+          [ -z "${dup}" ] || { echo "::error::duplicate shard class: ${dup}"; exit 1; }
+          for c in $(tr ',' ' ' <<<"${explicit}"); do
+            n=$(find apps/api/src/test -name "${c}.java" | wc -l)
+            [ "${n}" -eq 1 ] || { echo "::error::${c}.java found ${n} times"; exit 1; }
+          done
+          case "${SHARD}" in
+            adjust)  filter="${adjust}" ;;
+            context) filter="${context}" ;;
+            general) filter="${general}" ;;
+            rest)    filter=$(tr ',' '\n' <<<"${explicit}" | sed 's/^/!/' | paste -sd, -) ;;
+            *) echo "::error::unknown shard ${SHARD}"; exit 1 ;;
+          esac
+          echo "shard ${SHARD}: -Dtest=${filter}"
+          echo "filter=${filter}" >> "$GITHUB_OUTPUT"
+
+      - name: test:api
+        env:
+          TEST_FILTER: ${{ steps.shard.outputs.filter }}
+        run: python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml "-Dtest=${TEST_FILTER}" package
+
+      - name: Upload surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-${{ matrix.shard }}
+          path: apps/api/target/surefire-reports/
+          if-no-files-found: warn
+          retention-days: 14

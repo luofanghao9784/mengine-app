@@ -1,0 +1,17 @@
+import hashlib, json
+from pathlib import Path
+base=Path('/opt/paperclip/runtime')
+manifest=json.loads(Path('/root/paperclip-install/controller-env-hardening.json').read_text())
+assert json.loads((base/'node_modules/paperclipai/package.json').read_text())['version']==manifest['runtimeVersion']
+p=base/manifest['file']
+raw=p.read_bytes();digest=hashlib.sha256(raw).hexdigest()
+if digest==manifest['afterSha256']:
+    print('Controller environment filter already patched')
+elif digest==manifest['beforeSha256']:
+    s=raw.decode();anchor=manifest['insertionAnchor'];assert s.count(anchor)==1
+    patched=s.replace(anchor,anchor+manifest['insertion']).encode()
+    assert hashlib.sha256(patched).hexdigest()==manifest['afterSha256']
+    p.write_bytes(patched)
+    print('Hash-pinned controller environment filter patched; restart required')
+else:
+    raise RuntimeError('Unknown runtime content; refusing to overwrite')

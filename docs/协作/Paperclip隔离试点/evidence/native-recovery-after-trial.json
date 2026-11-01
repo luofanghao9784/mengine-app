@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "observedAt": "2026-11-01T07:27:56.270Z",
+  "scope": "SAME_HOST_NEW_DATABASE_LOGICAL_RESTORE_ONLY",
+  "backupEngine": "pg_dump",
+  "tablesCompared": 277,
+  "sourceUnchanged": true,
+  "allRowsMatch": true,
+  "differences": [],
+  "restoredCompanyPaused": true,
+  "backupSha256": "16e8a21c644d463e124404c1f5059ab2ebecf45c5d5dd061ba31ceaa0c99ad3d",
+  "backupBytes": 352848,
+  "datasetFingerprintSha256": "45ec5bbc49f2ac139c6085da197f3a3d533ba3f94b1faf200844a768516dca8a",
+  "restoreAndCompareMs": 1530,
+  "sourceDatabase": "paperclip",
+  "isolatedRestoreDatabase": "mengine_recovery_f435a88e0f188670",
+  "backupArchivePublished": false,
+  "credentialsRestoredToLiveService": false,
+  "crossHostRecovery": "NOT_TESTED",
+  "crashDuringActiveModelRun": "NOT_TESTED",
+  "rpo": "NOT_ESTABLISHED"
+}

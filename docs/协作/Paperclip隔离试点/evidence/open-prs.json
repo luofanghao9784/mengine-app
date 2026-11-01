@@ -1,0 +1,600 @@
+[
+  {
+    "headRefName": "fix/resume-a-01-dependency-audit-96",
+    "headRefOid": "f5026fd0d047c2a5e6679b3bf37b8f4c2fcf344f",
+    "isDraft": true,
+    "number": 97,
+    "statusCheckRollup": [],
+    "title": "fix(deps): 修复开发工具链2高危1中危，保留E2E/API阻塞"
+  },
+  {
+    "headRefName": "fix/backup-common-migrations-92",
+    "headRefOid": "4415c11d7882db1968cadb5ff5d8e7a1acdd9f2d",
+    "isDraft": true,
+    "number": 93,
+    "statusCheckRollup": [],
+    "title": "fix(backup): 纳入默认common迁移并保留恢复门禁"
+  },
+  {
+    "headRefName": "fix/preview-bash32-punctuation-88",
+    "headRefOid": "1aac85b32d0186101713cee998b646734efc80b1",
+    "isDraft": true,
+    "number": 90,
+    "statusCheckRollup": [],
+    "title": "fix(preview): 明确中文标点前变量边界（Bash3.2）"
+  },
+  {
+    "headRefName": "fix/preview-start-argv-86",
+    "headRefOid": "438a5be07af499cbed3b829a2db4f9cd022a95ad",
+    "isDraft": true,
+    "number": 87,
+    "statusCheckRollup": [],
+    "title": "fix(preview): 兼容Bash3.2的严格启动参数传递"
+  },
+  {
+    "headRefName": "fix/preview-parent-pipefail-84",
+    "headRefOid": "b10900dfb3942323c9587b976a5b9cd51f4e7188",
+    "isDraft": true,
+    "number": 85,
+    "statusCheckRollup": [],
+    "title": "fix(ci): 为预览幂等step显式开启父shell pipefail"
+  },
+  {
+    "headRefName": "fix/preview-idempotency-cleanup-81",
+    "headRefOid": "b58a2cd33354a2a3ea2d446bd687480701581d61",
+    "isDraft": true,
+    "number": 83,
+    "statusCheckRollup": [],
+    "title": "fix(preview): 修复安装幂等和卸载提示边界"
+  },
+  {
+    "headRefName": "fix/opened-capabilities-read-failure-copy",
+    "headRefOid": "a58e91e21c2c9b29c10b185e4e8ae02fffd0cbc3",
+    "isDraft": true,
+    "number": 82,
+    "statusCheckRollup": [],
+    "title": "fix(copy): 已开通读取失败不再推断后台开通中"
+  },
+  {
+    "headRefName": "fix/preview-pg-version-77",
+    "headRefOid": "35a19d8303479dd611ae882993aaa1112ddfdfbe",
+    "isDraft": true,
+    "number": 78,
+    "statusCheckRollup": [],
+    "title": "fix(preview): 正确识别Homebrew PostgreSQL 18版本"
+  },
+  {
+    "headRefName": "fix/ci-integrated-candidate-75",
+    "headRefOid": "3e450e72660eda88498d4719e17f84a7a335f380",
+    "isDraft": true,
+    "number": 76,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T02:22:52Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41158561952/job/124410709997",
+        "name": "with-test-postgres · test:api (adjust)",
+        "startedAt": "2026-10-31T02:07:49Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T02:08:42Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41158561934/job/124410709547",
+        "name": "contracts · engine",
+        "startedAt": "2026-10-31T02:07:49Z",
+        "status": "COMPLETED",
+        "workflowName": "Contracts · Engine gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T02:08:34Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41158561960/job/124410709542",
+        "name": "A build · B unit · C e2e frontend",
+        "startedAt": "2026-10-31T02:07:49Z",
+        "status": "COMPLETED",
+        "workflowName": "Frontend gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T02:20:56Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41158561952/job/124410710240",
+        "name": "with-test-postgres · test:api (context)",
+        "startedAt": "2026-10-31T02:07:49Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T03:38:18Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41158561952/job/124410710178",
+        "name": "with-test-postgres · test:api (general)",
+        "startedAt": "2026-10-31T02:07:49Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T03:38:07Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41158561952/job/124410710273",
+        "name": "with-test-postgres · test:api (rest)",
+        "startedAt": "2026-10-31T02:07:49Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      }
+    ],
+    "title": "fix(ci): 整合六项门禁、安装前提及测试修正候选"
+  },
+  {
+    "headRefName": "fix/context-paging-fixture-lease-73",
+    "headRefOid": "40c84dac904c764e1019cd12838bf234d1dd1aa4",
+    "isDraft": true,
+    "number": 74,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T02:03:27Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41157502008/job/124407424134",
+        "name": "with-test-postgres · test:api (adjust)",
+        "startedAt": "2026-10-31T01:54:01Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T02:07:51Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41157502008/job/124407424163",
+        "name": "with-test-postgres · test:api (context)",
+        "startedAt": "2026-10-31T01:54:01Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T03:24:34Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41157502008/job/124407423948",
+        "name": "with-test-postgres · test:api (general)",
+        "startedAt": "2026-10-31T01:54:01Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T03:24:19Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41157502008/job/124407424181",
+        "name": "with-test-postgres · test:api (rest)",
+        "startedAt": "2026-10-31T01:54:01Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      }
+    ],
+    "title": "test(api): 隔离长分页夹具租约并覆盖过期采用拒绝"
+  },
+  {
+    "headRefName": "fix/engine-stop-notification-sync-71",
+    "headRefOid": "6f76c0f0db1f296b68bbfb63211b6b8da49431ce",
+    "isDraft": true,
+    "number": 72,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T01:47:47Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41156973842/job/124405804212",
+        "name": "contracts · engine",
+        "startedAt": "2026-10-31T01:46:59Z",
+        "status": "COMPLETED",
+        "workflowName": "Contracts · Engine gate"
+      }
+    ],
+    "title": "test(engine): 同步当前停止问题关闭与真实 root idle 通知"
+  },
+  {
+    "headRefName": "fix/ci-macos-runner-context-69",
+    "headRefOid": "753c5b72b2913367f1a16dbc0b70ed7dbcdd2a22",
+    "isDraft": true,
+    "number": 70,
+    "statusCheckRollup": [],
+    "title": "fix(ci): 修复 macOS 手动 workflow 的 runner 上下文校验"
+  },
+  {
+    "headRefName": "fix/ci-main-required-checks-67",
+    "headRefOid": "99fbcb145a187512997f1042e3871e395c975994",
+    "isDraft": true,
+    "number": 68,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T01:21:55Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41154937096/job/124399534645",
+        "name": "contracts · engine",
+        "startedAt": "2026-10-31T01:21:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Contracts · Engine gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T01:36:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41154937056/job/124399534798",
+        "name": "with-test-postgres · test:api (adjust)",
+        "startedAt": "2026-10-31T01:21:15Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T01:22:09Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41154937082/job/124399534752",
+        "name": "A build · B unit · C e2e frontend",
+        "startedAt": "2026-10-31T01:21:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Frontend gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T01:34:29Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41154937056/job/124399534759",
+        "name": "with-test-postgres · test:api (context)",
+        "startedAt": "2026-10-31T01:21:15Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T02:51:33Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41154937056/job/124399534784",
+        "name": "with-test-postgres · test:api (general)",
+        "startedAt": "2026-10-31T01:21:16Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T02:48:26Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41154937056/job/124399534613",
+        "name": "with-test-postgres · test:api (rest)",
+        "startedAt": "2026-10-31T01:21:15Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      }
+    ],
+    "title": "fix(ci): 所有 main PR 实际运行六项必需检查"
+  },
+  {
+    "headRefName": "fix/test-queue-isolation-65",
+    "headRefOid": "9581f4093308e98b598b9b600cd7cbce915e2fcc",
+    "isDraft": true,
+    "number": 66,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T21:07:32Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41128610299/job/124313462865",
+        "name": "with-test-postgres · test:api (adjust)",
+        "startedAt": "2026-10-30T21:07:30Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T21:07:32Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41128610299/job/124313462910",
+        "name": "with-test-postgres · test:api (context)",
+        "startedAt": "2026-10-30T21:07:30Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T21:07:33Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41128610299/job/124313463048",
+        "name": "with-test-postgres · test:api (general)",
+        "startedAt": "2026-10-30T21:07:30Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T21:07:32Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41128610299/job/124313462514",
+        "name": "with-test-postgres · test:api (rest)",
+        "startedAt": "2026-10-30T21:07:30Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      }
+    ],
+    "title": "test: 隔离 Knowledge 与 Departure 队列夹具（parser验证受阻）"
+  },
+  {
+    "headRefName": "fix/ci-scene-bridge-wiki-deps-63",
+    "headRefOid": "73cf44fc196c2135da30e491196c6d8e0a77d2d1",
+    "isDraft": true,
+    "number": 64,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T01:26:30Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41125167691/job/124396927589",
+        "name": "with-test-postgres · test:api (adjust)",
+        "startedAt": "2026-10-31T01:11:15Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T01:24:39Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41125167691/job/124396927539",
+        "name": "with-test-postgres · test:api (context)",
+        "startedAt": "2026-10-31T01:11:15Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T02:38:04Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41125167691/job/124396927527",
+        "name": "with-test-postgres · test:api (general)",
+        "startedAt": "2026-10-31T01:11:15Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-31T02:41:57Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41125167691/job/124396927317",
+        "name": "with-test-postgres · test:api (rest)",
+        "startedAt": "2026-10-31T01:11:15Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      }
+    ],
+    "title": "fix(ci): 补齐 SceneBridge wiki 依赖与原生构建前提"
+  },
+  {
+    "headRefName": "fix/briefing-discover-archived-61",
+    "headRefOid": "b1bc0766236561abc643087d6ea51f0c9025d580",
+    "isDraft": true,
+    "number": 62,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T20:28:24Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41123469323/job/124295799410",
+        "name": "with-test-postgres · test:api (adjust)",
+        "startedAt": "2026-10-30T20:28:22Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T20:28:24Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41123469323/job/124295799376",
+        "name": "with-test-postgres · test:api (context)",
+        "startedAt": "2026-10-30T20:28:22Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T20:28:24Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41123469323/job/124295799229",
+        "name": "with-test-postgres · test:api (general)",
+        "startedAt": "2026-10-30T20:28:22Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T20:28:24Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41123469323/job/124295798653",
+        "name": "with-test-postgres · test:api (rest)",
+        "startedAt": "2026-10-30T20:28:22Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      }
+    ],
+    "title": "fix(api): 画报策略发现跳过归档空间"
+  },
+  {
+    "headRefName": "fix/ct043-rule-scope-uncertain-result",
+    "headRefOid": "e28d4357bc33331f692cd0b497fc341437184dbe",
+    "isDraft": true,
+    "number": 60,
+    "statusCheckRollup": [],
+    "title": "fix: CT-043 说明问题行识别范围与提交结果不确定性"
+  },
+  {
+    "headRefName": "codex/data-foundation-copy",
+    "headRefOid": "7a62ec607d591ab0ac794cfa4ee839d6f4facbab",
+    "isDraft": true,
+    "number": 58,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T19:08:47Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41112803641/job/124259229896",
+        "name": "A build · B unit · C e2e frontend",
+        "startedAt": "2026-10-30T19:08:45Z",
+        "status": "COMPLETED",
+        "workflowName": "Frontend gate"
+      }
+    ],
+    "title": "fix(copy): 数据底座与审计记录人话（白名单字典）"
+  },
+  {
+    "headRefName": "codex/login-copy-patch",
+    "headRefOid": "fe45dfc0778c27b20d517bae794c18a857346c12",
+    "isDraft": false,
+    "number": 56,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T18:50:42Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41110336550/job/124250803345",
+        "name": "A build · B unit · C e2e frontend",
+        "startedAt": "2026-10-30T18:50:41Z",
+        "status": "COMPLETED",
+        "workflowName": "Frontend gate"
+      }
+    ],
+    "title": "fix(copy): 登录页人话补丁（工作台 / 数据口径同步 / 品牌与引擎名 / 选端问候语 / 已开通板块 / 第四端登录闸）"
+  },
+  {
+    "headRefName": "codex/ct-043-b-workspace-submit-result",
+    "headRefOid": "3e68d9d1396815e1566e9eda6d5c7c27e144fc4d",
+    "isDraft": false,
+    "number": 54,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T18:46:31Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41109532378/job/124248054415",
+        "name": "A build · B unit · C e2e frontend",
+        "startedAt": "2026-10-30T18:44:57Z",
+        "status": "COMPLETED",
+        "workflowName": "Frontend gate"
+      }
+    ],
+    "title": "feat(workspace): CT-043-B 质量检查提交与结果接线"
+  },
+  {
+    "headRefName": "codex/ct-043-a-quality-check-submit-api",
+    "headRefOid": "0f3725cbaf60a00b4f05b46e30092f4bbe07e0ca",
+    "isDraft": false,
+    "number": 53,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T18:52:03Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41108262485/job/124244168403",
+        "name": "with-test-postgres · test:api (adjust)",
+        "startedAt": "2026-10-30T18:36:45Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T18:38:02Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41108261851/job/124243907302",
+        "name": "contracts · engine",
+        "startedAt": "2026-10-30T18:36:12Z",
+        "status": "COMPLETED",
+        "workflowName": "Contracts · Engine gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T18:50:43Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41108262485/job/124244168934",
+        "name": "with-test-postgres · test:api (context)",
+        "startedAt": "2026-10-30T18:36:45Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T20:07:07Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41108262485/job/124244168929",
+        "name": "with-test-postgres · test:api (general)",
+        "startedAt": "2026-10-30T18:36:45Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T20:06:26Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41108262485/job/124244168036",
+        "name": "with-test-postgres · test:api (rest)",
+        "startedAt": "2026-10-30T18:36:45Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      }
+    ],
+    "title": "feat(api): CT-043-A 质量检查提交与规则结论"
+  },
+  {
+    "headRefName": "codex/preview-agent-admin-bootstrap",
+    "headRefOid": "50878ed4dfa2ffcbe83fe8b9c7d19c9c394d0ba9",
+    "isDraft": false,
+    "number": 48,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T18:28:03Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41105729892/job/124234914018",
+        "name": "with-test-postgres · test:api (adjust)",
+        "startedAt": "2026-10-30T18:18:03Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T18:27:42Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41105729892/job/124234914835",
+        "name": "with-test-postgres · test:api (context)",
+        "startedAt": "2026-10-30T18:18:03Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T19:48:22Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41105729892/job/124234914648",
+        "name": "with-test-postgres · test:api (general)",
+        "startedAt": "2026-10-30T18:18:03Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-30T19:48:30Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/luofanghao9784/mengine-app/actions/runs/41105729892/job/124234914465",
+        "name": "with-test-postgres · test:api (rest)",
+        "startedAt": "2026-10-30T18:18:03Z",
+        "status": "COMPLETED",
+        "workflowName": "API · Postgres gate"
+      }
+    ],
+    "title": "feat(identity): 仅预览 --bootstrap-agent-admin 合成第四端账号"
+  }
+]

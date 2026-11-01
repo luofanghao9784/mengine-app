@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "observationSeconds": 25,
+  "schedulerIntervalMs": 10000,
+  "companyPaused": true,
+  "taskUnchangedAcrossSweeps": true,
+  "newRuns": 0,
+  "syntheticCanaryIssueId": "b4aa4b21-fb1b-4e67-bfe7-7c2e88a5f39e"
+}

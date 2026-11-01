@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+test "$(hostname)" = @PAPERCLIP_HOSTNAME@
+test -f /etc/mengine-paperclip-managed
+export DEBIAN_FRONTEND=noninteractive
+systemctl stop paperclip.service
+install -d -m 755 /usr/share/postgresql-common/pgdg
+curl -fsS https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+gpg --show-keys --with-colons /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc | grep -q B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+cat > /etc/apt/sources.list.d/pgdg.sources <<'REPO'
+Types: deb
+URIs: https://apt.postgresql.org/pub/repos/apt
+Suites: noble-pgdg
+Architectures: amd64
+Components: main
+Signed-By: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+REPO
+apt-get update -qq
+apt-get install -y -qq postgresql-18 postgresql-client-18
+systemctl enable --now postgresql
+python3 - <<'PY'
+import json, os, secrets, subprocess
+from pathlib import Path
+envfile=Path('/etc/paperclip.env')
+env=envfile.read_text()
+secret_file=Path('/root/paperclip-install/database-password')
+if not secret_file.exists():
+    secret_file.write_text(secrets.token_hex(32)+'\n')
+    os.chmod(secret_file,0o600)
+password=secret_file.read_text().strip()
+exists=subprocess.check_output(['runuser','-u','postgres','--','psql','-tAc',"SELECT 1 FROM pg_roles WHERE rolname='paperclip'"],text=True).strip()
+sql=(f"ALTER ROLE paperclip PASSWORD '{password}';" if exists else f"CREATE ROLE paperclip LOGIN PASSWORD '{password}';")
+subprocess.run(['runuser','-u','postgres','--','psql','-v','ON_ERROR_STOP=1'],input=sql,text=True,check=True,stdout=subprocess.DEVNULL)
+exists=subprocess.check_output(['runuser','-u','postgres','--','psql','-tAc',"SELECT 1 FROM pg_database WHERE datname='paperclip'"],text=True).strip()
+if not exists: subprocess.run(['runuser','-u','postgres','--','createdb','-O','paperclip','paperclip'],check=True)
+url=f'postgresql://paperclip:{password}@127.0.0.1:5432/paperclip'
+lines=[line for line in env.splitlines() if not line.startswith('DATABASE_URL=')]
+envfile.write_text('\n'.join(lines)+'\nDATABASE_URL='+url+'\n')
+os.chmod(envfile,0o600)
+config=Path('/var/lib/paperclip/instances/default/config.json')
+backup=Path('/root/paperclip-install/config-before-public-db.json')
+if not backup.exists(): backup.write_bytes(config.read_bytes());os.chmod(backup,0o600)
+d=json.loads(config.read_text())
+d['database']['mode']='postgres'
+d['database']['connectionString']=url
+d['database'].setdefault('backup',{})['enabled']=False
+d['server'].update(deploymentMode='authenticated',exposure='public',bind='loopback',host='127.0.0.1',port=3100,allowedHostnames=['@PAPERCLIP_IPV4@','127.0.0.1','localhost'])
+d.setdefault('auth',{}).update(baseUrlMode='explicit',publicBaseUrl='https://@PAPERCLIP_IPV4@')
+config.write_text(json.dumps(d,indent=2)+'\n')
+os.chmod(config,0o600)
+PY
+sed -i 's/^After=network-online.target$/After=network-online.target postgresql@18-main.service/; /Wants=network-online.target/a Requires=postgresql@18-main.service' /etc/systemd/system/paperclip.service
+systemctl daemon-reload
+systemctl reset-failed paperclip.service
+systemctl start paperclip.service
+echo 'External PostgreSQL configured on loopback; existing embedded state retained.'

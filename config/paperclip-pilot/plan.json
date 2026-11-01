@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 1,
+  "companyName": "MENGINE Paperclip 隔离试点 100",
+  "repository": "luofanghao9784/mengine-app",
+  "upstream": {
+    "version": "2026.1023.0",
+    "commit": "1b4c803816e82b0265c8422e1a804327a7ed8c54",
+    "npmIntegrity": "sha512-PA2gLYoJKcmen1YaNr7jtyyZK2xNyW92XEedgZ82S1MMeMEB2kdmk1okRMD4aFUV4OZPFBwk76pV0jCM2Fuy0g=="
+  },
+  "dispatchEnabled": false,
+  "historicalImportEnabled": false,
+  "maxDevelopmentSlots": 2,
+  "infrastructureMonthlyLimitUSD": 50,
+  "modelBudgetStatus": "SUBSCRIPTION_AUTHORIZED_FOR_BOUNDED_PILOT_ONLY",
+  "roles": [
+    {
+      "key": "chief",
+      "name": "总负责人",
+      "department": "governance",
+      "reportsTo": null,
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "dq",
+      "name": "DQ 调度负责人",
+      "department": "governance",
+      "reportsTo": "chief",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "product",
+      "name": "产品负责人",
+      "department": "product",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "ux",
+      "name": "体验设计",
+      "department": "product",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "research",
+      "name": "研究分析",
+      "department": "product",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "system_architect",
+      "name": "系统架构",
+      "department": "engineering",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "backend_architect",
+      "name": "后端架构",
+      "department": "engineering",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "frontend_architect",
+      "name": "前端架构",
+      "department": "engineering",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "frontend",
+      "name": "前端研发",
+      "department": "engineering",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "backend",
+      "name": "后端研发",
+      "department": "engineering",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "data",
+      "name": "数据工程",
+      "department": "engineering",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "integration",
+      "name": "集成工程",
+      "department": "engineering",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "qa",
+      "name": "独立质量验收",
+      "department": "quality",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "reliability",
+      "name": "可靠性与性能",
+      "department": "quality",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "security",
+      "name": "安全审查",
+      "department": "quality",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "sre",
+      "name": "平台运维",
+      "department": "operations",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "customer_success",
+      "name": "客户成功",
+      "department": "customer_success",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "growth",
+      "name": "市场增长",
+      "department": "growth",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    },
+    {
+      "key": "business",
+      "name": "商业运营",
+      "department": "business",
+      "reportsTo": "dq",
+      "adapterType": "codex_local",
+      "status": "paused"
+    }
+  ],
+  "adapterConfig": {
+    "dangerouslyBypassApprovalsAndSandbox": false,
+    "timeoutSec": 300,
+    "graceSec": 10,
+    "extraArgs": [
+      "--sandbox",
+      "read-only",
+      "-c",
+      "approval_policy=\"never\"",
+      "-c",
+      "sandbox_workspace_write.network_access=false"
+    ],
+    "engine": "cli"
+  },
+  "runtimeConfig": {
+    "heartbeat": {
+      "enabled": false,
+      "wakeOnDemand": false,
+      "wakeOnAssignment": false,
+      "wakeOnAutomation": false,
+      "intervalSec": 0
+    }
+  },
+  "operatingPolicy": {
+    "customer_success": "仅合成FAQ/工单分类和内部草稿；客户渠道写入关闭，争议/退款人工升级",
+    "growth": "仅内容草稿、事实校核和实验建议；对外发布/广告采购关闭",
+    "business": "仅合成订阅、收入、留存报表；支付/合同/资金操作关闭",
+    "operations": "仅试点健康/日志/备份检查；生产凭据、部署、重启和数据写入关闭",
+    "product": "反馈归因、需求草稿、UX验收；保留原产品与R01–R26/G01–G05标准",
+    "engineering": "仅新试点任务；历史任务、UNKNOWN、已有Issue/PR不可自动认领",
+    "quality": "独立QA/安全/产品证据；非作者luofanghao1203人审不可由机审替代"
+  }
+}

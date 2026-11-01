@@ -1,0 +1,30 @@
+{
+  "observedAt": "2026-11-01",
+  "companyStatus": "paused",
+  "rolesPaused": 19,
+  "taskCount": 7,
+  "doneTasks": [
+    "MEN-5",
+    "MEN-6"
+  ],
+  "cancelledTasks": [
+    "MEN-1",
+    "MEN-2",
+    "MEN-3",
+    "MEN-4",
+    "MEN-7"
+  ],
+  "paperclipRunCount": 9,
+  "trialNewRunCount": 4,
+  "directSubscriptionProbeCount": 1,
+  "globalHeartbeatSchedulerEnabled": false,
+  "runtimeRecoveryPatch": "APPLIED_HASH_VERIFIED",
+  "runtimePatchRollbackAndReapply": "PASS",
+  "modelCredentialsDetachedFromAllRoles": true,
+  "modelCostAccountingComplete": false,
+  "observedSessionModel": "gpt-6-astra",
+  "cloudDeployment": "NOT_PERFORMED",
+  "productionWrites": "NOT_PERFORMED",
+  "historicalAuthority": "NOT_OBTAINED",
+  "independentHumanReview": "NOT_PERFORMED"
+}

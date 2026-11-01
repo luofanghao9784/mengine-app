@@ -1,0 +1,134 @@
+[
+  {
+    "id": "e4d6e730-5389-43d6-975d-69699a1417fe",
+    "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+    "issueId": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+    "invocationSource": "on_demand",
+    "triggerDetail": "manual",
+    "status": "cancelled",
+    "errorCode": "issue_reassigned",
+    "startedAt": "2026-11-01T07:21:00.704Z",
+    "finishedAt": "2026-11-01T07:21:35.954Z",
+    "runtimeMode": "legacy",
+    "costAccountingPending": true,
+    "context": {
+      "issueId": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+      "source": null,
+      "currentStageId": null
+    },
+    "usage": {
+      "billingType": "subscription_included",
+      "biller": "chatgpt",
+      "model": "unknown",
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costStatus": "unpriced",
+      "costUsd": null,
+      "accountingReceiptReady": false
+    },
+    "driverKind": null,
+    "driverVersion": null,
+    "exitCode": 1,
+    "signal": null,
+    "recordedProcessStillExists": false
+  },
+  {
+    "id": "a469f457-bc86-4ed4-adb4-4def64780d12",
+    "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+    "issueId": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+    "invocationSource": "automation",
+    "triggerDetail": "system",
+    "status": "succeeded",
+    "errorCode": null,
+    "startedAt": "2026-11-01T07:21:36.949Z",
+    "finishedAt": "2026-11-01T07:22:19.639Z",
+    "runtimeMode": "legacy",
+    "costAccountingPending": false,
+    "context": {
+      "issueId": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+      "source": null,
+      "currentStageId": null
+    },
+    "usage": {
+      "billingType": "subscription_included",
+      "biller": "chatgpt",
+      "model": "unknown",
+      "inputTokens": 20923,
+      "outputTokens": 1765,
+      "costStatus": "reported",
+      "costUsd": null,
+      "accountingReceiptReady": true
+    },
+    "driverKind": null,
+    "driverVersion": null,
+    "exitCode": 0,
+    "signal": null,
+    "recordedProcessStillExists": false
+  },
+  {
+    "id": "0c023b1d-f9c6-40b7-b51d-56445ebeae62",
+    "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+    "issueId": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+    "invocationSource": "automation",
+    "triggerDetail": "system",
+    "status": "cancelled",
+    "errorCode": "issue_reassigned",
+    "startedAt": "2026-11-01T07:22:12.810Z",
+    "finishedAt": "2026-11-01T07:23:07.331Z",
+    "runtimeMode": "legacy",
+    "costAccountingPending": true,
+    "context": {
+      "issueId": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+      "source": null,
+      "currentStageId": null
+    },
+    "usage": {
+      "billingType": "subscription_included",
+      "biller": "chatgpt",
+      "model": "unknown",
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costStatus": "unpriced",
+      "costUsd": null,
+      "accountingReceiptReady": false
+    },
+    "driverKind": null,
+    "driverVersion": null,
+    "exitCode": 1,
+    "signal": null,
+    "recordedProcessStillExists": false
+  },
+  {
+    "id": "7e65124d-487e-425f-8046-905969c5d92a",
+    "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+    "issueId": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+    "invocationSource": "automation",
+    "triggerDetail": "system",
+    "status": "succeeded",
+    "errorCode": null,
+    "startedAt": "2026-11-01T07:23:16.921Z",
+    "finishedAt": "2026-11-01T07:24:10.922Z",
+    "runtimeMode": "legacy",
+    "costAccountingPending": false,
+    "context": {
+      "issueId": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+      "source": null,
+      "currentStageId": null
+    },
+    "usage": {
+      "billingType": "subscription_included",
+      "biller": "chatgpt",
+      "model": "unknown",
+      "inputTokens": 11529,
+      "outputTokens": 1970,
+      "costStatus": "reported",
+      "costUsd": null,
+      "accountingReceiptReady": true
+    },
+    "driverKind": null,
+    "driverVersion": null,
+    "exitCode": 0,
+    "signal": null,
+    "recordedProcessStillExists": false
+  }
+]

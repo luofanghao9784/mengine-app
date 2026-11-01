@@ -1,0 +1,27 @@
+{
+  "observedAt": "2026-11-01T06:41:07.254297+00:00",
+  "baseMain": "d945af9235b07ecfbfc4990bd6c4ebae4324b769",
+  "upstreamCommit": "1b4c803816e82b0265c8422e1a804327a7ed8c54",
+  "nodeVersion": "v24.22.1",
+  "npmVersion": "11.19.1",
+  "pythonVersion": "Python 3.9.6",
+  "health": {
+    "status": "ok",
+    "deploymentMode": "local_trusted",
+    "deploymentExposure": "private"
+  },
+  "uiHttpStatus": 200,
+  "bind": "127.0.0.1:43100",
+  "heartbeatSchedulerEnabled": false,
+  "serviceInstalled": false,
+  "repeatedSeedSameIds": true,
+  "restartSameCompanyAndAgentIds": true,
+  "restartKind": "GRACEFUL_STOP_AND_RESTART_WITH_SAME_DATA_NEW_RUNTIME_DIRECTORY",
+  "runtimeLockSha256": "01b9f302dc62d8eeb73b65163618d5d39d44ed223ce6b444e4b8a40b38866c47",
+  "lockDryRunExitCode": 0,
+  "historicalAuthority": "NOT_OBTAINED",
+  "unknownExecutionStopReceipts": "NOT_OBTAINED",
+  "cloudDeployment": "NOT_PERFORMED",
+  "productionWrites": "NOT_PERFORMED",
+  "realModelDevelopmentLoop": "NOT_TESTED"
+}

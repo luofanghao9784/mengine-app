@@ -1,0 +1,42 @@
+cli_auth_credentials_store = "file"
+approval_policy = "never"
+default_permissions = "pilot-coder"
+
+[permissions.pilot-coder.filesystem]
+":root" = "deny"
+":minimal" = "read"
+"@PILOT_WORKSPACE@" = "write"
+"@PILOT_WORKSPACE@/.git" = "read"
+
+"/Library/Developer/CommandLineTools" = "read"
+
+[permissions.pilot-coder.network]
+enabled = true
+
+[permissions.pilot-coder.network.domains]
+"127.0.0.1" = "allow"
+
+[shell_environment_policy]
+inherit = "all"
+include_only = ["PATH", "PAPERCLIP_*", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"]
+
+[shell_environment_policy.set]
+PATH = "/Library/Developer/CommandLineTools/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+[projects."@PILOT_WORKSPACE@"]
+trust_level = "trusted"
+
+[features]
+network_proxy = true
+
+[permissions.pilot-reviewer.filesystem]
+":root" = "deny"
+":minimal" = "read"
+"@PILOT_WORKSPACE@" = "read"
+"/Library/Developer/CommandLineTools" = "read"
+
+[permissions.pilot-reviewer.network]
+enabled = true
+
+[permissions.pilot-reviewer.network.domains]
+"127.0.0.1" = "allow"

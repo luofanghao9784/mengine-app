@@ -1,0 +1,60 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import { createRequire } from 'node:module';
+import { spawn, spawnSync } from 'node:child_process';
+import { pipeline } from 'node:stream/promises';
+import { createGzip } from 'node:zlib';
+const require=createRequire('/opt/paperclip/runtime/package.json');
+const postgres=require('postgres');
+const url=new URL(process.env.DATABASE_URL);
+if(url.hostname!=='127.0.0.1'||url.pathname!=='/paperclip')throw Error('Unexpected source');
+const password=decodeURIComponent(url.password);
+process.env.PGPASSWORD=password;
+url.password='';
+delete process.env.DATABASE_URL;
+process.env.PAPERCLIP_PSQL_PATH='/usr/lib/postgresql/18/bin/psql';
+const { runDatabaseRestore }=await import('/opt/paperclip/runtime/node_modules/@paperclipai/db/dist/backup-lib.js');
+const options={host:'127.0.0.1',port:5432,username:'paperclip',password,max:1};
+const source=postgres({...options,database:'paperclip'});
+const targetName='paperclip_restore_'+crypto.randomBytes(6).toString('hex');
+const file='/var/backups/paperclip/recovery-'+targetName+'.sql.gz';
+let target;
+async function fingerprint(tx){
+  const tables=await tx`select table_schema,table_name from information_schema.tables
+    where table_type='BASE TABLE' and table_schema not in ('pg_catalog','information_schema')
+    and table_schema not like 'pg_%' order by table_schema,table_name`;
+  const result=[];
+  const q=s=>'"'+s.replaceAll('"','""')+'"';
+  for(const t of tables){
+    const [r]=await tx.unsafe(`select count(*)::int as count,
+      md5(coalesce(string_agg(payload,E'\\n' order by payload),'')) as hash
+      from (select to_jsonb(t)::text as payload from ${q(t.table_schema)}.${q(t.table_name)} t) x`);
+    result.push({...t,...r});
+  }
+  return result;
+}
+try{
+  const baseline=await source.begin('isolation level repeatable read read only',async tx=>{
+    const [r]=await tx`select pg_export_snapshot() as snapshot`;
+    const before=await fingerprint(tx);
+    const child=spawn('/usr/lib/postgresql/18/bin/pg_dump',[
+      '--dbname='+url.toString(),'--snapshot='+r.snapshot,'--format=plain','--clean','--if-exists','--no-owner','--no-privileges'],
+      {stdio:['ignore','pipe','pipe'],env:process.env});
+    child.stderr.resume();
+    const done=new Promise((resolve,reject)=>{child.once('error',()=>reject(Error('Native dump process failed')));child.once('close',code=>code===0?resolve():reject(Error('Native snapshot dump failed')));});
+    await Promise.all([done,pipeline(child.stdout,createGzip(),fs.createWriteStream(file,{mode:0o600}))]);
+    return before;
+  });
+  if(spawnSync('runuser',['-u','postgres','--','createdb','-O','paperclip',targetName],{stdio:'ignore'}).status!==0)throw Error('New restore database creation failed');
+  const targetUrl=new URL(url);targetUrl.pathname='/'+targetName;
+  await runDatabaseRestore({connectionString:targetUrl.toString(),backupFile:file});
+  target=postgres({...options,database:targetName});
+  const restored=await target.begin('isolation level repeatable read read only',fingerprint);
+  const differences=restored.filter((r,i)=>JSON.stringify(r)!==JSON.stringify(baseline[i])).map(r=>r.table_schema+'.'+r.table_name);
+  if(restored.length!==baseline.length||differences.length)throw Error('Snapshot row fingerprints differ');
+  console.log(JSON.stringify({status:'PASS',engine:'pg_dump',scope:'SAME_HOST_NEW_DATABASE_EXPORTED_SNAPSHOT',
+    tablesCompared:baseline.length,allRowsMatch:true,snapshotConsistentDuringConcurrentActivity:true,
+    sourceDatabaseOverwritten:false,restoreDatabase:targetName,restoreDatabaseAttachedToService:false,
+    archiveSha256:crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),
+    archivePublished:false,crossHostRecovery:'NOT_TESTED'}));
+}finally{if(target)await target.end();await source.end();}
