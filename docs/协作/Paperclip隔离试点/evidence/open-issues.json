@@ -1,0 +1,367 @@
+[
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 100,
+    "title": "认领：Paperclip AI公司管理平台隔离试点与迁移门禁"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 99,
+    "title": "认领：DQ 原生16岗24技能与隔离持久调度器试点"
+  },
+  {
+    "assignees": [],
+    "number": 98,
+    "title": "[基础设施] OpenHands 云端无人值守研发迁移试点与验收"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 96,
+    "title": "认领：RESUME-A-01 开发依赖漏洞定点锁文件修复"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 95,
+    "title": "认领：GATE-001 补齐真实前端回归入口与依赖安全门禁"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 94,
+    "title": "认领：R18/R26恢复迁移差额分类与有界摘要成本诊断"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 92,
+    "title": "认领：修复本地备份遗漏common迁移清单"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 91,
+    "title": "认领：CT-076 Native队列隔离与临时集群归属验证"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 89,
+    "title": "认领：CT-076 API取消片的实际最小诊断与可读执行单"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 88,
+    "title": "认领：修复预览脚本Bash3.2中文标点变量边界"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 86,
+    "title": "认领：修复预览启动在Bash3.2 nounset下的空数组参数"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 84,
+    "title": "认领：补齐macOS幂等step父shell失败传播"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 81,
+    "title": "认领：修复预览安装幂等产物路径及卸载变量边界"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 80,
+    "title": "认领：已开通功能读取失败提示去除开通中推断"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 79,
+    "title": "认领：CT043验收截图与原始记录共享"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 77,
+    "title": "认领：修复preview doctor误读Homebrew PostgreSQL版本"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 75,
+    "title": "认领：独立整合CI修正候选并验证六项真实触发"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 73,
+    "title": "认领：context长分页测试夹具租约与过期拒绝回归"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 71,
+    "title": "认领：引擎真实SDK停止通知定向验证与测试同步修正"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 69,
+    "title": "认领：修复 macOS 手动预览 workflow 的 runner 上下文校验"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 67,
+    "title": "认领：修正 main 必需六项检查的路径过滤"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 65,
+    "title": "认领：隔离Knowledge与Departure集成测试队列"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 63,
+    "title": "认领：API gate 补齐 SceneBridge wiki 依赖"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 61,
+    "title": "认领：画报策略发现跳过归档空间及最小回归"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 59,
+    "title": "认领：CT-043-B 规则范围与结果不确定性提示修复"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 57,
+    "title": "认领：数据底座与审计记录人话白名单补丁"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 55,
+    "title": "认领：登录页人话补丁与已开通板块、第四端登录闸"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 51,
+    "title": "认领：CT-043-A 质量检查最小提交后端"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 47,
+    "title": "认领：仅预览环境 AGENT_ADMIN 合成账号引导"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 43,
+    "title": "认领：CT-044 已上架目录前端只读接线"
+  },
+  {
+    "assignees": [
+      {
+        "id": "MDQ6VXNlcjM4MjQyODQ5",
+        "login": "luofanghao9784",
+        "name": "@SkuldLuo@",
+        "databaseId": 38242849
+      }
+    ],
+    "number": 26,
+    "title": "认领：prototype 数据基座文案改为数据底座"
+  }
+]

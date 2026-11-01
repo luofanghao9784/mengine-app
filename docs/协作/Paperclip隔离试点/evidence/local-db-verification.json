@@ -1,0 +1,11 @@
+{
+  "agents": {
+    "count": 19,
+    "all_paused": true,
+    "all_api_keys_empty": true,
+    "all_external_empty_homes": true
+  },
+  "heartbeatRuns": 0,
+  "issues": 0,
+  "externalAuthFileExists": false
+}

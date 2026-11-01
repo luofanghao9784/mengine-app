@@ -1,0 +1,30 @@
+{
+  "companyId": "5923bae1-b181-40f6-b060-e772fef05b8e",
+  "status": "paused",
+  "agentCount": 19,
+  "agentIds": [
+    "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+    "17b33f8d-048b-4f39-91f4-bb957356111c",
+    "37fb646f-2aee-489e-bf34-083eb8b56d53",
+    "39772bb3-640e-4ea0-9743-e84fa9586543",
+    "3d0022d5-0c96-42ed-9357-01b7861fb9d2",
+    "476c0c53-90c7-43fa-a5bb-dd2c275c5399",
+    "48c2f0b1-3cf8-437f-ab04-fd755f870971",
+    "586281aa-027a-40ee-b84b-e95d2ffabb9f",
+    "63a20125-276c-41aa-9972-cf3c20a847f0",
+    "6eb221c7-01f4-4a77-a84d-ef035026818c",
+    "83bb6805-422d-4e33-a5bc-665c59bacb63",
+    "8a7eaeda-6773-4585-8a9d-e47abb0ddf7b",
+    "9015005a-43c5-4786-b9a5-7701815f680c",
+    "9604696a-6367-48c2-b7bf-13339a13989e",
+    "aaa36644-8fb0-4727-8c4a-e1dcc8267c4a",
+    "b33a0fb8-cbfe-4299-a852-c99970740db0",
+    "cc70e17b-748a-4aa9-a108-cfdd36f19d22",
+    "e4257278-bb87-4bb0-b104-f5801059f3be",
+    "ec79c7e5-da58-4a1f-bac4-be38dbaf87b0"
+  ],
+  "taskCount": 0,
+  "modelCalls": "NOT_INVOKED",
+  "historicalImport": false,
+  "envVerification": "API_REDACTED_REQUIRES_LOCAL_DB_CHECK"
+}
