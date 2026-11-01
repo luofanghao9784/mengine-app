@@ -1,0 +1,33 @@
+{
+  "scope": "FOUR_REPRESENTATIVE_NONEMPTY_TABLES",
+  "differences": [
+    {
+      "table": "companies",
+      "column": "created_at",
+      "type": "timestamp with time zone",
+      "equalAtMillisecondPrecision": true
+    },
+    {
+      "table": "agents",
+      "column": "created_at",
+      "type": "timestamp with time zone",
+      "equalAtMillisecondPrecision": true
+    },
+    {
+      "table": "activity_log",
+      "column": "created_at",
+      "type": "timestamp with time zone",
+      "equalAtMillisecondPrecision": true
+    },
+    {
+      "table": "agent_identity_keys",
+      "column": "created_at",
+      "type": "timestamp with time zone",
+      "equalAtMillisecondPrecision": true
+    }
+  ],
+  "differingFieldInstances": 107,
+  "timestampsOnly": true,
+  "allEqualAtMillisecondPrecision": true,
+  "sourceNotModified": true
+}

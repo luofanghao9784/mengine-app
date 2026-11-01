@@ -11,7 +11,7 @@
   "historicalImportEnabled": false,
   "maxDevelopmentSlots": 2,
   "infrastructureMonthlyLimitUSD": 200,
-  "modelBudgetStatus": "UNAPPROVED_SEPARATE_FROM_INFRASTRUCTURE",
+  "modelBudgetStatus": "SUBSCRIPTION_AUTHORIZED_FOR_BOUNDED_PILOT_ONLY",
   "roles": [
     {
       "key": "chief",
@@ -177,7 +177,8 @@
       "approval_policy=\"never\"",
       "-c",
       "sandbox_workspace_write.network_access=false"
-    ]
+    ],
+    "engine": "cli"
   },
   "runtimeConfig": {
     "heartbeat": {

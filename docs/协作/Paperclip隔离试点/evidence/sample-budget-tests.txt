@@ -1,0 +1,23 @@
+test_custom_cap_boundaries (test_budget.BudgetTests) ... ok
+test_default_cap_boundaries (test_budget.BudgetTests) ... ok
+test_empty_items (test_budget.BudgetTests) ... ok
+test_explicit_zero_extras_preserve_defaults (test_budget.BudgetTests) ... ok
+test_invalid_costs (test_budget.BudgetTests) ... ok
+test_invalid_items_containers (test_budget.BudgetTests) ... ok
+test_invalid_labels (test_budget.BudgetTests) ... ok
+test_invalid_limits (test_budget.BudgetTests) ... ok
+test_invalid_tax_and_reserve (test_budget.BudgetTests) ... ok
+test_large_integer_precision (test_budget.BudgetTests) ... ok
+test_large_tax_preserves_integer_precision (test_budget.BudgetTests) ... ok
+test_nonempty_unicode_and_whitespace_labels (test_budget.BudgetTests) ... ok
+test_tax_and_reserve_are_keyword_only (test_budget.BudgetTests) ... ok
+test_tax_and_reserve_cap_boundaries (test_budget.BudgetTests) ... ok
+test_tax_rounds_up_to_one_cent (test_budget.BudgetTests) ... ok
+test_valid_items_and_no_mutation (test_budget.BudgetTests) ... ok
+test_zero_limit (test_budget.BudgetTests) ... ok
+test_zero_subtotal_with_tax_and_reserve (test_budget.BudgetTests) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 0.001s
+
+OK

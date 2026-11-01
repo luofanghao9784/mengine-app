@@ -20,6 +20,7 @@ def validate(plan):
     assert plan["infrastructureMonthlyLimitUSD"] <= 200
     assert plan["maxDevelopmentSlots"] <= 2
     assert plan["upstream"]["version"] == "2026.1023.0"
+    assert plan["adapterConfig"]["engine"] == "cli", "ACP does not enforce this CLI profile contract"
     assert plan["adapterConfig"]["dangerouslyBypassApprovalsAndSandbox"] is False
     assert plan["adapterConfig"]["extraArgs"] == [
         "--sandbox", "read-only", "-c", 'approval_policy="never"',

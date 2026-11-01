@@ -20,6 +20,12 @@ class SafetyTests(unittest.TestCase):
     def test_paused_plan(self):
         seed.validate(self.plan)
 
+    def test_reject_engine_that_does_not_enforce_cli_profiles(self):
+        for engine in ("acp", None):
+            self.plan["adapterConfig"]["engine"] = engine
+            with self.subTest(engine=engine), self.assertRaises(AssertionError):
+                seed.validate(self.plan)
+
     def test_reject_dispatch_import_bypass_budget_and_concurrency(self):
         for key, value in [("dispatchEnabled", True), ("historicalImportEnabled", True),
                            ("infrastructureMonthlyLimitUSD", 201), ("maxDevelopmentSlots", 3)]:

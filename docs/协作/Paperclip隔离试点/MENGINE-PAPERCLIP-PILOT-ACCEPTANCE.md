@@ -1,57 +1,65 @@
-# MENGINE Paperclip 本机试点验证报告
+# MENGINE Paperclip 本机真实模型试点报告
 
-日期：2026-11-01（北京时间）。认领：[Issue #100](https://github.com/luofanghao9784/mengine-app/issues/100)。结论：**本机基础安装、暂停组织配置、重复初始化和正常停止后的恢复已验证；正式研发接管与云端无人值守验收未通过。**
+更新：2026-11-01，北京时间。关联 [Issue #100](https://github.com/luofanghao9784/mengine-app/issues/100)、[Draft PR #101](https://github.com/luofanghao9784/mengine-app/pull/101)。
 
-用户选择先完成本机试点与 Draft PR，再审核云资源报价。本轮没有采购、云资源创建、生产写入、主分支推送或合并。
+**结论：已接通用户授权的独立 ChatGPT 订阅登录；带明确本地补丁的 Paperclip 完成两条真实编码任务及两轮独立 QA，第二条由依赖解除自动接续。当前已暂停公司和全部 19 岗并解绑执行岗位凭据。云端无人值守、正式研发接管与经营系统接入尚未验收。**
 
-## 真实盘点
+本轮交付不是原版 Paperclip 无修改通过验收。原版的 ACP 执行失败、首次 QA 唤醒遗漏、成本核算阻断和 JavaScript 恢复精度差异均保留；未将失败任务改为成功。初始未接模型的盘点见[阶段一快照](MENGINE-PAPERCLIP-PILOT-ACCEPTANCE-PHASE1.md)。
 
-仓库为 `luofanghao9784/mengine-app`，独立克隆起点与收尾远端 main 均为 `d945af9235b07ecfbfc4990bd6c4ebae4324b769`。未复用或修改现有有未提交变更的工作目录。原有本地 Git 代理端口不可达，本次仅对独立克隆的网络命令临时关闭该代理，未改全局配置。
+## 执行范围与版本
 
-保留 [#98 OpenHands 云端试点](https://github.com/luofanghao9784/mengine-app/issues/98)；发现并避开 [#99 原生 DQ 隔离调度器](https://github.com/luofanghao9784/mengine-app/issues/99)。既有 PR 的失败/取消结果不能视为成功；没有尝试合并或修复其他认领。只读快照见 [开放 Issue](evidence/open-issues.json)、[开放 PR 与检查](evidence/open-prs.json)。这些是取样时刻的证据，后续状态以 GitHub 实时记录为准。
+- 仓库：`luofanghao9784/mengine-app`；开发基线 `d945af9235b07ecfbfc4990bd6c4ebae4324b769`。只推任务分支与 Draft PR，不合并、不修改生产、不采购。
+- Paperclip：`2026.1023.0`，上游 `1b4c803816e82b0265c8422e1a804327a7ed8c54`；本机额外补丁及前后摘要在 `config/paperclip-pilot/patches/`。完整依赖锁保留。
+- 实际执行 CLI：npm 安装的 `codex-cli 0.156.1`，显式 `engine=cli`；未使用本机全局登录。会话元数据观察到 `gpt-6-astra`；选择模型的最终权限与订阅额度仍由账户决定。
+- 用户在官方浏览器完成独立订阅登录；auth.json 留在私有试点目录，不进仓库、报告、配置包或数据库恢复实例。
+- 只有一个合成 Git 工作目录可写，QA 使用只读权限；两个任务顺序复用该目录。本轮没有验证多个可写 worktree 并行，也没有给模型 GitHub、云或生产凭据。
 
-历史 `.ai/TASKS.json` revision 13 权威原件未取得，历史 UNKNOWN 的执行端停止回执未取得。仓库旧 `docs/codex-tasks/QUEUE.md` 及旧组织包不是替代权威；旧组织包的 revision 0 空模板未导入。本轮公司任务数为 0，原任务与暂停状态没有迁移。R01–R26/G01–G05 的完整原始验收证据尚未对账，不宣称满足。
+## 两条真实任务
 
-[实时主分支保护快照](evidence/main-protection.json)确认六项必需检查、严格基线、管理员约束、一名独立审批者、过期审批撤销、最近推送独立审批和讨论解决要求均开启。本 PR 不调整保护或现有工作流。`luofanghao1203` 的非作者人审仍未发生；机审、配置与本机检查都不能代替它。
-
-## 本机安装及实际结果
-
-Paperclip 固定 `2026.1023.0`，上游 tag 提交 `1b4c803816e82b0265c8422e1a804327a7ed8c54`。环境为 macOS arm64、Node v24.22.1、npm 11.19.1、Python 3.9.6、内嵌 PostgreSQL 18.1。运行时直接依赖与完整锁文件位于 `config/paperclip-pilot/runtime/`，未加入梦擎业务依赖。
-
-| 验证项 | 结果 | 真实证据及限制 |
+| 任务 | 实际交付 | 审查与接续 |
 |---|---|---|
-| 固定版本安装 | PASS | 最终独立目录安装退出 0；完整锁文件在另一空目录执行 `npm ci --dry-run --legacy-peer-deps --ignore-scripts` 退出 0；未将 dry-run 当成第二次实际安装 |
-| 服务与页面 | PASS | `/api/health` 返回 `ok`，主页 HTTP 200；实际浏览器显示暂停警告、19 paused、0 running、0 tasks、0 spend |
-| 访问范围 | PASS（本机） | 实际监听 `127.0.0.1:43100`；local_trusted/private。未验收云端认证或公网访问安全 |
-| 公司与岗位 | PASS（配置） | 1 个暂停公司、19 个暂停岗位；原 16 岗加客户成功/增长/商业运营；岗位创建与技能创建权限关闭，新岗位审批重新开启 |
-| 执行器限制 | PASS（落库） | 显式关闭 bypass；只读执行参数、关闭网络参数及心跳/任务唤醒配置均经 API 读回。尚未启动 Codex/OpenCode 进程验证执行限制 |
-| 凭据隔离 | PASS（本机静态） | 只读数据库事务确认 19 个岗位的模型密钥为空，均指向外部空 Codex home，auth.json 不存在；仅输出计数和布尔值 |
-| 重复初始化 | PASS | 重跑返回完全相同公司与岗位 ID，仍为 19 岗、0 任务；补齐后重跑无创建或更新请求 |
-| 正常停止与恢复 | PASS（有界范围） | 向本试点服务发送 SIGINT，执行端退出 0，API 与数据库监听均退出；以全新安装目录加载同一数据目录后，公司/岗位 ID 与暂停配置保持一致 |
-| 安全拒绝检查 | PASS | 6 个本地检查覆盖远端/歧义地址、非空工作目录、异名或活动公司、重复岗位、调度/导入/唤醒、超预算和超并发配置拒绝；见[检查输出](evidence/safety-tests.txt) |
-| 两条真实研发任务自动接续 | NOT TESTED | 未调用模型、未建立开发任务、未给 Agent GitHub 写入凭据；不能以模板创建代替编码闭环 |
-| 重复事件/并发认领/停止竞态/失联 | NOT TESTED | 重复初始化不等于事件防重或执行租约验证；没有旧执行端回执 |
-| 崩溃恢复、隔离备份恢复、RTO/RPO | NOT TESTED | 仅正常重启恢复已验证；上游自动备份配置存在不等于备份恢复验收 |
-| 24 Skill、OpenCode、独立 QA/机审/人审 | NOT TESTED | 没有自动导入旧技能、运行真实编码或伪造独立审查 |
-| 客服/分析/监控/增长/商业集成 | CONFIG ONLY | 有职责与权限边界；没有接入真实渠道、客户数据、支付或对外发布 |
-| $200 云端硬预算及 7×24 | NOT TESTED | 已提供公开报价候选；未开通账户资源、未核对含税订单或实际 CI 用量，未部署云端 |
+| MEN-5 / `a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a` | 整数分为单位的基础设施预算计算器及边界测试 | 独立 QA Agent 执行检查并批准；executionState=completed / lastDecisionOutcome=approved |
+| MEN-6 / `ebffcf64-e205-4d8c-9384-9b76114db41e` | 增加税费向上取整和费用预留，保留原调用行为 | 第一条批准后由原生依赖机制自动唤醒；第二轮独立 QA 批准，同样留下完成决策 |
 
-原始 API 统一脱敏环境变量，初版验证将脱敏值误当成空值，导致断言失败；已修正为 API 结构检查加本机数据库只读核验，没有关闭脱敏。[初始化读回](evidence/seed-after-restart.json)、[数据库布尔证据](evidence/local-db-verification.json)、[运行摘要及锁文件摘要](evidence/local-runtime.json)。`modelCalls=NOT_INVOKED` 另外由 `heartbeatRuns=0` 的数据库计数支持。
+只有 MEN-5 初次启动为人工 kickoff。随后 QA、第二条编码、第二轮 QA 的 invocationSource 均为 `automation`。本轮四个执行记录及时间见 [native-trial-runs.json](evidence/native-trial-runs.json)，完整状态观察、8 次新运行观察阈值、每次 180 秒配置及清理回执见 [native-two-task-trial.json](evidence/native-two-task-trial.json)。此前设置试点失败产生的 MEN-1～MEN-4 保留为 Cancelled，暂停守卫 MEN-7 也保留为 Cancelled。
 
-## 安装中遇到的实际失败
+两个编码执行因移交任务而记录为 `cancelled / issue_reassigned`，两个 QA 执行记录为 `succeeded`；**不能表述为四个进程全部正常退出**。代码、测试、QA 决策及后继任务均有独立证据。编码执行的 token/cost 回执不完整，不能把其中 0 token 或页面 $0.00 当作没有消耗额度或完整财务核算。
 
-依赖下载曾停滞。中断后过早复用同一安装目录，旧安装进程的延迟清理移除了新依赖，已停止本试点服务、等待旧安装完全结束，改用全新 `paperclip-runtime-verified` 目录完成安装，保留同一公司数据。该问题已修复；没有把此前短暂的健康状态当作最终安装成功。
+最终代码在 `scripts/paperclip-pilot/sample-budget/`。主执行者另外实际运行了全部 **18 项单元测试**，涵盖非法输入、布尔值拒绝、大整数精度、空输入、临界预算、税费取整及预留导致超限。该工具仅计算候选成本，不创建、购买或停止云资源。
 
-npm 11 阻止未批准的依赖安装脚本，初次内嵌数据库初始化失败。审阅后只执行了对应 PostgreSQL 包的链接恢复脚本，17 条链接均在该包 native 目录，随后 initdb 与真实服务启动成功。其他安装脚本未批量放行。
+## 实际权限与暂停验证
 
-从中断安装得到的首份锁文件曾被 `npm ci` 拒绝，原因是缺失部分平台可选依赖；全新目录重新解析得到最终锁文件后，空目录 dry-run 已通过。报告及 PR 只交付最终锁文件，不交付失败锁文件。
+原生 Codex 命名权限配置采用根目录拒绝、最小系统读取、合成工作区授权，以及只允许本机 Paperclip API 的工具网络代理。编码岗可写，QA 岗只读。必须使用 CLI engine；不与旧的 `--sandbox` 配置混用。权限模板位于 `config/paperclip-pilot/codex-profiles/`。
 
-## 当前入口、成本与回退
+六项真实系统检查通过：编码岗写试点目录成功，目录外合成标记读取失败，目录外写入失败已在初始检查观察；最终检查另确认登录目录合成标记读取失败、QA 写入失败、本机 API 成功、外部网络请求被拒绝。最终六项结果见 [permissions-actual.json](evidence/permissions-actual.json)。这些是本机实测，不代替 Linux 云主机或多租户隔离验收。
 
-当前本机入口：[Paperclip Dashboard](http://127.0.0.1:43100/MEN/dashboard)。公司 ID：`5923bae1-b181-40f6-b060-e772fef05b8e`。它是前台本机进程，没有注册登录启动服务；Mac 关闭后不会继续运行。公司预算 UI 显示 Unlimited，**不是 $200 硬保险**；$200 是独立云基础设施预算，模型预算另行授权。本阶段靠全部暂停、无模型凭据与无写入连接器阻止运行，不能将此状态直接作为带凭据的无人值守配置启用。
+公司暂停后，在原生调度开启、间隔 10 秒时建立一条不可执行的合成任务，观察 25 秒：任务状态和更新时间均未改变，没有新运行。随后关闭该合成任务，保留审计记录。[暂停守卫证据](evidence/paused-company-guard.json)。这只是有界观察，不代表长期无人值守已验收。
 
-最终安装目录为当前聊天工作目录下 `work/paperclip-runtime-verified`；数据为 `work/paperclip-state-100`；合成目录为 `work/paperclip-synthetic-100`。这些实际状态和私密文件不提交仓库。恢复启动、只读核验与云端 $200 候选明细见[操作说明](README.md)。模型、客服、监控等业务订阅均未采购。
+结束时只读数据库核验：19 岗全部暂停，19 岗模型 API key 均为空且指向不带 auth.json 的空目录；7 条本轮任务、9 个 Paperclip 运行记录、0 个运行中/排队执行。独立订阅的凭据文件仍由用户保留在私有登录目录，但执行岗位已经解除关联。[最终状态](evidence/final-paused-db.json)。另有一次直接 CLI 连通性探测，不在这 9 个 Paperclip 运行之内。
 
-回退仅需停止该试点进程并确认两端口退出，保留独立数据和日志；原任务系统没有被接管，无需迁回。配置撤回走新的审查提交，不删除其他 worktree 或原系统数据。
+## 原版失败及本地修正
 
-下一阶段必须先审核具体地域与含税报价，并补齐历史权威/UNKNOWN 回执，再在受限制执行环境中完成真实研发和故障验收。当前裁决：**允许审查本机试点 Draft；禁止据此恢复正式业务、合并主线、采购或部署生产。**
+1. **默认 ACP 与 CLI 权限不一致。** 原版适配器默认 ACP；其运行回执显示 persistent/approve-all，终端调用退出 134，未生成代码。已停止原试跑，核对终态与无代码副作用，只对明确的本轮恢复记录提交了执行端停止/未执行证据，随后显式固定 CLI。没有通过重置历史 UNKNOWN 或放宽权限解决。
+2. **首次 QA 唤醒遗漏。** 编码 Agent 提交进入审查时，QA 首次唤醒因前一执行环境仍在清理而被跳过；原恢复逻辑在 QA 尚无任何运行时直接跳过，任务滞留 in_review。最小补丁补投当前仍待处理的首次审查，保留已有队列、权限、成本和运行准入检查；另外让暂停公司的任务不进入恢复扫描。原版失败后用新编号 MEN-5/MEN-6 验证，未靠主执行者手工唤醒 QA 或标记批准过关。
+3. **成本门禁阻断。** 早期设置了 $2.50 的试点账面阈值，观察到预算/核算门禁阻断；原始错误还包括“completed runs await accounting”，不能只归因于实际花费超额，更不能视为订阅外账单。最终阶段不设虚构的订阅美元阈值，改用 8 次新运行停止观察阈值、每次 180 秒配置及 12 分钟观察窗口的有界试点；只发生 4 次该轮运行。观察守卫存在轮询窗口，不能视作服务端硬准入上限。实际超时/运行阈值触发、完整成本归集和账户额度耗尽恢复仍未验收。
+4. **JavaScript 数据库恢复精度差异。** 原版 JavaScript 备份恢复后内容摘要不一致；四张代表性非空表中观察到 107 处时间字段差异，均在毫秒精度相同、亚毫秒不同。详见[诊断](evidence/javascript-recovery-precision-failure.json)。本轮没有修补该备份引擎，也没有用行数相同代替内容一致。
+
+补丁为明确的本机试点修改，并非新上游正式版本。源码 patch、运行时 patch 与 SHA-256 清单均可审查；`patch_runtime.py` 拒绝未知内容并要求服务停止后更改。已经实际完成 **revert → 原始摘要核对 → apply → 补丁摘要核对**，并通过运行时 JS 语法检查。完整上游 TypeScript 构建/单元套件尚未运行；本轮验证依据是失败复现、真实原生流程、权限检查和恢复演练。
+
+## 备份与恢复
+
+采用本机已有 PostgreSQL 18.6 的原生 pg_dump/psql 工具，对内嵌 PostgreSQL 18.1 做备份，并恢复到同主机全新数据库。原库未被覆盖，恢复库未接入运行服务，也未启动模型。最终演练在真实任务完成之后执行，**277 张表的全部行内容摘要与原库一致，且原库前后摘要不变**。[恢复证据](evidence/native-recovery-after-trial.json)。原始备份包含私有运行状态，只留在权限受限的 work 目录，未随 PR/输出包公开。
+
+这是同主机逻辑备份恢复，不包括新主机、完整实例私钥/文件恢复、运行中崩溃、RTO/RPO 或模型在途恢复。上游自动备份在原生工具不可用时可能退回上述 JavaScript 引擎，因此**自动备份策略和完整灾备仍未验收**；不能只因本次原生手动演练通过而接受它。
+
+## 当前裁决与下一阶段
+
+当前入口：[本机 Paperclip](http://127.0.0.1:43100/MEN/issues)。19 岗及公司均暂停，启动器已恢复默认关闭原生事件调度；仍为前台本机进程，不保证 Mac 关闭后继续运行。当前使用经过摘要核对的本地恢复补丁，启动需要明确 `--allow-recovery-patch`。补丁撤销和同目录恢复已经实测。
+
+允许审查：本机订阅连接、CLI 权限、带补丁的两任务真实研发接续、独立 QA、18 项工具测试、暂停守卫、原生同机逻辑恢复。仍不允许据此恢复正式业务或合并主线。
+
+尚未验收：历史 revision 13 原任务权威与 UNKNOWN 停止回执；24 Skill 的原件核对与实际迁移；OpenCode；多可写 worktree；跨主机恢复及真实在途故障；完整模型成本和限额策略；GitHub 六项必需检查与 `luofanghao1203` 非作者人审；真实客户、监控、增长、支付等连接器；Linux 云端和 7×24 运行。
+
+原 #98 OpenHands 和 #99 原生 DQ 试点继续保留，未接管它们。模型凭据不因岗位模板存在而开放给全部岗位。云资源候选仍按[操作说明的 $200/月明细](README.md)审核，含税、地域、流量与 CI 账户实际报价尚未锁定，未经确认不采购；生产权限没有扩大。
+
+官方依据：[Codex 认证](https://learn.chatgpt.com/docs/auth)、[命名权限配置](https://learn.chatgpt.com/docs/permissions)。权限配置为持续演进功能，云端必须重新实测，不能直接复制本机通过结论。

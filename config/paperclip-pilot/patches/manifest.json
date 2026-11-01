@@ -1,0 +1,17 @@
+{
+  "upstreamVersion": "2026.1023.0",
+  "upstreamCommit": "1b4c803816e82b0265c8422e1a804327a7ed8c54",
+  "scope": "LOCAL_PILOT_ONLY",
+  "files": [
+    {
+      "file": "server/src/services/recovery/service.ts",
+      "beforeSha256": "c414df876e7df64e701a752513db8e5cf7365589294d50da0e1396788a9207db",
+      "afterSha256": "44942615dff53c4aae97c86016c7f8942ac1228fa4b443bb5ef00229a81faf91"
+    },
+    {
+      "file": "server/dist/services/recovery/service.js",
+      "beforeSha256": "045a3e250179498817b7a721d94ace5cfd31dc5f03c292dbd6c70f5cdb28ad0f",
+      "afterSha256": "e814c78f15c572338a0da6088dabf16abc5bc2526731d4b6fbe5b999f1d1825d"
+    }
+  ]
+}

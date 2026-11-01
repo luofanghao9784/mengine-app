@@ -1,0 +1,855 @@
+{
+  "companyId": "5923bae1-b181-40f6-b060-e772fef05b8e",
+  "status": "TASKS_REVIEWED_DONE_PENDING_OPERATOR_VERIFICATION",
+  "tasks": [
+    {
+      "id": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+      "identifier": "MEN-5",
+      "title": "[PILOT-100] A 整数成本门禁"
+    },
+    {
+      "id": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+      "identifier": "MEN-6",
+      "title": "[PILOT-100] B 税费与预留成本接续"
+    }
+  ],
+  "observations": [
+    {
+      "at": 1793517660.746111,
+      "tasks": [
+        {
+          "id": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+          "status": "todo",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        },
+        {
+          "id": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+          "status": "todo",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        }
+      ],
+      "runs": [
+        {
+          "id": "e4d6e730-5389-43d6-975d-69699a1417fe",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "running",
+          "errorCode": null
+        },
+        {
+          "id": "16fb118f-47ea-4e5a-b9b5-45ba9dc03f65",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "c95c00f0-3617-4e95-b048-76d87d2961ae",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "5e3f624a-a984-4f99-bafe-9d26994aa5d3",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "cancelled"
+        },
+        {
+          "id": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ]
+    },
+    {
+      "at": 1793517663.7884521,
+      "tasks": [
+        {
+          "id": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+          "status": "in_progress",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        },
+        {
+          "id": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+          "status": "todo",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        }
+      ],
+      "runs": [
+        {
+          "id": "e4d6e730-5389-43d6-975d-69699a1417fe",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "running",
+          "errorCode": null
+        },
+        {
+          "id": "16fb118f-47ea-4e5a-b9b5-45ba9dc03f65",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "c95c00f0-3617-4e95-b048-76d87d2961ae",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "5e3f624a-a984-4f99-bafe-9d26994aa5d3",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "cancelled"
+        },
+        {
+          "id": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ]
+    },
+    {
+      "at": 1793517697.396676,
+      "tasks": [
+        {
+          "id": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+          "status": "in_review",
+          "assigneeAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "executionState": {
+            "status": "pending",
+            "monitor": null,
+            "reviewRequest": null,
+            "currentStageId": "01d803c0-842b-4103-89ca-438be1e89e39",
+            "lastDecisionId": null,
+            "returnAssignee": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5"
+            },
+            "currentStageType": "review",
+            "completedStageIds": [],
+            "currentStageIndex": 0,
+            "currentParticipant": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "9604696a-6367-48c2-b7bf-13339a13989e"
+            },
+            "lastDecisionOutcome": null,
+            "changesRequestedCount": 0
+          }
+        },
+        {
+          "id": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+          "status": "todo",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        }
+      ],
+      "runs": [
+        {
+          "id": "a469f457-bc86-4ed4-adb4-4def64780d12",
+          "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "status": "running",
+          "errorCode": null
+        },
+        {
+          "id": "e4d6e730-5389-43d6-975d-69699a1417fe",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "16fb118f-47ea-4e5a-b9b5-45ba9dc03f65",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "c95c00f0-3617-4e95-b048-76d87d2961ae",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "5e3f624a-a984-4f99-bafe-9d26994aa5d3",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "cancelled"
+        },
+        {
+          "id": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ]
+    },
+    {
+      "at": 1793517734.138745,
+      "tasks": [
+        {
+          "id": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+          "status": "done",
+          "assigneeAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "executionState": {
+            "status": "completed",
+            "monitor": null,
+            "reviewRequest": null,
+            "currentStageId": null,
+            "lastDecisionId": "6693af49-ad6b-4a5c-91af-906537e21164",
+            "returnAssignee": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5"
+            },
+            "currentStageType": null,
+            "completedStageIds": [
+              "01d803c0-842b-4103-89ca-438be1e89e39"
+            ],
+            "currentStageIndex": null,
+            "currentParticipant": null,
+            "lastDecisionOutcome": "approved",
+            "changesRequestedCount": 0
+          }
+        },
+        {
+          "id": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+          "status": "in_progress",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        }
+      ],
+      "runs": [
+        {
+          "id": "0c023b1d-f9c6-40b7-b51d-56445ebeae62",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "running",
+          "errorCode": null
+        },
+        {
+          "id": "a469f457-bc86-4ed4-adb4-4def64780d12",
+          "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "status": "running",
+          "errorCode": null
+        },
+        {
+          "id": "e4d6e730-5389-43d6-975d-69699a1417fe",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "16fb118f-47ea-4e5a-b9b5-45ba9dc03f65",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "c95c00f0-3617-4e95-b048-76d87d2961ae",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "5e3f624a-a984-4f99-bafe-9d26994aa5d3",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "cancelled"
+        },
+        {
+          "id": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ]
+    },
+    {
+      "at": 1793517740.22771,
+      "tasks": [
+        {
+          "id": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+          "status": "done",
+          "assigneeAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "executionState": {
+            "status": "completed",
+            "monitor": null,
+            "reviewRequest": null,
+            "currentStageId": null,
+            "lastDecisionId": "6693af49-ad6b-4a5c-91af-906537e21164",
+            "returnAssignee": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5"
+            },
+            "currentStageType": null,
+            "completedStageIds": [
+              "01d803c0-842b-4103-89ca-438be1e89e39"
+            ],
+            "currentStageIndex": null,
+            "currentParticipant": null,
+            "lastDecisionOutcome": "approved",
+            "changesRequestedCount": 0
+          }
+        },
+        {
+          "id": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+          "status": "in_progress",
+          "assigneeAgentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "executionState": null
+        }
+      ],
+      "runs": [
+        {
+          "id": "0c023b1d-f9c6-40b7-b51d-56445ebeae62",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "running",
+          "errorCode": null
+        },
+        {
+          "id": "a469f457-bc86-4ed4-adb4-4def64780d12",
+          "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "e4d6e730-5389-43d6-975d-69699a1417fe",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "16fb118f-47ea-4e5a-b9b5-45ba9dc03f65",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "c95c00f0-3617-4e95-b048-76d87d2961ae",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "5e3f624a-a984-4f99-bafe-9d26994aa5d3",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "cancelled"
+        },
+        {
+          "id": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ]
+    },
+    {
+      "at": 1793517788.974164,
+      "tasks": [
+        {
+          "id": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+          "status": "done",
+          "assigneeAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "executionState": {
+            "status": "completed",
+            "monitor": null,
+            "reviewRequest": null,
+            "currentStageId": null,
+            "lastDecisionId": "6693af49-ad6b-4a5c-91af-906537e21164",
+            "returnAssignee": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5"
+            },
+            "currentStageType": null,
+            "completedStageIds": [
+              "01d803c0-842b-4103-89ca-438be1e89e39"
+            ],
+            "currentStageIndex": null,
+            "currentParticipant": null,
+            "lastDecisionOutcome": "approved",
+            "changesRequestedCount": 0
+          }
+        },
+        {
+          "id": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+          "status": "in_review",
+          "assigneeAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "executionState": {
+            "status": "pending",
+            "monitor": null,
+            "reviewRequest": null,
+            "currentStageId": "96b080ee-12e6-45b3-ae07-cd2f7a7cf6fe",
+            "lastDecisionId": null,
+            "returnAssignee": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5"
+            },
+            "currentStageType": "review",
+            "completedStageIds": [],
+            "currentStageIndex": 0,
+            "currentParticipant": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "9604696a-6367-48c2-b7bf-13339a13989e"
+            },
+            "lastDecisionOutcome": null,
+            "changesRequestedCount": 0
+          }
+        }
+      ],
+      "runs": [
+        {
+          "id": "0c023b1d-f9c6-40b7-b51d-56445ebeae62",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "a469f457-bc86-4ed4-adb4-4def64780d12",
+          "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "e4d6e730-5389-43d6-975d-69699a1417fe",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "16fb118f-47ea-4e5a-b9b5-45ba9dc03f65",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "c95c00f0-3617-4e95-b048-76d87d2961ae",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "5e3f624a-a984-4f99-bafe-9d26994aa5d3",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "cancelled"
+        },
+        {
+          "id": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ]
+    },
+    {
+      "at": 1793517798.13393,
+      "tasks": [
+        {
+          "id": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+          "status": "done",
+          "assigneeAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "executionState": {
+            "status": "completed",
+            "monitor": null,
+            "reviewRequest": null,
+            "currentStageId": null,
+            "lastDecisionId": "6693af49-ad6b-4a5c-91af-906537e21164",
+            "returnAssignee": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5"
+            },
+            "currentStageType": null,
+            "completedStageIds": [
+              "01d803c0-842b-4103-89ca-438be1e89e39"
+            ],
+            "currentStageIndex": null,
+            "currentParticipant": null,
+            "lastDecisionOutcome": "approved",
+            "changesRequestedCount": 0
+          }
+        },
+        {
+          "id": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+          "status": "in_review",
+          "assigneeAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "executionState": {
+            "status": "pending",
+            "monitor": null,
+            "reviewRequest": null,
+            "currentStageId": "96b080ee-12e6-45b3-ae07-cd2f7a7cf6fe",
+            "lastDecisionId": null,
+            "returnAssignee": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5"
+            },
+            "currentStageType": "review",
+            "completedStageIds": [],
+            "currentStageIndex": 0,
+            "currentParticipant": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "9604696a-6367-48c2-b7bf-13339a13989e"
+            },
+            "lastDecisionOutcome": null,
+            "changesRequestedCount": 0
+          }
+        }
+      ],
+      "runs": [
+        {
+          "id": "7e65124d-487e-425f-8046-905969c5d92a",
+          "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "status": "running",
+          "errorCode": null
+        },
+        {
+          "id": "0c023b1d-f9c6-40b7-b51d-56445ebeae62",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "a469f457-bc86-4ed4-adb4-4def64780d12",
+          "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "e4d6e730-5389-43d6-975d-69699a1417fe",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "16fb118f-47ea-4e5a-b9b5-45ba9dc03f65",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "c95c00f0-3617-4e95-b048-76d87d2961ae",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "5e3f624a-a984-4f99-bafe-9d26994aa5d3",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "cancelled"
+        },
+        {
+          "id": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ]
+    },
+    {
+      "at": 1793517843.916757,
+      "tasks": [
+        {
+          "id": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+          "status": "done",
+          "assigneeAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "executionState": {
+            "status": "completed",
+            "monitor": null,
+            "reviewRequest": null,
+            "currentStageId": null,
+            "lastDecisionId": "6693af49-ad6b-4a5c-91af-906537e21164",
+            "returnAssignee": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5"
+            },
+            "currentStageType": null,
+            "completedStageIds": [
+              "01d803c0-842b-4103-89ca-438be1e89e39"
+            ],
+            "currentStageIndex": null,
+            "currentParticipant": null,
+            "lastDecisionOutcome": "approved",
+            "changesRequestedCount": 0
+          }
+        },
+        {
+          "id": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+          "status": "done",
+          "assigneeAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "executionState": {
+            "status": "completed",
+            "monitor": null,
+            "reviewRequest": null,
+            "currentStageId": null,
+            "lastDecisionId": "296bfde1-3c8b-4580-b11d-1f156daa9a7b",
+            "returnAssignee": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5"
+            },
+            "currentStageType": null,
+            "completedStageIds": [
+              "96b080ee-12e6-45b3-ae07-cd2f7a7cf6fe"
+            ],
+            "currentStageIndex": null,
+            "currentParticipant": null,
+            "lastDecisionOutcome": "approved",
+            "changesRequestedCount": 0
+          }
+        }
+      ],
+      "runs": [
+        {
+          "id": "7e65124d-487e-425f-8046-905969c5d92a",
+          "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "status": "running",
+          "errorCode": null
+        },
+        {
+          "id": "0c023b1d-f9c6-40b7-b51d-56445ebeae62",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "a469f457-bc86-4ed4-adb4-4def64780d12",
+          "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "e4d6e730-5389-43d6-975d-69699a1417fe",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "16fb118f-47ea-4e5a-b9b5-45ba9dc03f65",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "c95c00f0-3617-4e95-b048-76d87d2961ae",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "5e3f624a-a984-4f99-bafe-9d26994aa5d3",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "cancelled"
+        },
+        {
+          "id": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ]
+    },
+    {
+      "at": 1793517853.072802,
+      "tasks": [
+        {
+          "id": "a3e38c21-f55d-445f-a4cc-cf4bdd0f9a7a",
+          "status": "done",
+          "assigneeAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "executionState": {
+            "status": "completed",
+            "monitor": null,
+            "reviewRequest": null,
+            "currentStageId": null,
+            "lastDecisionId": "6693af49-ad6b-4a5c-91af-906537e21164",
+            "returnAssignee": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5"
+            },
+            "currentStageType": null,
+            "completedStageIds": [
+              "01d803c0-842b-4103-89ca-438be1e89e39"
+            ],
+            "currentStageIndex": null,
+            "currentParticipant": null,
+            "lastDecisionOutcome": "approved",
+            "changesRequestedCount": 0
+          }
+        },
+        {
+          "id": "ebffcf64-e205-4d8c-9384-9b76114db41e",
+          "status": "done",
+          "assigneeAgentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "executionState": {
+            "status": "completed",
+            "monitor": null,
+            "reviewRequest": null,
+            "currentStageId": null,
+            "lastDecisionId": "296bfde1-3c8b-4580-b11d-1f156daa9a7b",
+            "returnAssignee": {
+              "type": "agent",
+              "userId": null,
+              "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5"
+            },
+            "currentStageType": null,
+            "completedStageIds": [
+              "96b080ee-12e6-45b3-ae07-cd2f7a7cf6fe"
+            ],
+            "currentStageIndex": null,
+            "currentParticipant": null,
+            "lastDecisionOutcome": "approved",
+            "changesRequestedCount": 0
+          }
+        }
+      ],
+      "runs": [
+        {
+          "id": "7e65124d-487e-425f-8046-905969c5d92a",
+          "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "0c023b1d-f9c6-40b7-b51d-56445ebeae62",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "a469f457-bc86-4ed4-adb4-4def64780d12",
+          "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "e4d6e730-5389-43d6-975d-69699a1417fe",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "16fb118f-47ea-4e5a-b9b5-45ba9dc03f65",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "c95c00f0-3617-4e95-b048-76d87d2961ae",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "issue_reassigned"
+        },
+        {
+          "id": "5e3f624a-a984-4f99-bafe-9d26994aa5d3",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "cancelled",
+          "errorCode": "cancelled"
+        },
+        {
+          "id": "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "483efed4-da95-4564-a61a-55d5e1e1c8e6",
+          "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ]
+    }
+  ],
+  "historicalTasksImported": false,
+  "cloudOrProductionWrites": false,
+  "modelAuth": "USER_AUTHORIZED_ISOLATED_CHATGPT_SUBSCRIPTION",
+  "engine": "cli",
+  "priorRunIds": [
+    "16fb118f-47ea-4e5a-b9b5-45ba9dc03f65",
+    "c95c00f0-3617-4e95-b048-76d87d2961ae",
+    "5e3f624a-a984-4f99-bafe-9d26994aa5d3",
+    "d7d34cbc-3a9c-46cc-a9eb-e97260e61f8b",
+    "483efed4-da95-4564-a61a-55d5e1e1c8e6"
+  ],
+  "preservedPriorTaskIds": [
+    "40aa5689-711e-4e28-90f1-1b7beeb03715",
+    "69c8bc8c-7fbd-4f25-af3e-9d36fc9a1c1c",
+    "9ac97273-540e-46b6-bc02-d2ddccd709be",
+    "e78c69c5-7586-4c95-8ffa-05230a9c2315"
+  ],
+  "perRunTimeoutSeconds": 180,
+  "initialRunId": "e4d6e730-5389-43d6-975d-69699a1417fe",
+  "cleanup": [
+    {
+      "agentId": "0bdf9d79-eccf-4285-accc-7436f77bfba5",
+      "pausedAndCredentialsDetached": true
+    },
+    {
+      "agentId": "9604696a-6367-48c2-b7bf-13339a13989e",
+      "pausedAndCredentialsDetached": true
+    }
+  ],
+  "runObservationStopThreshold": 8,
+  "hardAdmissionCapVerified": false
+}

@@ -1,0 +1,44 @@
+[
+  {
+    "check": "coderWrite",
+    "profile": "pilot-coder",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "pass": true
+  },
+  {
+    "check": "outsideRead",
+    "profile": "pilot-coder",
+    "exitCode": 1,
+    "expectedExitCode": 1,
+    "pass": true
+  },
+  {
+    "check": "authCanaryRead",
+    "profile": "pilot-coder",
+    "exitCode": 1,
+    "expectedExitCode": 1,
+    "pass": true
+  },
+  {
+    "check": "reviewerWrite",
+    "profile": "pilot-reviewer",
+    "exitCode": 1,
+    "expectedExitCode": 1,
+    "pass": true
+  },
+  {
+    "check": "localApi",
+    "profile": "pilot-coder",
+    "exitCode": 0,
+    "expectedExitCode": 0,
+    "pass": true
+  },
+  {
+    "check": "externalNetwork",
+    "profile": "pilot-coder",
+    "exitCode": 22,
+    "expectedExitCode": 22,
+    "pass": true
+  }
+]
