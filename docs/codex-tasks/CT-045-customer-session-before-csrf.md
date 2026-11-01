@@ -69,7 +69,10 @@ if(!List.of("GET","HEAD","OPTIONS").contains(request.getMethod()) && !identities
 - 不用 `getRequestURI()` 做豁免前缀比较，不在过滤器异常之后调用 `chain.doFilter`。
 - 不给 `CustomerSessionBeforeCsrfFilter` 加 `@Component`、`@Service`、`@Configuration` 或其它会被组件扫描收成 Bean 的注解。
 
-**CT-043-A 用例收紧：后续一步。** 本基准没有 `CheckTaskIntegrationTest`。本单用自己的新测试把 `POST /api/tenant-admin/v1/quality-ops/check-tasks` 的匿名三种锁成严格 401。CT-043-A 实现时，匿名无 CSRF、匿名乱 CSRF 必须写成严格 401，匿名有效 CSRF 继续 401，已登录无 CSRF 继续 403 `ACCESS_DENIED`。不再写「401 或 403」。若开工时 `CheckTaskIntegrationTest` 已经在 main 上，并且那两条仍允许 403：允许同一 PR 只改这两处断言，其余断言和控制器不动。当前基准下不要创建这个类。
+**`CheckTaskIntegrationTest` 的匿名断言按合入顺序收紧。** 本单自己的新测试仍把 `POST /api/tenant-admin/v1/quality-ops/check-tasks` 的匿名三种锁成严格 401。不改 [`CT-043-A`](CT-043-A-quality-check-submit-api.md) 那份任务单。按当前进度，#53（CT-043-A 实现）大概率先合。
+
+- #53 先合：在 CT-045 的同一个实现 PR 里，把 `CheckTaskIntegrationTest` 的「匿名无 CSRF」「匿名乱 CSRF」两条断言从 `{401,403}` 收紧为 `401`。该文件写入改动白名单，只许改这两条断言。
+- CT-045 先合：这个实现 PR 不创建、不修改 `CheckTaskIntegrationTest`。#53 合入之后另开一个单行小改，只做同样的两处收紧。
 
 ## 契约（各情形状态码与行为表）
 
@@ -116,14 +119,19 @@ if(!List.of("GET","HEAD","OPTIONS").contains(request.getMethod()) && !identities
 
 必跑（禁止 `-DskipTests`，禁止 `@Disabled`，禁止把已登录 403 改成 401 来变绿）：
 
+共享电脑是 Linux。JDK 21，PostgreSQL 18.6。`JAVA_HOME` 指本机已装的 JDK 21，示例路径按实际安装修改。`initdb`、`pg_ctl`、`psql` 已在 `PATH` 里就不必设 `POSTGRES_BIN`；不在 `PATH` 里时再设，例如 `export POSTGRES_BIN=/usr/lib/postgresql/18/bin`。测试仍走 `scripts/with-test-postgres.py`。
+
 ```bash
-export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
-export POSTGRES_BIN="$(brew --prefix postgresql@18)/bin"
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+export PATH="$JAVA_HOME/bin:${POSTGRES_BIN:+$POSTGRES_BIN:}$PATH"
+java -version
+psql --version
 python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml test \
-  -Dtest=CustomerSessionBeforeCsrfIntegrationTest,ForwardingIntegrationTest,IdentityIntegrationTest,PhoneIdentityIntegrationTest,CapabilityRegistryIntegrationTest,AgentAdminIdentityIntegrationTest,UnifiedIdentityIntegrationTest
+  -Dtest=CustomerSessionBeforeCsrfIntegrationTest,ForwardingIntegrationTest,IdentityIntegrationTest,PhoneIdentityIntegrationTest,CapabilityRegistryIntegrationTest,AgentAdminIdentityIntegrationTest,UnifiedIdentityIntegrationTest,ExperienceIntegrationTest,FeedbackIntegrationTest,ExperienceAdjustmentIntegrationTest,GeneralExperienceSuggestionIntegrationTest,GeneralExperienceLibraryIntegrationTest
+python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml test
 ```
 
-最后为 `BUILD SUCCESS`，上述类 `Failures: 0`。
+两次都要 `BUILD SUCCESS`，并且 `Failures: 0, Errors: 0`。第二次是 `apps/api` 全量 `mvn test`，不带 `-Dtest`。
 
 | # | 断言 |
 |---|---|
@@ -142,9 +150,10 @@ python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml tes
 | A13 | 第四端回归不变：`CapabilityRegistryIntegrationTest` 与 `AgentAdminIdentityIntegrationTest` 全绿。`git diff` 中没有 `AgentAdminSecurity.java` |
 | A14 | 总台回归不变：`UnifiedIdentityIntegrationTest` 全绿（总台登录不带 CSRF 仍 403）。`PlatformSecurity.java` 与 `SupportSecurity.java` 无 diff |
 | A15 | `git diff --name-only origin/main` 每一行都在白名单。无迁移。无 `src/**`。客户链源码中该写路径没有新的 `permitAll` 或 `csrf.disable()`。`AgentAdminSecurity` 不引用新过滤器。测试反射 `CustomerSessionBeforeCsrfFilter`：不存在返回该类型的 `@Bean` 方法；类上的直接注解和元注解都不得包含 `@Component`、`@Service`、`@Configuration`、`@Controller`、`@RestController`、`@Repository`、`@WebFilter` |
-| A16 | 已登录后不带 CSRF 仍须 403 的旧用例保持原断言，包括 `ExperienceIntegrationTest.realHttpRequiresSessionCsrfAndReturnsNoStore`、`FeedbackIntegrationTest.realHttpFeedbackPersistsAndRequiresSessionCsrf`、`ExperienceAdjustmentIntegrationTest.httpSubmissionAndObservationRequireCustomerCsrfAndExposeNoProposedBody`、`GeneralExperienceSuggestionIntegrationTest.httpSuggestionRequiresCustomerSessionAndCsrfAndNeverReturnsPrivateText`。它们变红时，修正过滤器对已登录的判断 |
+| A16 | 已登录后不带 CSRF 仍须 403 的旧用例保持原断言，包括 `ExperienceIntegrationTest.realHttpRequiresSessionCsrfAndReturnsNoStore`、`FeedbackIntegrationTest.realHttpFeedbackPersistsAndRequiresSessionCsrf`、`ExperienceAdjustmentIntegrationTest.httpSubmissionAndObservationRequireCustomerCsrfAndExposeNoProposedBody`、`GeneralExperienceSuggestionIntegrationTest.httpSuggestionRequiresCustomerSessionAndCsrfAndNeverReturnsPrivateText`，以及 `GeneralExperienceLibraryIntegrationTest` 里已登录缺 CSRF 仍为 403 的断言。它们变红时，修正过滤器对已登录的判断 |
 | A17 | 豁免模式集合与 `apiSecurity` 里 `requestMatchers(...).permitAll()` 的路径模式集合相等，测试读出两边比较。豁免匹配使用 `PathPattern` 或与 `requestMatchers` 相同的 `servletPath`。过滤器源码不得用 `getRequestURI()` 做豁免前缀比较。匿名 `POST /api/v1/auth/login/extra` 仍是 401，不得因字符串前缀被当成登录豁免 |
 | A18 | 两条独立用例，都落在受保护写上，响应为 A1 的 401 合同，业务表不增加，且不是后续 CSRF 的 403、也不是业务成功。其一：已认证主体名不是合法 UUID。其二：`validSession` 抛出查库异常。两条都不得进入控制器 |
+| A19 | 按合入顺序收紧 `CheckTaskIntegrationTest` 的「匿名无 CSRF」「匿名乱 CSRF」，从 `{401,403}` 改为 `401`，其余断言不动。#53 先合（按当前进度大概率如此）：收紧写在 CT-045 的同一个实现 PR。CT-045 先合：本 PR 不改该文件，#53 合入后另开单行小改。不改 CT-043-A 任务单 |
 
 A5 的覆盖方式：安全链在进入控制器之前返回固定 401 合同，所以已映射的客户写口都到不了业务写入。代表口再查表。豁免口和安全方法不进这条遍历，由 A4 的 GET、A11、A12 锁住。
 
@@ -158,10 +167,9 @@ A5 的覆盖方式：安全链在进入控制器之前返回固定 401 合同，
 | `apps/api/src/main/java/com/dreamcore/workspace/identity/CustomerSessionBeforeCsrfFilter.java` | 新建。仅服务客户链，由 `IdentitySecurity` 显式 `new`。无 `@Bean`，无 `@Component` / `@Service` / `@Configuration` 等扫描注解。豁免与 `permitAll` 同一套路径匹配。异常路径不调用 `chain.doFilter` |
 | `apps/api/src/test/java/com/dreamcore/workspace/CustomerSessionBeforeCsrfIntegrationTest.java` | 新建。承担 A1–A3、A5、A6–A7 的 check-tasks、A10、A15 的注解反射、A17、A18 |
 | `apps/api/src/test/java/com/dreamcore/workspace/ForwardingIntegrationTest.java` | 只扩展 `publicApiRequiresSessionAndCsrf`：匿名 POST 改为 401，并补上匿名三种与已登录缺 CSRF、乱 CSRF、登录前 CSRF。`realAuthenticatedHttpAcceptanceConflictAndRevocation` 的 201 保持原样 |
+| `apps/api/src/test/java/com/dreamcore/workspace/CheckTaskIntegrationTest.java` | 仅当 #53 已先合。按 A19 只改「匿名无 CSRF」「匿名乱 CSRF」两条，从 `{401,403}` 改为 `401`。CT-045 先合时，本 PR 不改此文件 |
 
-额外只允许这一类 diff：某个已有测试仅仅因为「匿名、非豁免、客户链写」从 403 变成 401 而失败。只改那一条期望，PR 里写上文件名。已知必改是上一行的转发测试。已登录仍应 403 的期望不在此列。
-
-开工时若 `apps/api/src/test/java/com/dreamcore/workspace/CheckTaskIntegrationTest.java` 已存在：可以把它加入本次 diff，且只把匿名无 CSRF、匿名乱 CSRF 从「401 或 403」改为严格 401。不存在则不要创建。
+额外只允许这一类 diff：某个已有测试仅仅因为「匿名、非豁免、客户链写」从 403 变成 401 而失败。只改那一条期望，PR 正文列出文件名。已知必改是转发测试那一行。已登录仍应 403 的期望不在此列。
 
 禁改：
 
@@ -182,7 +190,8 @@ A5 的覆盖方式：安全链在进入控制器之前返回固定 401 合同，
 
 ```bash
 # 开工前确认当前没有暂停令。有，或拿不准：停，问 DQ。
-REPO="$HOME/Desktop/mengine-app-luofanghao9784"
+# 共享电脑是 Linux。REPO 改成这台机器上的正式克隆；origin 必须是 luofanghao9784/mengine-app。
+REPO="${MENGINE_REPO:-$HOME/mengine-app}"
 cd "$REPO"
 git remote get-url origin | grep -q 'luofanghao9784/mengine-app' || { echo 'ERROR: 错误 remote，停'; exit 1; }
 git status
@@ -190,22 +199,30 @@ git switch main && git pull
 git merge-base --is-ancestor d945af9235b07ecfbfc4990bd6c4ebae4324b769 HEAD || { echo 'ERROR: main 不含本单基准，停'; exit 1; }
 test -f apps/api/src/main/java/com/dreamcore/workspace/identity/IdentitySecurity.java || { echo 'ERROR: 找不到 IdentitySecurity，停'; exit 1; }
 test ! -f apps/api/src/main/java/com/dreamcore/workspace/agentadmin/CapabilityRegistryStubSecurity.java || { echo 'ERROR: StubSecurity 还在，停'; exit 1; }
-export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
-export POSTGRES_BIN="$(brew --prefix postgresql@18)/bin"
+# JDK 21。下面路径是示例，改成已安装的 JDK 21。
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+export PATH="$JAVA_HOME/bin:$PATH"
+# PostgreSQL 18.6。工具已在 PATH 则下面这一行不必执行。
+# export POSTGRES_BIN=/usr/lib/postgresql/18/bin
+# [ -n "${POSTGRES_BIN:-}" ] && export PATH="$POSTGRES_BIN:$PATH"
+java -version
+psql --version
 git switch -c fix/ct-045-customer-session-before-csrf
 ```
 
 实现并跑完「验收断言」里的测试命令，看到 `BUILD SUCCESS` 之后：
 
 ```bash
-cd "$HOME/Desktop/mengine-app-luofanghao9784"
+cd "${MENGINE_REPO:-$HOME/mengine-app}"
 git remote get-url origin | grep -q 'luofanghao9784/mengine-app' || exit 1
 git add \
   apps/api/src/main/java/com/dreamcore/workspace/identity/IdentitySecurity.java \
   apps/api/src/main/java/com/dreamcore/workspace/identity/CustomerSessionBeforeCsrfFilter.java \
   apps/api/src/test/java/com/dreamcore/workspace/CustomerSessionBeforeCsrfIntegrationTest.java \
   apps/api/src/test/java/com/dreamcore/workspace/ForwardingIntegrationTest.java
-# CheckTaskIntegrationTest 仅当开工时已经存在、且按 A16 只收紧匿名断言时，才追加这一行 git add
+# #53 已先合时，按 A19 追加 CheckTaskIntegrationTest，且 diff 只有那两条断言：
+# git add apps/api/src/test/java/com/dreamcore/workspace/CheckTaskIntegrationTest.java
+# 因匿名写从 403 变为 401 而改到的旧测试：按 PR 正文列出的文件追加
 echo '验收：git diff --name-only 仅落在白名单内'
 git diff --name-only origin/main
 git commit -m "$(cat <<'EOM'
@@ -221,7 +238,7 @@ gh pr create -R luofanghao9784/mengine-app --base main --head fix/ct-045-custome
 客户链 IdentitySecurity 对写请求先认 DREAMCORE_SESSION，再查 CSRF。未登录写一律 401；已登录但 CSRF 缺失或无效仍是 403。第四端链、总台链不改，不共享 Filter Bean。
 
 ## 测试
-CustomerSessionBeforeCsrfIntegrationTest、ForwardingIntegrationTest、IdentityIntegrationTest、PhoneIdentityIntegrationTest、CapabilityRegistryIntegrationTest、AgentAdminIdentityIntegrationTest、UnifiedIdentityIntegrationTest。
+必跑类见任务单 -Dtest。另跑一次 apps/api 全量 mvn test。两次都是 Failures: 0, Errors: 0。
 
 ## 审查
 架构逻辑 + 安全审查 + 质量性能。勿自动合并。"
@@ -229,7 +246,7 @@ CustomerSessionBeforeCsrfIntegrationTest、ForwardingIntegrationTest、IdentityI
 
 网页备用：https://github.com/luofanghao9784/mengine-app/compare/main...fix/ct-045-customer-session-before-csrf
 
-共享电脑上的克隆若不是 `~/Desktop/mengine-app-luofanghao9784`，只改 `cd` 的目录，不改 remote。
+共享电脑是 Linux。克隆不在 `$HOME/mengine-app` 时，只改 `REPO` 或 `cd` 的目录，不改 remote。
 
 `git status` 若已有别人的改动：`git stash push -u -m "ct-045-before"`，做完回到原分支再 `git stash pop`。`git pull` 或 `stash pop` 出现 `CONFLICT`：把 `git status` 原文交给 DQ，自己不解。`git push` 被拒：`git pull --rebase` 一次再执行上面的 push；仍冲突则停。禁止 `git push --force`、`-f`、`--force-with-lease`。
 
