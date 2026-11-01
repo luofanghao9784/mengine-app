@@ -11,6 +11,7 @@ import type {
   ExportSummary,
 } from '../../contracts/public-api/export.ts';
 import { createIdentityRequest, IdentityError, record, uuid } from '../identity/client.ts';
+import { withTimeout } from '../shared/abort-timeout.ts';
 const integer = (v: unknown, min = 0, max = Number.MAX_SAFE_INTEGER): v is number =>
   Number.isSafeInteger(v) && Number(v) >= min && Number(v) <= max;
 const one = (v: unknown, values: string[]) => typeof v === 'string' && values.includes(v);
@@ -222,7 +223,7 @@ export function createExportClient(fetcher: typeof fetch = fetch) {
           credentials: 'same-origin',
           cache: 'no-store',
           redirect: 'error',
-          signal: AbortSignal.any([AbortSignal.timeout(60000), ...(signal ? [signal] : [])]),
+          signal: withTimeout(signal, 60000),
         });
         if (!response.ok) {
           const error: unknown = await response.json().catch(() => null);

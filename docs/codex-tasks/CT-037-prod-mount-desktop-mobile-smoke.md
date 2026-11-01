@@ -1,5 +1,7 @@
 # CT-037 现网挂载 + 桌面/手机冒烟（M4）
 
+> **现状**：#41 已合 348cafc，生产 CapabilityCatalogPort=GrantCatalogAdapter，Empty 已删。下文若仍写 Empty 恒空，以本句为准。
+
 状态：执行单可交　｜　轨 **C 交付**　｜　分支（执行时）：`codex/ct-037-prod-mount-desktop-mobile-smoke`　｜　**审查人（两人审）：发布验收 + 质量性能**（架构逻辑可选；diff 出现 Java / 契约 / 迁移则架构改为必审并打回）　｜　基准：`origin/main` `701c3ca`（CT-039 实现 #31；含 CT-034-A `75ab17a`）　｜　日切片：**D9～D14（11-08～11-13）/ 可演示点**：现网 URL 能打开四端；桌面冒烟勾完 M1～M3 里已合的路径；手机 390 有上架空态、开通空态各 1
 
 > **挂靠**：两周 M4 · 验收句 **S1–S4**（[两周主路径验收句](https://www.notion.so/40966c386fbf81ad97cff544bc2906ff)）。日表 [`两周日切片-三轨并行-20261031.md`](两周日切片-三轨并行-20261031.md)。  

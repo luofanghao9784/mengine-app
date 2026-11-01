@@ -56,7 +56,7 @@ const LENS: Record<Lens, { name: string; cap: string }> = {
   q: { name: '排队', cap: '入口处的光尘对应排队记录，每条一颗，最多 10 颗' },
   w: { name: '等待', cap: '等待资料、决定或部分完成的记录' },
   u: { name: '待核对', cap: '超时或断连后无法确认动作是否已发生的记录' },
-  d: { name: '近 5 分钟完成', cap: '梦核表面的迸发对应两次快照之间新完成的记录' },
+  d: { name: '近 5 分钟完成', cap: '梦擎表面的迸发对应两次快照之间新完成的记录' },
   f: { name: '保留异常', cap: '珊瑚色标记保留的失败与中断，可能含已重试的历史尝试' },
 };
 const lensKeys = Object.keys(LENS) as Lens[];
@@ -223,7 +223,7 @@ export function EngineStage3D({
         <canvas
           ref={canvas}
           className="eng3d-gl"
-          aria-label={demo ? '梦核引擎繁忙演示图（模拟数据）' : '梦核引擎实时运行图'}
+          aria-label={demo ? '梦擎引擎繁忙演示图（模拟数据）' : '梦擎引擎实时运行图'}
         />
         {!webgl && (
           <p className="eng3d-nogl">当前浏览器无法启用 WebGL，3D 运行图不可用，下方读数仍会每 3 秒更新。</p>
@@ -567,7 +567,7 @@ function Tip({
     body = (
       <>
         <h3>
-          梦核<small>全链路</small>
+          梦擎<small>全链路</small>
         </h3>
         <dl>
           {row('执行中', s.r)}

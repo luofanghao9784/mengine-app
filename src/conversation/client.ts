@@ -15,6 +15,7 @@ import type {
 } from '../../contracts/public-api/conversation';
 import { createIdentityRequest, IdentityError, record, text, uuid } from '../identity/client.ts';
 import { isChunk } from '../material/knowledge-client.ts';
+import { withTimeout } from '../shared/abort-timeout.ts';
 const count = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 const nullable = (v: unknown) => v === null || text(v);
 const states = [
@@ -367,7 +368,7 @@ export function createConversationClient(fetcher: typeof fetch = fetch) {
       artifact: TaskArtifact,
       signal?: AbortSignal,
     ) {
-      const requestSignal = AbortSignal.any([AbortSignal.timeout(15000), ...(signal ? [signal] : [])]);
+      const requestSignal = withTimeout(signal, 15000);
       try {
         const response = await fetcher(
           root(tenant) + `/${id(conversation)}/tasks/${id(task)}/artifacts/${id(artifact.id)}`,
