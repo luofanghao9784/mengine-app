@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "task_id": "REPLACE",
+  "scope": "trial",
+  "head_sha": "REPLACE_WITH_CURRENT_HEAD",
+  "state": "in_progress",
+  "objective": "填写一个可验收功能结果",
+  "owner_actor": "coordinator-session-id",
+  "stages": {
+    "requirements": {
+      "status": "pending",
+      "summary": "",
+      "evidence": []
+    },
+    "product": {
+      "status": "pending",
+      "summary": "",
+      "evidence": []
+    },
+    "architecture": {
+      "status": "pending",
+      "summary": "",
+      "evidence": []
+    },
+    "development": {
+      "status": "pending",
+      "summary": "",
+      "evidence": []
+    },
+    "quality": {
+      "status": "pending",
+      "summary": "",
+      "evidence": []
+    },
+    "testing": {
+      "status": "pending",
+      "summary": "",
+      "evidence": []
+    },
+    "operations": {
+      "status": "pending",
+      "summary": "",
+      "evidence": []
+    }
+  },
+  "acceptance": [
+    {
+      "id": "AC-01",
+      "description": "填写可观测业务行为",
+      "check_ids": []
+    }
+  ],
+  "checks": [],
+  "review": {
+    "author_actor": "",
+    "reviewer_actor": "",
+    "head_sha": "",
+    "status": "pending",
+    "evidence": [],
+    "open_blockers": []
+  },
+  "delivery": {
+    "status": "pending",
+    "summary": "",
+    "evidence": [],
+    "production_deployed": false
+  },
+  "blockers": [],
+  "next_authorized_task": null
+}

@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "version_sha": "REPLACE",
+  "claim": "未验收，不能依据本表模板声明产品成熟",
+  "dimensions": [
+    {
+      "id": "tenant-isolation",
+      "name": "企业和空间隔离",
+      "status": "unverified",
+      "required_evidence": "跨企业/空间读取、检索、下载、缓存和后台任务拒绝证据",
+      "evidence": [],
+      "gap": "待按当前版本核实"
+    },
+    {
+      "id": "identity-access",
+      "name": "身份与权限",
+      "status": "unverified",
+      "required_evidence": "服务端身份域、角色、撤权、会话和资源权限验证",
+      "evidence": [],
+      "gap": "待按当前版本核实"
+    },
+    {
+      "id": "data-consistency",
+      "name": "数据与一致性",
+      "status": "unverified",
+      "required_evidence": "约束、事务、并发、状态转换、幂等/重试和数据版本",
+      "evidence": [],
+      "gap": "待按当前版本核实"
+    },
+    {
+      "id": "feature-closure",
+      "name": "功能闭环",
+      "status": "unverified",
+      "required_evidence": "从用户入口经API持久化到结果反馈，含空态/失败/恢复",
+      "evidence": [],
+      "gap": "待按当前版本核实"
+    },
+    {
+      "id": "architecture-contracts",
+      "name": "架构与契约",
+      "status": "unverified",
+      "required_evidence": "模块边界、API与事件契约、版本兼容及替换影响",
+      "evidence": [],
+      "gap": "待按当前版本核实"
+    },
+    {
+      "id": "integration-truth",
+      "name": "集成真实性",
+      "status": "unverified",
+      "required_evidence": "真实接口、来源/模型区分、证据与授权边界",
+      "evidence": [],
+      "gap": "待按当前版本核实"
+    },
+    {
+      "id": "audit-observability",
+      "name": "审计与可观测性",
+      "status": "unverified",
+      "required_evidence": "关键动作审计、关联ID、日志脱敏、指标和告警",
+      "evidence": [],
+      "gap": "待按当前版本核实"
+    },
+    {
+      "id": "testing-regression",
+      "name": "质量与回归",
+      "status": "unverified",
+      "required_evidence": "关键路径、负向权限、故障/恢复、独立审查与当前CI",
+      "evidence": [],
+      "gap": "待按当前版本核实"
+    },
+    {
+      "id": "performance-capacity",
+      "name": "性能和容量",
+      "status": "unverified",
+      "required_evidence": "真实目标负载下延迟、吞吐、资源与队列行为",
+      "evidence": [],
+      "gap": "待按当前版本核实"
+    },
+    {
+      "id": "recovery-durability",
+      "name": "持久化与恢复",
+      "status": "unverified",
+      "required_evidence": "重启/中断恢复、备份恢复、新主机演练和RTO/RPO",
+      "evidence": [],
+      "gap": "待按当前版本核实"
+    },
+    {
+      "id": "release-rollback",
+      "name": "发布与回滚",
+      "status": "unverified",
+      "required_evidence": "固定版本/产物、配置/迁移、升级兼容与回退证据",
+      "evidence": [],
+      "gap": "待按当前版本核实"
+    },
+    {
+      "id": "operations-support",
+      "name": "运维与交付",
+      "status": "unverified",
+      "required_evidence": "安装诊断、运行手册、异常处理、成本归属与责任人",
+      "evidence": [],
+      "gap": "待按当前版本核实"
+    }
+  ]
+}
