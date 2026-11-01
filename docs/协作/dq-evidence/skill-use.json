@@ -1,0 +1,337 @@
+{
+  "issue": 99,
+  "cases": [
+    {
+      "id": "SK01",
+      "skill": "dq-product-slice",
+      "skill_sha256": "8dd14834bb84c009036560a0249639888cdc27b325bc1f9df11a0f78afb2551a",
+      "executor": "DQ/root",
+      "input": "合成需求WS-01：员工希望把会话产生的草稿共享到所属工作空间。首期只做草稿发布按钮。拆一项当天可验收的切片。",
+      "output": "WS-01切片：员工在既有会话草稿卡点击“共享到工作空间”，仅发布一份固定版本到其所属获准空间。读取草稿权限与发布共享成果权限分别由服务端验证；有读权无发布权返回403且零共享记录。验收：有发布权成功返回成果ID/版本；跨企业、无空间发布权拒绝；双击同幂等键只一份。审批与跨部门协作不进入此切片。此为合成需求设计，未改产品实现。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK02",
+      "skill": "dq-backlog-triage",
+      "skill_sha256": "82f37d4f3ee2951987488c3bb0be470110f52ed7847878d9cca13da2afd5771f",
+      "executor": "DQ/root",
+      "input": "合成列表：A已认领且有Draft PR；B同目标但换标题；C为UNKNOWN且没有副作用回执。请分流。",
+      "output": "A保留原Issue与Draft，核对固定head及执行回执；B按目标、路径、幂等影响与A核实同源后关联A，不能仅凭标题认定新任务；C保持UNKNOWN隔离且不得Ready、不得重跑，先向原执行端核对副作用与停止回执。没有退出证据不称已停止。该合成列表未创建或修改任何真实认领。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK03",
+      "skill": "dq-ux-state-design",
+      "skill_sha256": "b4df3acc8d485adae826ede10e1291c06c4e57c232de72db47834b010787f693",
+      "executor": "DQ/root",
+      "input": "合成质量检查页：提交10秒超时，无查询接口；按钮目前显示“失败，立即重试”。设计最小交互修正。",
+      "output": "保留当前质量检查页布局。提交中禁用重复提交；10秒网络超时显示“暂时无法确认提交结果，重复提交可能产生新任务”，保留输入，不显示确定失败或成功，不自动重试。没有查询接口时不臆造查询按钮；用户主动重试前说明重复风险，后续幂等/状态查询为另一个切片。验收可用超时夹具验证没有第二次POST及未显示成功。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK04",
+      "skill": "dq-plain-language-copy",
+      "skill_sha256": "cbe2eb7a55bcc857e0fbdda1da517fbe462a9e99fdedeb2f2dba6ceabbe27ae4",
+      "executor": "DQ/root",
+      "input": "合成文案：capability读取500→“后台开通中”；200空列表→“Grant不存在”。给出最小替换。",
+      "output": "500读取态原“后台开通中”改“暂时无法读取已开通功能，请稍后重试”；200空列表原“Grant不存在”改“目前没有已开通的AI功能”。401提示登录过期，403提示无访问权限，分别沿既有错误流程。接口读失败不能证明后台开通过程。此为合成文案产出，不重复修改#80/#82。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK05",
+      "skill": "dq-architecture-boundary",
+      "skill_sha256": "5bd4b9eef72954097758941912173f1d38fb4af2534fd5b9b722eaccab055746",
+      "executor": "DQ/root",
+      "input": "合成方案：引擎直接写平台result表，前端隐藏其他企业记录。指出边界缺口并给最小改法。",
+      "output": "阻断原方案：引擎直写平台result表破坏平台权限与状态所有权，前端隐藏不能执行企业隔离。最小修改为引擎经版本化结果回调/接口返回执行ID、尝试代际、版本及证据，平台服务端核对企业、空间、对象和当前授权后事务落库；检索/缓存/下载也沿同权限。回退可停用新适配器保留既有接口，不回灌业务库。重要边界决定需DQ统一ADR。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK06",
+      "skill": "dq-contract-review",
+      "skill_sha256": "ce51a551cf3fa3bac5dda83130624d19f99c9d4b0a063a1bc053cb554468a930",
+      "executor": "DQ/root",
+      "input": "合成POST /checks允许任意字段，客户端把403转成[]。给出接口审查结论。",
+      "output": "接口审查不放行：POST /checks应拒绝未知字段、验证闭集及幂等键；403保留权限错误，客户端不得转空列表200。契约验证覆盖有效输入成功、未知字段400、匿名401/403依既有链、无权限403且零副作用、200真正空数据。以服务端与调用方行为一起验证，OpenAPI文件存在不能证明接线。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK07",
+      "skill": "dq-implementation-plan",
+      "skill_sha256": "40612273b6a37c856661c42314b270609f0fcfe4e2379200f12e7ae92cdeca84",
+      "executor": "DQ/root",
+      "input": "已授权合成任务：新增草稿发布接口及按钮。后端与前端分工，契约由DQ管理。拟实现计划。",
+      "output": "DQ先认领并固定本任务契约与需求编号。架构交DQ维护输入/输出及幂等规则；后端只负责授权/事务/回执及接口测试；前端负责现页按钮、提交中/成功/失败/不确定状态和行为测试，各自独立Worktree。依赖顺序：契约定稿→后端及前端按契约并行→DQ集成→QA/安全/产品独立验证→Draft PR和1203非作者门禁。原队列不复制，新账本仅当前pilot。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK08",
+      "skill": "dq-code-review",
+      "skill_sha256": "91c79c6ea2be444f356eb7c25b1ad4cd57d97776139c9ca50b44221a461c45f8",
+      "executor": "DQ/root",
+      "input": "合成diff：catch所有异常return success=true，测试只断言HTTP200。给阻断性审查意见。",
+      "output": "P1阻断：任意异常后return success=true会把落库、授权或执行失败宣称完成，调用者无法恢复；仅断言HTTP200的测试不能证明共享结果或权限。应按错误类型保留明确失败/不确定状态，成功只由真实事务/工具回执决定；新增落库失败与权限拒绝时不成功且无共享成果的反例，并验证真实成功ID/版本。此合成diff缺固定base/head，不能冒称对真实提交已审核；模型意见不替代1203人审。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK09",
+      "skill": "dq-frontend-change",
+      "skill_sha256": "79af794b47b4c5658eff0079a1bb05caabc585ff58da5456256374e1e269ef3f",
+      "executor": "/root/team_skills (skill author)",
+      "input": "合成前端函数把所有非200返回[]。要求列出最小状态处理及验证，不修改业务范围。",
+      "output": {
+        "finding": "所有非200映射为空数组会把未登录、拒绝访问和服务异常显示成正常空态。",
+        "change": [
+          "200且合法数组才进入列表/空态；响应形状不合法显示读取失败。",
+          "401沿既有客户端退出失效会话并回登录；403保留拒绝状态和错误码，不退出合法会话。",
+          "5xx/网络异常显示暂时无法读取，读取重试不等于重新提交业务任务。",
+          "AbortError沿调用取消语义处理，不显示成功或普通读取失败；保留既有路由和组件。"
+        ],
+        "verification": [
+          "模拟200有数据、200空、401、403、503、网络失败、调用方取消；检查各状态和请求次数。",
+          "在现页走读取失败后重试恢复主路径及窄屏；未提供页面和API，本次未运行浏览器。"
+        ],
+        "limits": "只读合成方案，无前端实际修改或端到端通过结论。"
+      },
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK10",
+      "skill": "dq-accessibility-check",
+      "skill_sha256": "880caec3679738d6ce950423ab4f57e9dc2785f1b666b8f88c3a7868c05bfa20",
+      "executor": "/root/team_skills (skill author)",
+      "input": "合成对话框打开不聚焦、关闭不回焦、错误仅红色边框。给可验证修正。",
+      "output": {
+        "finding": "焦点未进入对话框、关闭未返回触发控件，键盘用户可能继续操作背景；红色边框不能传达错误含义。",
+        "change": [
+          "使用项目原有dialog组件及名称，打开后聚焦标题或首个适当控件，键盘焦点限制在对话框，支持Escape关闭。",
+          "保存触发元素引用；关闭后若仍存在返回该控件，已移除时回到合理下一操作。",
+          "给输入提供错误文字，通过aria-describedby关联，置aria-invalid；异步失败使用适当状态播报，不单靠颜色。"
+        ],
+        "verification": [
+          "键盘从触发按钮打开、Tab/Shift+Tab遍历、Escape关闭、确认焦点返回。",
+          "实际屏幕阅读器核对名称和错误播报，320px宽度核对内容可操作。"
+        ],
+        "limits": "本次为合成诊断，未提供可操作DOM；不宣称已跑键盘、屏幕阅读器或截图验收。"
+      },
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK11",
+      "skill": "dq-backend-change",
+      "skill_sha256": "9c1b6e38559a3d85e5f2e587b961b21c69e6cc1895a8bbe34926333dfe8ce3ef",
+      "executor": "/root/team_skills (skill author)",
+      "input": "合成发布接口只检查登录，按body.workspaceId落库。写出最小授权和事务检查清单。",
+      "output": {
+        "finding": "登录成功仅证明主体身份，不能授权任意body.workspaceId发布。",
+        "checks": [
+          "从服务端会话绑定当前企业/主体；按企业+空间查询目标，不能信任body.tenantId。",
+          "校验企业启用、成员有效、空间未归档、当前对象属于该空间与企业。",
+          "分别检查源草稿读取权及目标空间发布权，读取不自动允许共享。",
+          "在同一提交边界再次校验资格和草稿版本，版本冲突拒绝；发布记录与成功回执原子保存。",
+          "撤权、跨企业、只读成员、空间归档、版本冲突均不得写入；无权限不能转空列表或成功。"
+        ],
+        "verification": [
+          "合成企业A主体不能向B空间发布；同企业只读主体拒绝；有效发布者成功且二次同幂等键不重复。"
+        ],
+        "limits": "检查设计，不是已实现或已跑权限集成测试。"
+      },
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK12",
+      "skill": "dq-idempotency-check",
+      "skill_sha256": "6e5227323ea804cdf843b1e7e9822825ee42e6bc1a68ffd6d5010ead060ebaec",
+      "executor": "/root/team_skills (skill author)",
+      "input": "合成任务key=K先写共享成果但响应丢失，客户端重试；第二次payload不同。给处理方案。",
+      "output": {
+        "finding": "共享成果可能已经落库，响应丢失不能把第一次判为失败；不同payload不能沿同key重复写。",
+        "protocol": [
+          "幂等身份用企业、主体/获准业务范围、操作、key=K绑定；规范化payload算摘要。",
+          "原子唯一约束争用K，同payload返回已有成果ID和提交回执；运行中返回可查询状态，不重复创建。",
+          "第二次payload不同则409幂等冲突，不执行写入；不能覆盖第一次成果。",
+          "超时先按K查询；无法确认副作用时UNKNOWN并隔离，不自动Ready或重放；恢复前核对实际成果。"
+        ],
+        "verification": [
+          "并发同K同payload只能1个成果；同K不同payload零新增；写后响应丢失再查K得到原ID。"
+        ],
+        "limits": "未运行真实接口或数据库，结果是合成重试处理方案。"
+      },
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK13",
+      "skill": "dq-engine-integration",
+      "skill_sha256": "9147471c9dc7079aade350fb7d411bf02fa00a936bd0bdca8794d41939d10b09",
+      "executor": "/root/team_skills (skill author)",
+      "input": "合成SDK发session idle但未收到当前callId closed。可否宣布当前任务停止？",
+      "output": {
+        "decision": "不能宣布当前任务已停止。",
+        "reason": "session idle没有与当前callId的结束回执关联，可能属于其他时序或其他任务，不能证明当前执行者退出。",
+        "required": [
+          "核对SDK实际版本与停止事件文档；接收同一订阅、当前callId的closed/终态，再结合执行者退出或协议定义的确证。",
+          "暂时保持STOPPING；有界等待超时后记录UNKNOWN和最后已知事件，保留attempt与围栏，停止继续派发。",
+          "拒绝旧attempt迟到完成覆写新代际状态，不用模型口头“已停”替代证据。"
+        ],
+        "limits": "合成事件判断，未调用SDK或真实停止接口。"
+      },
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK14",
+      "skill": "dq-grounded-output",
+      "skill_sha256": "25932445bb20f1df9b6fade6b62c92e397b433b1a33abead2f62689766ef56e4",
+      "executor": "/root/team_skills (skill author)",
+      "input": "合成回答称“已发布”，仅有模型文本，没有工具执行回执和版本。给验收判定。",
+      "output": {
+        "decision": "不通过发布成功验收，发布结果未验证。",
+        "reason": "只有模型自然语言，无工具执行回执、成果ID、对象版本或持久状态；不能证明发布发生。",
+        "required": [
+          "获得绑定当前任务/attempt、操作者及获权空间的真实发布工具回执，固定成果ID、版本和提交时间。",
+          "按权限只读核对成果实际可见/持久化；引用来源对象与快照，源事实与模型判断分列。",
+          "如果已调用但响应丢失则结果不确定，先查回执不重发；从未执行也不能补造成功记录。"
+        ],
+        "limits": "只审合成回答，不发起真实发布或模型调用。"
+      },
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK15",
+      "skill": "dq-data-lineage",
+      "skill_sha256": "935963d6e419207bbd0bf9c90d8161ee293df5bfd4dfa051b2f7c90045ebe89d",
+      "executor": "/root/team_skills (skill author)",
+      "input": "合成资料上传成功，解析尚未完成，页面宣称“知识已发布”。输出正确状态与所缺证据。",
+      "output": {
+        "correct_status": "资料已上传，正在等待解析；尚未发布为可用知识。",
+        "missing_evidence": [
+          "源资料ID、版本和原件摘要，属于哪个获权企业/空间。",
+          "解析任务成功回执、解析器版本、输出及解析限制。",
+          "治理/准入校验结果和对应源快照，AI可用状态。",
+          "明确发布动作、知识对象ID/版本、发布回执和权限继承；撤权后派生检索与缓存失效验证。"
+        ],
+        "change": "将上传成功、解析中、治理待核验、AI可用和已发布按真实执行状态分别展示，失败保留错误与旧有效版本。",
+        "limits": "未运行资料处理或治理，不把本判断当生产状态。"
+      },
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK16",
+      "skill": "dq-migration-review",
+      "skill_sha256": "92ba82f0134216dc896fb6bac37007b39afc71f7c01343b72a5ef3a6cd37e36c",
+      "executor": "/root/team_skills (skill author)",
+      "input": "合成默认迁移178份，恢复coverage仅49份；候选把coverage摘要直接更新。判定。",
+      "output": {
+        "decision": "拒绝放行该恢复候选；直接更新coverage摘要不能证明可恢复。",
+        "gap": {
+          "default_migrations": 178,
+          "covered": 49,
+          "unclassified_or_unverified": 129
+        },
+        "next_steps": [
+          "只读枚举两个实际默认迁移目录，固定版本/摘要和依赖，检查重复号与备份清单一致。",
+          "将129份按需要恢复、外部依赖、可安全缺省或不适用分类，逐项写依据；未知项不自动激活。",
+          "隔离合成源/目标做实际恢复与数据/权限/业务状态核对，记录失败及有界耗时，覆盖缺口未关闭时保留拒绝。",
+          "源码变更与coverage证明分离，不能更新指纹绕过门禁；真实源保留和源丢失恢复分别验收。"
+        ],
+        "limits": "数字来自合成输入，仅计算129差额，不声称已逐项审完真实迁移。"
+      },
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK17",
+      "skill": "dq-qa-behavior",
+      "skill_sha256": "9bb9fd5d670749da37d5b760cc5cecd17fedff773d0682754d7ebff14e57ef06",
+      "executor": "/root/independent_acceptance (non-author)",
+      "input": "合成发布按钮测试仅查元素存在，接口返回500仍显示成功。设计最小测试。",
+      "output": "最小行为回归需包含成功和失败两条。成功：合成已授权员工在所属空间提交一次发布，断言接口返回真实成果ID/版本，刷新后能读取同一成果且只新增一条；不可只断言按钮存在。失败：接口500后页面保留草稿并显示“暂时无法发布”，不得出现成功提示、成果ID或清空输入，按钮允许用户明确再试而不自动重发。另用无发布权但有读取权的合成员工断言403且零成果。当前没有提供页面/接口实现，产出为可执行验收设计，不冒称浏览器或真实发布已通过。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK18",
+      "skill": "dq-queue-recovery",
+      "skill_sha256": "6189f84deb6d75a95fc83aba13d6310d998ef33fc9aa19301fb4963e38e8d9b6",
+      "executor": "/root/independent_acceptance (non-author)",
+      "input": "合成worker执行中被kill，租约到期。调度器把任务Ready并立即重跑。审查并给验证步骤。",
+      "output": "该自动重跑方案阻断。kill后任务只能在租约到期变UNKNOWN，保持原attempt/事件与占槽，暂停新领取；先按真实执行/副作用回执对账，不能直接改Ready。旧worker即使随后返回，也因attempt token/generation不匹配被拒绝。已独立跑默认暂停、stop→过期UNKNOWN、重开DB→UNKNOWN、不重复enrol、旧heartbeat/finish拒绝探针；五组通过。作者13项机制测试中真实SIGKILL/重开/租约用例亦由我独立运行通过。当前回执仍由本地可信DQ提交，不证明真实Codex进程已退出。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK19",
+      "skill": "dq-performance-probe",
+      "skill_sha256": "7758ae6a02d5c24e12ef9122208029b288e337e30267a9c21506c4e6b32f24d6",
+      "executor": "/root/independent_acceptance (non-author)",
+      "input": "合成环境关闭后台任务后CPU低，团队声称高负载性能验收通过。给判断和最小合成测量。",
+      "output": "低CPU仅证明后台关闭后的空闲健康，不接受高负载验收。最小试点测量固定当前queue.py摘要、15条合成Ready任务、15个独立进程同时claim，记录成功数、重复领取、占槽和执行时长；已真实测得15进程全部退出0、恰3次claim成功、3个唯一任务、occupied=3（约0.032秒整段工具耗时，仅本机短测）。这证明原子领取限流，不能推导模型吞吐、长运行P95或业务CPU表现。若后续做性能比较需固定机器/后台开关、重复批次和任务规模，保留原超时与断言。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK20",
+      "skill": "dq-security-review",
+      "skill_sha256": "d0afdfd24c22d51b2dee38f3e3a521cadfbed387f5b288b01f1467f26d71bbf3",
+      "executor": "/root/independent_acceptance (non-author)",
+      "input": "合成tenantId由前端传入，缓存仅按query做key。指出跨企业风险与必要反例。",
+      "output": "存在跨企业访问与缓存泄漏风险。tenant身份必须由服务端有效会话/成员资格解析，body tenantId只能作受权目标并与当前企业匹配；缓存key至少绑定有效企业、空间/对象、当前权限代际及来源版本，缓存命中后仍执行权限检查。合成反例：企业A/B使用同query；A填充缓存后B请求只能看到B获权结果；A伪造B tenantId应403且不得写入或返回B数据；A撤权后旧缓存不可继续命中。当前仅有方案输入，未提供实际接口/缓存实现，不能声称隔离已动态通过。队列SQLite actor名/receipt摘要只是本地attestation，不承担此权限边界。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK21",
+      "skill": "dq-local-operations",
+      "skill_sha256": "5af8024cc16cbdb84cc87ae335488713374af7c0c75f461e0280b3828eaf6e12",
+      "executor": "/root/independent_acceptance (non-author)",
+      "input": "合成预览端口被另一任务占用，启动器计划kill占用PID再启动。给处置。",
+      "output": "拒绝kill另一任务PID。先只读核对占用端口、工作目录、PID/父进程和数据目录归属；本任务选择空闲回环端口及独立数据目录，启动器对冲突明确失败，不抢占原实例。停止仅针对本任务已核定的进程组，随后确认退出与端口释放；无法确认则UNKNOWN。该场景为处置演练，未启动/终止任何其他任务服务；不会用kill命令本身作为成功证据。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK22",
+      "skill": "dq-release-gate",
+      "skill_sha256": "e66a64c4699baa19df3e6d82a3d4734f88bea0cdaa19ab5959bb067dea9c0bd6",
+      "executor": "/root/independent_acceptance (non-author)",
+      "input": "候选head=B，测试绿属于A；B的API cancelled，作者评论“批准”。可否放行？",
+      "output": "不放行。A的绿不能覆盖head=B；B的API cancelled不是通过；作者评论“批准”不构成非作者审核。候选保持Draft，取得B相应tree上的完整适用CI、QA/安全/产品结论及1203非作者放行后才可裁决。真实对照当前历史#76 API cancelled与#97尚无PR-triggered workflow记录，均不能继承其他SHA绿。本报告是独立Agent技术审查，不能替代1203 GitHub身份的人审，也未执行合并或发布。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK23",
+      "skill": "dq-technical-handoff",
+      "skill_sha256": "ea369e30416371e54169cf71b9e32848c974cf1c646c2d04bb4ad71a6a1b3243",
+      "executor": "/root/independent_acceptance (non-author)",
+      "input": "旧交接写main=A、任务完成；当前PR未合且head=B。给交接修正规则。",
+      "output": "保留原交接“当时main=A/当时任务完成”的日期语义，新增当前核对段：来源为实时GitHub PR/branch和执行回执，head=B仍未合入；分别记录代码准备、实际测试、PR、部署和业务验收状态，缺证据明确UNKNOWN。当前历史.ai/TASKS.json未取得，不能创建新文件补写“完成”或以旧QUEUE接管权威；记录来源缺口与下一只读对账动作。修正交接不触发重跑、合并、部署或恢复业务暂停。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    },
+    {
+      "id": "SK24",
+      "skill": "dq-growth-experiment",
+      "skill_sha256": "d1d7cbbb5d571800299ee501289cc067e5bd725d727a0a421ad2f68cbfd90de8",
+      "executor": "/root/independent_acceptance (non-author)",
+      "input": "合成目标提升员工AI草稿复用。团队建议以后台任务数为成功指标并自动发客户邮件。给实验方案。",
+      "output": "仅设计内部实验：目标为已使用草稿能力且获权共享的员工，假设更清楚的来源/适用空间提示能提高可复用成果比例。主指标是获权共享草稿被其他员工成功打开并明确采用的比例，辅以7日再次使用率、质量反馈与发布失败率；后台任务数只能是成本/活动指标。先以合成数据和内部原型走查，无新增外发；样本数量及真实参与者须在执行前由产品确认现有授权范围。出现越权、误导发布或负反馈上升即停止。客户邮件、买量、真实数据采集与未验收能力承诺均不在本任务内；尚未运行真实增长实验。",
+      "kind": "explicit-skill-load-synthetic-professional-task",
+      "limits": "实际专业场景产出；不是完整产品工程、浏览器执行、真实数据或人审验收。"
+    }
+  ]
+}

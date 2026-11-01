@@ -1,0 +1,4 @@
+# 项目级上限；DQ调度器仍须对跨进程任务实施独立原子限流。
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3

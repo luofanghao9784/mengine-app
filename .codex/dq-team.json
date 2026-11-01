@@ -1,0 +1,261 @@
+{
+  "schema_version": 1,
+  "coordinator": "DQ",
+  "issue": 99,
+  "default_mode": "PAUSED",
+  "max_execution_concurrency": 3,
+  "roles": [
+    {
+      "name": "dq_product",
+      "title": "产品",
+      "path": ".codex/agents/dq-product.toml",
+      "skills": [
+        "dq-product-slice",
+        "dq-backlog-triage"
+      ]
+    },
+    {
+      "name": "dq_ux",
+      "title": "体验",
+      "path": ".codex/agents/dq-ux.toml",
+      "skills": [
+        "dq-ux-state-design",
+        "dq-plain-language-copy"
+      ]
+    },
+    {
+      "name": "dq_architect",
+      "title": "架构",
+      "path": ".codex/agents/dq-architect.toml",
+      "skills": [
+        "dq-architecture-boundary",
+        "dq-contract-review"
+      ]
+    },
+    {
+      "name": "dq_tech_lead",
+      "title": "技术负责人",
+      "path": ".codex/agents/dq-tech-lead.toml",
+      "skills": [
+        "dq-implementation-plan",
+        "dq-code-review"
+      ]
+    },
+    {
+      "name": "dq_frontend",
+      "title": "前端",
+      "path": ".codex/agents/dq-frontend.toml",
+      "skills": [
+        "dq-frontend-change",
+        "dq-accessibility-check"
+      ]
+    },
+    {
+      "name": "dq_backend",
+      "title": "后端",
+      "path": ".codex/agents/dq-backend.toml",
+      "skills": [
+        "dq-backend-change",
+        "dq-idempotency-check"
+      ]
+    },
+    {
+      "name": "dq_engine",
+      "title": "引擎",
+      "path": ".codex/agents/dq-engine.toml",
+      "skills": [
+        "dq-engine-integration",
+        "dq-grounded-output"
+      ]
+    },
+    {
+      "name": "dq_data",
+      "title": "数据",
+      "path": ".codex/agents/dq-data.toml",
+      "skills": [
+        "dq-data-lineage",
+        "dq-migration-review"
+      ]
+    },
+    {
+      "name": "dq_qa",
+      "title": "质量",
+      "path": ".codex/agents/dq-qa.toml",
+      "skills": [
+        "dq-qa-behavior",
+        "dq-queue-recovery"
+      ]
+    },
+    {
+      "name": "dq_performance",
+      "title": "性能",
+      "path": ".codex/agents/dq-performance.toml",
+      "skills": [
+        "dq-performance-probe"
+      ]
+    },
+    {
+      "name": "dq_security",
+      "title": "安全",
+      "path": ".codex/agents/dq-security.toml",
+      "skills": [
+        "dq-security-review"
+      ]
+    },
+    {
+      "name": "dq_operations",
+      "title": "运维",
+      "path": ".codex/agents/dq-operations.toml",
+      "skills": [
+        "dq-local-operations"
+      ]
+    },
+    {
+      "name": "dq_release",
+      "title": "发布验收",
+      "path": ".codex/agents/dq-release.toml",
+      "skills": [
+        "dq-release-gate"
+      ]
+    },
+    {
+      "name": "dq_documentation",
+      "title": "文档",
+      "path": ".codex/agents/dq-documentation.toml",
+      "skills": [
+        "dq-technical-handoff"
+      ]
+    },
+    {
+      "name": "dq_growth",
+      "title": "增长",
+      "path": ".codex/agents/dq-growth.toml",
+      "skills": [
+        "dq-growth-experiment"
+      ]
+    }
+  ],
+  "skills": [
+    {
+      "name": "dq-product-slice",
+      "role": "dq_product",
+      "path": ".agents/skills/dq-product-slice/SKILL.md"
+    },
+    {
+      "name": "dq-backlog-triage",
+      "role": "dq_product",
+      "path": ".agents/skills/dq-backlog-triage/SKILL.md"
+    },
+    {
+      "name": "dq-ux-state-design",
+      "role": "dq_ux",
+      "path": ".agents/skills/dq-ux-state-design/SKILL.md"
+    },
+    {
+      "name": "dq-plain-language-copy",
+      "role": "dq_ux",
+      "path": ".agents/skills/dq-plain-language-copy/SKILL.md"
+    },
+    {
+      "name": "dq-architecture-boundary",
+      "role": "dq_architect",
+      "path": ".agents/skills/dq-architecture-boundary/SKILL.md"
+    },
+    {
+      "name": "dq-contract-review",
+      "role": "dq_architect",
+      "path": ".agents/skills/dq-contract-review/SKILL.md"
+    },
+    {
+      "name": "dq-implementation-plan",
+      "role": "dq_tech_lead",
+      "path": ".agents/skills/dq-implementation-plan/SKILL.md"
+    },
+    {
+      "name": "dq-code-review",
+      "role": "dq_tech_lead",
+      "path": ".agents/skills/dq-code-review/SKILL.md"
+    },
+    {
+      "name": "dq-frontend-change",
+      "role": "dq_frontend",
+      "path": ".agents/skills/dq-frontend-change/SKILL.md"
+    },
+    {
+      "name": "dq-accessibility-check",
+      "role": "dq_frontend",
+      "path": ".agents/skills/dq-accessibility-check/SKILL.md"
+    },
+    {
+      "name": "dq-backend-change",
+      "role": "dq_backend",
+      "path": ".agents/skills/dq-backend-change/SKILL.md"
+    },
+    {
+      "name": "dq-idempotency-check",
+      "role": "dq_backend",
+      "path": ".agents/skills/dq-idempotency-check/SKILL.md"
+    },
+    {
+      "name": "dq-engine-integration",
+      "role": "dq_engine",
+      "path": ".agents/skills/dq-engine-integration/SKILL.md"
+    },
+    {
+      "name": "dq-grounded-output",
+      "role": "dq_engine",
+      "path": ".agents/skills/dq-grounded-output/SKILL.md"
+    },
+    {
+      "name": "dq-data-lineage",
+      "role": "dq_data",
+      "path": ".agents/skills/dq-data-lineage/SKILL.md"
+    },
+    {
+      "name": "dq-migration-review",
+      "role": "dq_data",
+      "path": ".agents/skills/dq-migration-review/SKILL.md"
+    },
+    {
+      "name": "dq-qa-behavior",
+      "role": "dq_qa",
+      "path": ".agents/skills/dq-qa-behavior/SKILL.md"
+    },
+    {
+      "name": "dq-queue-recovery",
+      "role": "dq_qa",
+      "path": ".agents/skills/dq-queue-recovery/SKILL.md"
+    },
+    {
+      "name": "dq-performance-probe",
+      "role": "dq_performance",
+      "path": ".agents/skills/dq-performance-probe/SKILL.md"
+    },
+    {
+      "name": "dq-security-review",
+      "role": "dq_security",
+      "path": ".agents/skills/dq-security-review/SKILL.md"
+    },
+    {
+      "name": "dq-local-operations",
+      "role": "dq_operations",
+      "path": ".agents/skills/dq-local-operations/SKILL.md"
+    },
+    {
+      "name": "dq-release-gate",
+      "role": "dq_release",
+      "path": ".agents/skills/dq-release-gate/SKILL.md"
+    },
+    {
+      "name": "dq-technical-handoff",
+      "role": "dq_documentation",
+      "path": ".agents/skills/dq-technical-handoff/SKILL.md"
+    },
+    {
+      "name": "dq-growth-experiment",
+      "role": "dq_growth",
+      "path": ".agents/skills/dq-growth-experiment/SKILL.md"
+    }
+  ],
+  "scope": "isolated-pilot-only"
+}

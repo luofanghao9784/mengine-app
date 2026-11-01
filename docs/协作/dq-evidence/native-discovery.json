@@ -1,0 +1,170 @@
+{
+  "kind": "native-discovery-no-model",
+  "root": "isolated-worktree",
+  "app_server": {
+    "platformFamily": "unix",
+    "platformOs": "macos"
+  },
+  "skills": [
+    {
+      "name": "dq-accessibility-check",
+      "path": ".agents/skills/dq-accessibility-check/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-architecture-boundary",
+      "path": ".agents/skills/dq-architecture-boundary/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-backend-change",
+      "path": ".agents/skills/dq-backend-change/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-backlog-triage",
+      "path": ".agents/skills/dq-backlog-triage/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-code-review",
+      "path": ".agents/skills/dq-code-review/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-contract-review",
+      "path": ".agents/skills/dq-contract-review/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-data-lineage",
+      "path": ".agents/skills/dq-data-lineage/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-engine-integration",
+      "path": ".agents/skills/dq-engine-integration/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-frontend-change",
+      "path": ".agents/skills/dq-frontend-change/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-grounded-output",
+      "path": ".agents/skills/dq-grounded-output/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-growth-experiment",
+      "path": ".agents/skills/dq-growth-experiment/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-idempotency-check",
+      "path": ".agents/skills/dq-idempotency-check/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-implementation-plan",
+      "path": ".agents/skills/dq-implementation-plan/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-local-operations",
+      "path": ".agents/skills/dq-local-operations/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-migration-review",
+      "path": ".agents/skills/dq-migration-review/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-performance-probe",
+      "path": ".agents/skills/dq-performance-probe/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-plain-language-copy",
+      "path": ".agents/skills/dq-plain-language-copy/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-product-slice",
+      "path": ".agents/skills/dq-product-slice/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-qa-behavior",
+      "path": ".agents/skills/dq-qa-behavior/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-queue-recovery",
+      "path": ".agents/skills/dq-queue-recovery/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-release-gate",
+      "path": ".agents/skills/dq-release-gate/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-security-review",
+      "path": ".agents/skills/dq-security-review/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-technical-handoff",
+      "path": ".agents/skills/dq-technical-handoff/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "name": "dq-ux-state-design",
+      "path": ".agents/skills/dq-ux-state-design/SKILL.md",
+      "enabled": true,
+      "scope": "repo"
+    }
+  ],
+  "skill_errors": [],
+  "agent_layers": [
+    {
+      "source": ".codex/config.toml",
+      "agents": {
+        "enabled": true,
+        "max_concurrent_threads_per_session": 3
+      },
+      "disabledReason": null
+    }
+  ],
+  "note": "Discovery is not agent invocation or behavioral acceptance.",
+  "validation": {
+    "exact_enabled_repo_skills": true,
+    "project_agent_layer_enabled_cap_3": true
+  }
+}

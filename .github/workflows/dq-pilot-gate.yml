@@ -1,0 +1,34 @@
+name: DQ pilot gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.codex/**'
+      - '.agents/skills/dq-*/**'
+      - 'scripts/dq/**'
+      - 'scripts/dq-team/**'
+      - 'tests/dq/**'
+      - '.github/workflows/dq-pilot-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dq-pilot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pilot:
+    name: roster · queue · native adapter contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate isolated team roster
+        run: python3 scripts/dq-team/validate.py
+      - name: Verify durable dispatch and failure behavior
+        run: python3 -m unittest discover -s tests/dq -v
+      # Native CLI tests use explicit fake executables; no model, API key,
+      # production access, purchased runner, or new external service is used.

@@ -1,0 +1,294 @@
+{
+  "schema_version": 1,
+  "scope": "synthetic-read-only",
+  "cases": [
+    {
+      "id": "SK01",
+      "skill": "dq-product-slice",
+      "role": "dq_product",
+      "task": "合成需求WS-01：员工希望把会话产生的草稿共享到所属工作空间。首期只做草稿发布按钮。拆一项当天可验收的切片。",
+      "acceptance": [
+        "保留WS-01",
+        "区分读取与发布权限",
+        "不扩展审批系统"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK02",
+      "skill": "dq-backlog-triage",
+      "role": "dq_product",
+      "task": "合成列表：A已认领且有Draft PR；B同目标但换标题；C为UNKNOWN且没有副作用回执。请分流。",
+      "acceptance": [
+        "B与A关联查重",
+        "C不得自动Ready",
+        "不宣称已停止"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK03",
+      "skill": "dq-ux-state-design",
+      "role": "dq_ux",
+      "task": "合成质量检查页：提交10秒超时，无查询接口；按钮目前显示“失败，立即重试”。设计最小交互修正。",
+      "acceptance": [
+        "结果不确定",
+        "不自动重试",
+        "保留现页布局"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK04",
+      "skill": "dq-plain-language-copy",
+      "role": "dq_ux",
+      "task": "合成文案：capability读取500→“后台开通中”；200空列表→“Grant不存在”。给出最小替换。",
+      "acceptance": [
+        "500不推断开通中",
+        "空列表清楚表达",
+        "术语中文化"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK05",
+      "skill": "dq-architecture-boundary",
+      "role": "dq_architect",
+      "task": "合成方案：引擎直接写平台result表，前端隐藏其他企业记录。指出边界缺口并给最小改法。",
+      "acceptance": [
+        "服务端企业隔离",
+        "版本化结果接口",
+        "拒绝直写业务表"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK06",
+      "skill": "dq-contract-review",
+      "role": "dq_architect",
+      "task": "合成POST /checks允许任意字段，客户端把403转成[]。给出接口审查结论。",
+      "acceptance": [
+        "未知字段拒绝",
+        "403不能转成功",
+        "有契约行为验证"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK07",
+      "skill": "dq-implementation-plan",
+      "role": "dq_tech_lead",
+      "task": "已授权合成任务：新增草稿发布接口及按钮。后端与前端分工，契约由DQ管理。拟实现计划。",
+      "acceptance": [
+        "依赖有序",
+        "文件归属明确",
+        "不另建权威队列"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK08",
+      "skill": "dq-code-review",
+      "role": "dq_tech_lead",
+      "task": "合成diff：catch所有异常return success=true，测试只断言HTTP200。给阻断性审查意见。",
+      "acceptance": [
+        "失败误报成功",
+        "测试无行为证明",
+        "独立review不等人审"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK09",
+      "skill": "dq-frontend-change",
+      "role": "dq_frontend",
+      "task": "合成前端函数把所有非200返回[]。要求列出最小状态处理及验证，不修改业务范围。",
+      "acceptance": [
+        "401与403分开",
+        "空态不同失败",
+        "可取消请求"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK10",
+      "skill": "dq-accessibility-check",
+      "role": "dq_frontend",
+      "task": "合成对话框打开不聚焦、关闭不回焦、错误仅红色边框。给可验证修正。",
+      "acceptance": [
+        "焦点进入返回",
+        "错误文本关联",
+        "不以截图代替键盘验证"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK11",
+      "skill": "dq-backend-change",
+      "role": "dq_backend",
+      "task": "合成发布接口只检查登录，按body.workspaceId落库。写出最小授权和事务检查清单。",
+      "acceptance": [
+        "企业空间对象校验",
+        "发布权区别读取权",
+        "事务内防竞态"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK12",
+      "skill": "dq-idempotency-check",
+      "role": "dq_backend",
+      "task": "合成任务key=K先写共享成果但响应丢失，客户端重试；第二次payload不同。给处理方案。",
+      "acceptance": [
+        "查已有回执",
+        "原子幂等",
+        "不同payload冲突"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK13",
+      "skill": "dq-engine-integration",
+      "role": "dq_engine",
+      "task": "合成SDK发session idle但未收到当前callId closed。可否宣布当前任务停止？",
+      "acceptance": [
+        "不凭无关联idle确认停止",
+        "绑定当前callId",
+        "缺回执保持不确定"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK14",
+      "skill": "dq-grounded-output",
+      "role": "dq_engine",
+      "task": "合成回答称“已发布”，仅有模型文本，没有工具执行回执和版本。给验收判定。",
+      "acceptance": [
+        "拒绝冒充发布成功",
+        "需要真实工具回执",
+        "保留来源版本"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK15",
+      "skill": "dq-data-lineage",
+      "role": "dq_data",
+      "task": "合成资料上传成功，解析尚未完成，页面宣称“知识已发布”。输出正确状态与所缺证据。",
+      "acceptance": [
+        "上传解析治理发布分开",
+        "来源快照",
+        "权限证据"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK16",
+      "skill": "dq-migration-review",
+      "role": "dq_data",
+      "task": "合成默认迁移178份，恢复coverage仅49份；候选把coverage摘要直接更新。判定。",
+      "acceptance": [
+        "129份缺口",
+        "拒绝以更新摘要放行",
+        "分类验证恢复"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK17",
+      "skill": "dq-qa-behavior",
+      "role": "dq_qa",
+      "task": "合成发布按钮测试仅查元素存在，接口返回500仍显示成功。设计最小测试。",
+      "acceptance": [
+        "失败不得成功",
+        "真实发布行为",
+        "正反场景"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK18",
+      "skill": "dq-queue-recovery",
+      "role": "dq_qa",
+      "task": "合成worker执行中被kill，租约到期。调度器把任务Ready并立即重跑。审查并给验证步骤。",
+      "acceptance": [
+        "UNKNOWN不重跑",
+        "旧worker完成被围栏拒绝",
+        "重启保留证据"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK19",
+      "skill": "dq-performance-probe",
+      "role": "dq_performance",
+      "task": "合成环境关闭后台任务后CPU低，团队声称高负载性能验收通过。给判断和最小合成测量。",
+      "acceptance": [
+        "空闲不代表负载",
+        "固定规模并发",
+        "不放宽超时"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK20",
+      "skill": "dq-security-review",
+      "role": "dq_security",
+      "task": "合成tenantId由前端传入，缓存仅按query做key。指出跨企业风险与必要反例。",
+      "acceptance": [
+        "服务端绑定tenant",
+        "缓存权限维度",
+        "跨租户负例"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK21",
+      "skill": "dq-local-operations",
+      "role": "dq_operations",
+      "task": "合成预览端口被另一任务占用，启动器计划kill占用PID再启动。给处置。",
+      "acceptance": [
+        "不杀其他任务",
+        "换隔离端口",
+        "核对进程归属"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK22",
+      "skill": "dq-release-gate",
+      "role": "dq_release",
+      "task": "候选head=B，测试绿属于A；B的API cancelled，作者评论“批准”。可否放行？",
+      "acceptance": [
+        "拒绝旧SHA绿",
+        "cancelled非绿",
+        "作者不自批"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK23",
+      "skill": "dq-technical-handoff",
+      "role": "dq_documentation",
+      "task": "旧交接写main=A、任务完成；当前PR未合且head=B。给交接修正规则。",
+      "acceptance": [
+        "当前源核验",
+        "保留历史语义",
+        "未合不称部署"
+      ],
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "SK24",
+      "skill": "dq-growth-experiment",
+      "role": "dq_growth",
+      "task": "合成目标提升员工AI草稿复用。团队建议以后台任务数为成功指标并自动发客户邮件。给实验方案。",
+      "acceptance": [
+        "使用价值指标",
+        "不自动外发",
+        "不承诺未验收能力"
+      ],
+      "status": "NOT_RUN"
+    }
+  ]
+}

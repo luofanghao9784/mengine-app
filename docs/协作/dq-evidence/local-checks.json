@@ -1,0 +1,39 @@
+{
+  "issue": 99,
+  "kind": "actual-local-execution",
+  "checks": [
+    {
+      "name": "roster",
+      "command": [
+        "python3",
+        "scripts/dq-team/validate.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "ccab3b0322ccb7199e30eb6a58c3e57ee031fd26e8b27930ef7d88f36613cfd0"
+    },
+    {
+      "name": "mechanisms",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests/dq",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log_sha256": "a9d5b5bd2d8337002fc931565265c7ab157fd73289a520743d181ad402a1828f"
+    },
+    {
+      "name": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}
