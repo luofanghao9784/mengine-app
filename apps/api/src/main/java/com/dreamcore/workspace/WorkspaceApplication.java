@@ -6,6 +6,7 @@ import com.dreamcore.workspace.conversation.BriefingBootstrapDeployment;
 import com.dreamcore.workspace.conversation.ReconciliationDeployment;
 import com.dreamcore.workspace.identity.IdentityException;
 import com.dreamcore.workspace.identity.PlatformBootstrap;
+import com.dreamcore.workspace.identity.AgentAdminBootstrap;
 import java.sql.SQLException;
 import java.util.Arrays;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
@@ -18,7 +19,19 @@ import org.springframework.context.ConfigurableApplicationContext;
 @SpringBootApplication
 public class WorkspaceApplication {
    public static void main(String[] args) {
-      if (Arrays.asList(args).contains("--bootstrap-admin")) {
+      if (Arrays.asList(args).contains("--bootstrap-agent-admin")) {
+         SpringApplication application = new SpringApplication(WorkspaceApplication.class);
+         application.setWebApplicationType(WebApplicationType.NONE);
+         // Validate before refresh: even Flyway and startup workers must not write on rejection.
+         application.addInitializers(context -> AgentAdminBootstrap.preflight(context.getEnvironment()));
+         try (ConfigurableApplicationContext context = application.run(args)) {
+            context.getBean(AgentAdminBootstrap.class).run();
+            System.out.println("Preview agent administrator bootstrap completed.");
+         } catch (Exception failure) {
+            System.err.println("Preview agent administrator bootstrap failed; requires explicit preview opt-in, only local/trial profiles, a private 0600 password file and no existing administrator or login.");
+            System.exit(1);
+         }
+      } else if (Arrays.asList(args).contains("--bootstrap-admin")) {
          SpringApplication application = new SpringApplication(new Class[]{WorkspaceApplication.class});
          application.setWebApplicationType(WebApplicationType.NONE);
 
