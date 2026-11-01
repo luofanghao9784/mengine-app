@@ -38,16 +38,15 @@ if(!List.of("GET","HEAD","OPTIONS").contains(request.getMethod()) && !identities
 
 做什么：
 
-1. 在客户链 `apiSecurity` 上、框架 CSRF 过滤器之前，增加只属于这条链的过滤器。类名 `CustomerSessionBeforeCsrfFilter`，放在 `com.dreamcore.workspace.identity`。在 `apiSecurity` 里 `new` 出来再 `addFilterBefore(..., CsrfFilter.class)`。它不是 `@Bean`，也不注册成对所有链生效的 Servlet Filter。
+1. 在客户链 `apiSecurity` 上、框架 CSRF 过滤器之前，增加只属于这条链的过滤器。类名 `CustomerSessionBeforeCsrfFilter`，放在 `com.dreamcore.workspace.identity`。在 `apiSecurity` 里 `new` 出来再 `addFilterBefore(..., CsrfFilter.class)`。它不是 `@Bean`，类上没有 `@Component`、`@Service`、`@Configuration`、`@Controller`、`@RestController`、`@Repository`、`@WebFilter`，也没有其它会让组件扫描把它收成 Bean 的构造型注解。禁止 Spring Boot 把它自动注册成全局 Servlet 过滤器。
 2. 该过滤器只处理写方法（不是 `GET` / `HEAD` / `OPTIONS`）。安全方法直接放行，行为与今天相同。
 3. 写方法且路径不在下面的豁免清单时：当前不是有效客户登录 → 立刻 `IdentitySecurity.writeError(response, 401, "AUTHENTICATION_REQUIRED")` 并返回，后面的 CSRF 过滤器看不到这次请求。有效登录的判断复用现有逻辑，而不是「有没有 Session」：
    - `SecurityContext` 里没有已认证主体，或主体是 `AnonymousAuthenticationToken` → 未登录。`GET /api/v1/auth/csrf` 留下的预登录 Session 属于这一类。此种 401 不新建 Session，也不作废这枚预登录 Cookie。
    - 有主体但 `IdentityService.validSession` 失败，或 Session 的 `AUTHENTICATION_SOURCE` 为 `PLATFORM_PASSWORD` → 按第 59–70 行的现有后果处理（作废会话、必要时 `closeSupportSession`），然后 401。这段对写请求发生在 CSRF 之前。
 4. 已是有效客户登录的写请求：过滤器调用 `chain.doFilter`，继续走现有 CSRF 过滤器。缺失或无效 CSRF 仍是 403 `ACCESS_DENIED`。有效 CSRF 进入原控制器。第 53 行那个已有过滤器保留，继续负责 GET 上的会话校验，并在 CSRF 通过后照旧复核。
-5. 豁免清单（这些写口保持今天的顺序：没有 CSRF 仍 403，带上本次 CSRF 仍进入现有处理器）与 `IdentitySecurity` 第 45–48 行已经 `permitAll` 的客户入口对齐，外加引擎回调：
-   - 精确路径：`/api/v1/auth/csrf`、`/api/v1/auth/login`、`/api/v1/auth/invitations/accept`、`/api/v1/auth/phone/configuration`、`/api/v1/auth/phone/invitation`、`/api/v1/auth/phone/switch-account`、`/api/v1/auth/phone/challenges`、`/api/v1/auth/phone/accept`、`/api/v1/auth/phone/reset`
-   - 前缀：`/api/v1/auth/phone/local-code/`、`/internal/v1/agent-access/`、`/internal/v1/engine-receipts/`、`/internal/v1/native-conversations/`
-6. 更新测试，使下面「验收断言」可重复跑绿。已知必改的旧断言只有 `ForwardingIntegrationTest.publicApiRequiresSessionAndCsrf` 里那次匿名 POST（今天期望 403）。
+5. 豁免判断与这条链的 `permitAll` 用同一份路径模式、同一种匹配。只用 `PathPattern`，或与 `requestMatchers` 相同的 `servletPath`。禁止用原始 `getRequestURI()` 做前缀比较（含 `startsWith`、`contains`、`indexOf`）。豁免模式集合与 `apiSecurity` 里 `requestMatchers(...).permitAll()` 的路径模式相等，不多不少。今天就是第 45–48 行已有的全部 `permitAll` 路径：客户入口、手机号入口、总台上的那些入口，以及 `/internal/v1/agent-access/**`、`/internal/v1/engine-receipts/**`、`/internal/v1/native-conversations/**`。`dispatcherTypeMatchers` 不是路径豁免。`local-code` 保持 `permitAll` 里的 `/*`，不要改成另一套 `/**` 前缀。这些写口保持今天的顺序：没有 CSRF 仍 403，带上本次 CSRF 仍进入现有处理器。
+6. 过滤器 `doFilterInternal` 内任何异常都直接返回错误并结束（fail closed）。包括主体 `UUID.fromString` 失败、`validSession` 查库失败，以及其它运行时异常。捕获后调用 `IdentitySecurity.writeError(response, 401, "AUTHENTICATION_REQUIRED")` 然后 `return`。`catch` 与 `finally` 里都不得调用 `chain.doFilter`。查库失败不得把请求放进后续 CSRF 或控制器。
+7. 更新测试，使下面「验收断言」可重复跑绿。已知必改的旧断言只有 `ForwardingIntegrationTest.publicApiRequiresSessionAndCsrf` 里那次匿名 POST（今天期望 403）。
 
 已钉死的范围：
 
@@ -67,6 +66,8 @@ if(!List.of("GET","HEAD","OPTIONS").contains(request.getMethod()) && !identities
 - 不改 `IdentitySecurity.writeError` 的文案、字段和 `retryable`。
 - 不改业务控制器、契约、迁移、`src/**`、`engine/**`、`workers/**`。本基准没有 `CheckTaskController`，本单不实现质量检查。
 - 不改 [`CT-043-A`](CT-043-A-quality-check-submit-api.md) 那份任务单。
+- 不用 `getRequestURI()` 做豁免前缀比较，不在过滤器异常之后调用 `chain.doFilter`。
+- 不给 `CustomerSessionBeforeCsrfFilter` 加 `@Component`、`@Service`、`@Configuration` 或其它会被组件扫描收成 Bean 的注解。
 
 **CT-043-A 用例收紧：后续一步。** 本基准没有 `CheckTaskIntegrationTest`。本单用自己的新测试把 `POST /api/tenant-admin/v1/quality-ops/check-tasks` 的匿名三种锁成严格 401。CT-043-A 实现时，匿名无 CSRF、匿名乱 CSRF 必须写成严格 401，匿名有效 CSRF 继续 401，已登录无 CSRF 继续 403 `ACCESS_DENIED`。不再写「401 或 403」。若开工时 `CheckTaskIntegrationTest` 已经在 main 上，并且那两条仍允许 403：允许同一 PR 只改这两处断言，其余断言和控制器不动。当前基准下不要创建这个类。
 
@@ -106,6 +107,8 @@ if(!List.of("GET","HEAD","OPTIONS").contains(request.getMethod()) && !identities
 | 第四端未登录写、预登录 Session 写 | `/api/agent-admin/**` | 401 先于 CSRF | 第四端现有文案 | 与 #22 相同，本单不改 |
 | 第四端已登录、无或错 CSRF | `/api/agent-admin/**` | 403 | 第四端现有文案 | 否 |
 | 总台登录不带 CSRF | `/api/platform-admin/v1/auth/login` | 403 | 保持今天 | 否 |
+| 已认证主体名不是合法 UUID | 客户链受保护写 | 401 | `AUTHENTICATION_REQUIRED` | 否。过滤器直接返回，不调用 `chain.doFilter` |
+| `validSession` 查库抛异常 | 客户链受保护写 | 401 | `AUTHENTICATION_REQUIRED` | 否。过滤器直接返回，不调用 `chain.doFilter` |
 
 总台链 `PlatformSecurity` 今天仍先查 CSRF（约第 40–42 行）。本单保持这条顺序。支持链同样不动。
 
@@ -138,8 +141,10 @@ python3 scripts/with-test-postgres.py ./apps/api/mvnw -B -f apps/api/pom.xml tes
 | A12 | `POST /api/v1/auth/invitations/accept` 与豁免清单中的手机号引导写口行为不变。`PhoneIdentityIntegrationTest` 全绿。匿名 `GET /api/v1/me` 仍 401 |
 | A13 | 第四端回归不变：`CapabilityRegistryIntegrationTest` 与 `AgentAdminIdentityIntegrationTest` 全绿。`git diff` 中没有 `AgentAdminSecurity.java` |
 | A14 | 总台回归不变：`UnifiedIdentityIntegrationTest` 全绿（总台登录不带 CSRF 仍 403）。`PlatformSecurity.java` 与 `SupportSecurity.java` 无 diff |
-| A15 | `git diff --name-only origin/main` 每一行都在白名单。无迁移。无 `src/**`。客户链源码中该写路径没有新的 `permitAll` 或 `csrf.disable()`。新过滤器类上没有 `@Bean`，`AgentAdminSecurity` 不引用它 |
+| A15 | `git diff --name-only origin/main` 每一行都在白名单。无迁移。无 `src/**`。客户链源码中该写路径没有新的 `permitAll` 或 `csrf.disable()`。`AgentAdminSecurity` 不引用新过滤器。测试反射 `CustomerSessionBeforeCsrfFilter`：不存在返回该类型的 `@Bean` 方法；类上的直接注解和元注解都不得包含 `@Component`、`@Service`、`@Configuration`、`@Controller`、`@RestController`、`@Repository`、`@WebFilter` |
 | A16 | 已登录后不带 CSRF 仍须 403 的旧用例保持原断言，包括 `ExperienceIntegrationTest.realHttpRequiresSessionCsrfAndReturnsNoStore`、`FeedbackIntegrationTest.realHttpFeedbackPersistsAndRequiresSessionCsrf`、`ExperienceAdjustmentIntegrationTest.httpSubmissionAndObservationRequireCustomerCsrfAndExposeNoProposedBody`、`GeneralExperienceSuggestionIntegrationTest.httpSuggestionRequiresCustomerSessionAndCsrfAndNeverReturnsPrivateText`。它们变红时，修正过滤器对已登录的判断 |
+| A17 | 豁免模式集合与 `apiSecurity` 里 `requestMatchers(...).permitAll()` 的路径模式集合相等，测试读出两边比较。豁免匹配使用 `PathPattern` 或与 `requestMatchers` 相同的 `servletPath`。过滤器源码不得用 `getRequestURI()` 做豁免前缀比较。匿名 `POST /api/v1/auth/login/extra` 仍是 401，不得因字符串前缀被当成登录豁免 |
+| A18 | 两条独立用例，都落在受保护写上，响应为 A1 的 401 合同，业务表不增加，且不是后续 CSRF 的 403、也不是业务成功。其一：已认证主体名不是合法 UUID。其二：`validSession` 抛出查库异常。两条都不得进入控制器 |
 
 A5 的覆盖方式：安全链在进入控制器之前返回固定 401 合同，所以已映射的客户写口都到不了业务写入。代表口再查表。豁免口和安全方法不进这条遍历，由 A4 的 GET、A11、A12 锁住。
 
@@ -150,8 +155,8 @@ A5 的覆盖方式：安全链在进入控制器之前返回固定 401 合同，
 | 路径 | 动作 |
 |---|---|
 | `apps/api/src/main/java/com/dreamcore/workspace/identity/IdentitySecurity.java` | 只在 `apiSecurity` 上、CSRF 过滤器之前挂上新过滤器。保留现有 CSRF 仓库、`loginSessions`、入口点、`accessDeniedHandler` 和第 53 行已有过滤器。不改 `writeError` 文案 |
-| `apps/api/src/main/java/com/dreamcore/workspace/identity/CustomerSessionBeforeCsrfFilter.java` | 新建。仅服务客户链，由 `IdentitySecurity` 显式 `new`。不打成 `@Bean` |
-| `apps/api/src/test/java/com/dreamcore/workspace/CustomerSessionBeforeCsrfIntegrationTest.java` | 新建。承担 A1–A3、A5、A6–A7 的 check-tasks、A10 |
+| `apps/api/src/main/java/com/dreamcore/workspace/identity/CustomerSessionBeforeCsrfFilter.java` | 新建。仅服务客户链，由 `IdentitySecurity` 显式 `new`。无 `@Bean`，无 `@Component` / `@Service` / `@Configuration` 等扫描注解。豁免与 `permitAll` 同一套路径匹配。异常路径不调用 `chain.doFilter` |
+| `apps/api/src/test/java/com/dreamcore/workspace/CustomerSessionBeforeCsrfIntegrationTest.java` | 新建。承担 A1–A3、A5、A6–A7 的 check-tasks、A10、A15 的注解反射、A17、A18 |
 | `apps/api/src/test/java/com/dreamcore/workspace/ForwardingIntegrationTest.java` | 只扩展 `publicApiRequiresSessionAndCsrf`：匿名 POST 改为 401，并补上匿名三种与已登录缺 CSRF、乱 CSRF、登录前 CSRF。`realAuthenticatedHttpAcceptanceConflictAndRevocation` 的 201 保持原样 |
 
 额外只允许这一类 diff：某个已有测试仅仅因为「匿名、非豁免、客户链写」从 403 变成 401 而失败。只改那一条期望，PR 里写上文件名。已知必改是上一行的转发测试。已登录仍应 403 的期望不在此列。
