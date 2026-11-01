@@ -11,7 +11,6 @@ on:
       - '.github/workflows/paperclip-pilot-ci.yml'
 permissions:
   contents: read
-  actions: write
 concurrency:
   group: paperclip-pilot-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -37,7 +36,7 @@ jobs:
       - name: Check reconciliation module syntax
         run: node --check scripts/paperclip-pilot/reconcile_usage.mjs
   abc:
-    name: A build · B unit · C e2e frontend
+    name: Paperclip · A build · B unit · C e2e frontend
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -81,7 +80,7 @@ jobs:
           CI: "true"
 
   contracts-engine:
-    name: contracts · engine
+    name: Paperclip · contracts · engine
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -125,7 +124,7 @@ jobs:
     # CT-004：按耗时分 4 片并行；每片超时仍为 90 分钟（不调大）。
     # 慢类耗时据 run 40937260088：PlatformExperienceAdjustment 1589s、GeneralExperienceTaskContext 701s、
     # PublicationFeedback 648s、FeedbackAdjustment 340s；GeneralExperiencePipeline 当次未跑完，耗时未知。
-    name: with-test-postgres · test:api (${{ matrix.shard }})
+    name: Paperclip · with-test-postgres · test:api (${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
