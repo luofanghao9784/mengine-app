@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+test "$(hostname)" = @PAPERCLIP_HOSTNAME@
+install -m 755 /root/paperclip-install/backup.mjs /opt/paperclip/backup.mjs
+cat > /etc/systemd/system/paperclip-backup.service <<'SERVICE'
+[Unit]
+Description=Native Paperclip DB and protected-file backup
+After=postgresql.service
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/etc/paperclip.env
+Environment=PATH=/opt/node-v24.20.0-linux-x64/bin:/usr/bin:/bin
+ExecStart=/opt/node-v24.20.0-linux-x64/bin/node /opt/paperclip/backup.mjs
+UMask=0077
+PrivateTmp=true
+NoNewPrivileges=true
+SERVICE
+cat > /etc/systemd/system/paperclip-backup.timer <<'TIMER'
+[Unit]
+Description=Daily Paperclip native backup at 03:15 China time
+[Timer]
+OnCalendar=*-*-* 19:15:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+[Install]
+WantedBy=timers.target
+TIMER
+systemctl daemon-reload
+systemctl enable --now paperclip-backup.timer
+systemctl start paperclip-backup.service
+echo 'Daily native backup timer enabled; first backup executed.'

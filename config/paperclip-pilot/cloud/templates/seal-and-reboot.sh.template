@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+test "$(hostname)" = @PAPERCLIP_HOSTNAME@
+test -f /etc/mengine-paperclip-managed
+active=$(runuser -u postgres -- psql -d paperclip -tAc "SELECT count(*) FROM heartbeat_runs WHERE status IN ('running','queued')")
+test "$active" = 0 || { echo 'Active executions exist; reboot withheld' >&2; exit 42; }
+admins=$(runuser -u postgres -- psql -d paperclip -tAc "SELECT count(*) FROM instance_user_roles WHERE role='instance_admin' AND user_id <> 'local-board'")
+test "$admins" = 1 || { echo 'Human administrator setup is not established' >&2; exit 43; }
+python3 - <<'PY'
+import json,os
+from pathlib import Path
+p=Path('/var/lib/paperclip/instances/default/config.json');d=json.loads(p.read_text());d['auth']['disableSignUp']=True;p.write_text(json.dumps(d,indent=2)+'\n');os.chmod(p,0o600)
+p=Path('/etc/paperclip.env');lines=[s for s in p.read_text().splitlines() if not s.startswith('PAPERCLIP_AUTH_DISABLE_SIGN_UP=')];p.write_text('\n'.join(lines)+'\nPAPERCLIP_AUTH_DISABLE_SIGN_UP=true\n');os.chmod(p,0o600)
+p=Path('/etc/systemd/system/paperclip.service');s=p.read_text();s=s.replace('After=network-online.target\n','After=network-online.target postgresql@18-main.service\n');
+if 'Requires=postgresql@18-main.service' not in s:s=s.replace('Wants=network-online.target\n','Wants=network-online.target\nRequires=postgresql@18-main.service\n')
+p.write_text(s)
+PY
+systemctl daemon-reload
+cat /proc/sys/kernel/random/boot_id > /root/paperclip-install/boot-before-reboot.txt
+echo 'No active executions; administrator established; public signup disabled. Rebooting dedicated host.'
+systemctl reboot

@@ -1,0 +1,9 @@
+{
+  "runtimeVersion": "2026.1023.0",
+  "file": "node_modules/@paperclipai/adapter-utils/dist/server-utils.js",
+  "beforeSha256": "17fcb556b4257c43cf29683808b0a53655f53c674795a16c5e13b16cae7e4a45",
+  "afterSha256": "5dc896cb0416482f4e0edf7a1d01dc2416ecd821477607524f9a044a353e9c5a",
+  "insertionAnchor": "    delete env.PAPERCLIPAI_CMD;",
+  "insertion": "\n    for (const key of [\"DATABASE_URL\", \"BETTER_AUTH_SECRET\", \"PGPASSWORD\"]) delete env[key];",
+  "scope": "Strip inherited controller secrets, preserve explicit per-agent bindings"
+}

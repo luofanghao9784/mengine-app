@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+set -euo pipefail
+test "$(hostname)" = @PAPERCLIP_HOSTNAME@
+test -f /etc/mengine-paperclip-managed
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -y -qq nginx python3-venv
+if [ ! -x /opt/certbot/bin/certbot ]; then
+  python3 -m venv /opt/certbot
+  /opt/certbot/bin/pip install --disable-pip-version-check 'certbot>=5.4,<6'
+fi
+/opt/certbot/bin/certbot --version
+/opt/certbot/bin/pip freeze > /root/paperclip-install/certbot-requirements.lock
+install -d -m 755 /var/www/paperclip-acme/.well-known/acme-challenge
+if [ -e /etc/nginx/sites-enabled/default ]; then
+  mv /etc/nginx/sites-enabled/default /root/paperclip-install/nginx-default-disabled
+fi
+if [ ! -f /etc/letsencrypt/live/@PAPERCLIP_IPV4@/fullchain.pem ]; then
+  cat > /etc/nginx/sites-available/paperclip <<'HTTP'
+server {
+  listen 80 default_server;
+  server_name @PAPERCLIP_IPV4@;
+  location ^~ /.well-known/acme-challenge/ { root /var/www/paperclip-acme; }
+  location / { return 404; }
+}
+HTTP
+  ln -sfn /etc/nginx/sites-available/paperclip /etc/nginx/sites-enabled/paperclip
+  nginx -t
+  systemctl enable --now nginx
+  systemctl reload nginx
+  ufw allow 80/tcp
+  /opt/certbot/bin/certbot certonly --non-interactive --agree-tos --register-unsafely-without-email \
+    --preferred-profile shortlived --webroot --webroot-path /var/www/paperclip-acme \
+    --ip-address @PAPERCLIP_IPV4@ --cert-name @PAPERCLIP_IPV4@
+fi
+cat > /etc/nginx/sites-available/paperclip <<'NGINX'
+map $http_upgrade $paperclip_connection_upgrade {
+  default upgrade;
+  '' close;
+}
+limit_req_zone $binary_remote_addr zone=paperclip_auth:10m rate=10r/m;
+server {
+  listen 80 default_server;
+  server_name @PAPERCLIP_IPV4@;
+  location ^~ /.well-known/acme-challenge/ { root /var/www/paperclip-acme; }
+  location / { return 308 https://@PAPERCLIP_IPV4@$request_uri; }
+}
+server {
+  listen 443 ssl default_server;
+  server_name @PAPERCLIP_IPV4@;
+  ssl_certificate /etc/letsencrypt/live/@PAPERCLIP_IPV4@/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/@PAPERCLIP_IPV4@/privkey.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  if ($host != '@PAPERCLIP_IPV4@') { return 444; }
+  client_max_body_size 64m;
+  add_header X-Content-Type-Options nosniff always;
+  add_header Referrer-Policy same-origin always;
+  location ~ ^/api/auth/(sign-in|sign-up|forget-password|request-password-reset) {
+    limit_req zone=paperclip_auth burst=10 nodelay;
+    limit_req_status 429;
+    proxy_pass http://127.0.0.1:3100;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+  location / {
+    proxy_pass http://127.0.0.1:3100;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $paperclip_connection_upgrade;
+    proxy_buffering off;
+    proxy_read_timeout 3600s;
+  }
+}
+NGINX
+sed -i 's|^PAPERCLIP_PUBLIC_URL=.*|PAPERCLIP_PUBLIC_URL=https://@PAPERCLIP_IPV4@|' /etc/paperclip.env
+sed -i 's|^PAPERCLIP_DEPLOYMENT_EXPOSURE=.*|PAPERCLIP_DEPLOYMENT_EXPOSURE=public|' /etc/paperclip.env
+sed -i 's|^PAPERCLIP_ALLOWED_HOSTNAMES=.*|PAPERCLIP_ALLOWED_HOSTNAMES=@PAPERCLIP_IPV4@,127.0.0.1,localhost|' /etc/paperclip.env
+systemctl restart paperclip
+nginx -t
+systemctl reload nginx
+ufw allow 443/tcp
+install -d -m 755 /etc/letsencrypt/renewal-hooks/deploy
+cat > /etc/letsencrypt/renewal-hooks/deploy/20-paperclip-nginx <<'HOOK'
+#!/bin/sh
+set -eu
+/usr/sbin/nginx -t
+/usr/bin/systemctl reload nginx
+HOOK
+chmod 755 /etc/letsencrypt/renewal-hooks/deploy/20-paperclip-nginx
+cat > /etc/systemd/system/paperclip-cert-renew.service <<'SERVICE'
+[Unit]
+Description=Renew Paperclip IP certificate and reload HTTPS
+Wants=network-online.target
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/opt/certbot/bin/certbot renew --quiet
+SERVICE
+cat > /etc/systemd/system/paperclip-cert-renew.timer <<'TIMER'
+[Unit]
+Description=Check the short-lived Paperclip IP certificate four times daily
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:00:00
+RandomizedDelaySec=900
+Persistent=true
+[Install]
+WantedBy=timers.target
+TIMER
+systemctl daemon-reload
+systemctl enable --now paperclip-cert-renew.timer
+openssl x509 -in /etc/letsencrypt/live/@PAPERCLIP_IPV4@/fullchain.pem -noout -issuer -dates -ext subjectAltName
+echo 'IP HTTPS and certificate renewal timer configured; agents remain disabled.'

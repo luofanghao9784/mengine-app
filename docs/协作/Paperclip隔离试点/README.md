@@ -1,5 +1,7 @@
 # Paperclip AI 公司隔离试点（Issue #100）
 
+当前云端部署与边界见 [2026-11-01 部署验证报告](CLOUD-DEPLOYMENT-20261101.md)：公网 IP + 免费 HTTPS 管理台已上线；19 岗暂停，云端模型/Linux 执行未验收。后续批准套餐为税前 $57.60/月，替代早期 $50 候选报价。
+
 本次授权：Paperclip 管理公司，Codex/OpenCode 承担研发执行，GitHub 保留独立质量门禁。用户已明确选择先完成本机试点与 Draft PR，再审核云资源报价。本单不是恢复历史业务调度的授权。
 
 2026-11-01 追加实施已完成独立订阅登录、带本地补丁的两任务真实编码/独立 QA 接续、权限与暂停守卫、原生数据库恢复验证。当前仍暂停并解绑执行岗位凭据。完整结果与未通过项以[当前报告](MENGINE-PAPERCLIP-PILOT-ACCEPTANCE.md)为准，初次盘点留在[阶段一快照](MENGINE-PAPERCLIP-PILOT-ACCEPTANCE-PHASE1.md)。

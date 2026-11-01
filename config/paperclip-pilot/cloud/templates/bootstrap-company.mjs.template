@@ -1,0 +1,103 @@
+// Additive bootstrap only. Never writes tasks or modifies another company.
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+const require=createRequire('/opt/paperclip/runtime/package.json');
+const {eq}=require('drizzle-orm');
+const {createDb,closeRegisteredClients,instanceUserRoles,agents}=await import('/opt/paperclip/runtime/node_modules/@paperclipai/db/dist/index.js');
+const {boardAuthService}=await import('/opt/paperclip/runtime/node_modules/@paperclipai/server/dist/services/board-auth.js');
+const plan=JSON.parse(fs.readFileSync('/root/paperclip-install/role-plan.json'));
+const ensure=(ok,message)=>{if(!ok)throw Error(message);};
+ensure(plan.dispatchEnabled===false&&plan.historicalImportEnabled===false,'No dispatch/import authorization');
+ensure(plan.roles.length===19&&new Set(plan.roles.map(r=>r.key)).size===19,'Unexpected role plan');
+ensure(plan.roles.every(r=>r.status==='paused'),'Every role must stay paused');
+const dbUrl=process.env.DATABASE_URL;
+const parsedUrl=new URL(dbUrl);
+ensure(parsedUrl.hostname==='127.0.0.1'&&parsedUrl.pathname==='/paperclip','Wrong database');
+const db=createDb(dbUrl,{maxConnections:1,applicationName:'mengine-cloud-bootstrap-100'});
+const board=boardAuthService(db);
+let key;
+let result;
+const audit=[];
+let companyId=null;
+const ownedAgentIds=new Set();
+async function api(method,p,payload){
+  if(method!=='GET'){
+    ensure((p==='/companies'&&method==='POST'&&payload.name===plan.companyName)||
+      (companyId&&(p===`/companies/${companyId}`||p===`/companies/${companyId}/agents`))||
+      (p.startsWith('/agents/')&&ownedAgentIds.has(p.slice('/agents/'.length))), 'Foreign mutation refused');
+  }
+  const response=await fetch('http://127.0.0.1:3100/api'+p,{method,redirect:'error',
+    headers:{'Content-Type':'application/json',Authorization:'Bearer '+key.token},
+    body:payload===undefined?undefined:JSON.stringify(payload)});
+  audit.push({method,path:p,status:response.status});
+  ensure(response.ok,`Bootstrap request rejected: ${method} ${p} ${response.status}`);
+  return response.json();
+}
+try{
+  const admins=(await db.select().from(instanceUserRoles)).filter(r=>r.role==='instance_admin'&&r.userId!=='local-board');
+  ensure(admins.length===1,'Exactly one established human administrator is required');
+  key=await board.createNamedBoardApiKey({userId:admins[0].userId,name:'Temporary MENGINE deployment bootstrap',expiresAt:new Date(Date.now()+15*60000)});
+  const companies=await api('GET','/companies');
+  const target=companies.filter(c=>c.name===plan.companyName);
+  ensure(target.length<=1,'Ambiguous target company');
+  const marker='MENGINE-CLOUD-BOOTSTRAP-100: isolated roles only; historical authority unchanged.';
+  let company=target[0];
+  if(company){ensure(company.description===marker&&company.status==='paused','Existing company is not our paused bootstrap');}
+  else company=await api('POST','/companies',{name:plan.companyName,description:marker});
+  companyId=company.id;
+  const tasks=await api('GET',`/companies/${companyId}/issues`);
+  ensure(Array.isArray(tasks)&&tasks.length===0,'Never reseed an existing task authority');
+  await api('PATCH',`/companies/${companyId}`,{status:'paused'});
+  const existing=await api('GET',`/companies/${companyId}/agents`);
+  const byKey=new Map();
+  for(const a of existing){
+    const role=a.metadata?.pilotRole;
+    ensure(plan.roles.some(r=>r.key===role)&&!byKey.has(role)&&a.status==='paused','Unrecognized or active existing role');
+    ownedAgentIds.add(a.id);byKey.set(role,a);
+  }
+  fs.mkdirSync('/var/lib/paperclip/mengine-workspace',{recursive:true,mode:0o700});
+  fs.mkdirSync('/var/lib/paperclip/uncredentialed-codex-home',{recursive:true,mode:0o700});
+  const {uid,gid}=fs.statSync('/var/lib/paperclip');
+  fs.chownSync('/var/lib/paperclip/mengine-workspace',uid,gid);
+  fs.chownSync('/var/lib/paperclip/uncredentialed-codex-home',uid,gid);
+  try{
+    await api('PATCH',`/companies/${companyId}`,{requireBoardApprovalForNewAgents:false});
+    for(const role of plan.roles){
+      if(byKey.has(role.key))continue;
+      const adapter={...plan.adapterConfig,cwd:'/var/lib/paperclip/mengine-workspace',
+        env:{CODEX_HOME:'/var/lib/paperclip/uncredentialed-codex-home',OPENAI_API_KEY:'',ANTHROPIC_API_KEY:'',DATABASE_URL:'',BETTER_AUTH_SECRET:'',PGPASSWORD:''}};
+      const agent=await api('POST',`/companies/${companyId}/agents`,{
+        name:role.name,role:'general',title:role.key,adapterType:'codex_local',adapterConfig:adapter,
+        runtimeConfig:plan.runtimeConfig,permissions:{canCreateAgents:false,canCreateSkills:false},
+        metadata:{pilotRole:role.key,department:role.department,cloudBootstrap:'100'},
+        reportsTo:role.reportsTo?byKey.get(role.reportsTo).id:null,
+        capabilities:plan.operatingPolicy[role.department]??'仅内部受控试点；未验收不得启用历史或生产调度。'});
+      ownedAgentIds.add(agent.id);
+      const paused=await api('PATCH','/agents/'+agent.id,{status:'paused'});
+      byKey.set(role.key,paused);
+    }
+  }finally{await api('PATCH',`/companies/${companyId}`,{requireBoardApprovalForNewAgents:true});}
+  const rows=await db.select().from(agents).where(eq(agents.companyId,companyId));
+  ensure(rows.length===19&&rows.every(a=>a.status==='paused'),'Role pause verification failed');
+  ensure(rows.every(a=>Object.values(a.adapterConfig.env).every(v=>typeof v!=='object'||v.value!==undefined)),'Unexpected env binding shape');
+  const plain=v=>typeof v==='string'?v:v?.value;
+  for(const a of rows){for(const name of ['OPENAI_API_KEY','ANTHROPIC_API_KEY','DATABASE_URL','BETTER_AUTH_SECRET','PGPASSWORD'])ensure(plain(a.adapterConfig.env[name])==='','Unexpected role credential');}
+  result={status:'PASS',companyId,companyName:plan.companyName,companyPrefix:company.issuePrefix,
+    roles:rows.length,allPaused:true,modelCredentialsAttached:false,historicalTasksImported:0,
+    otherCompanyCountPreserved:companies.filter(c=>c.id!==companyId).length,
+    existingCompaniesModified:false,temporaryOperatorKeyRevoked:false,audit};
+}finally{
+  if(key){
+    const revoked=await board.revokeBoardApiKey(key.id);
+    ensure(revoked?.revokedAt,'Temporary operator key revocation failed');
+    if(result)result.temporaryOperatorKeyRevoked=true;
+  }
+  await closeRegisteredClients(dbUrl);
+}
+if(result){
+  const rejected=await fetch('http://127.0.0.1:3100/api/companies',{redirect:'error',headers:{Authorization:'Bearer '+key.token}});
+  ensure(rejected.status===401||rejected.status===403,'Revoked operator key is still accepted');
+  result.revokedOperatorKeyRejected=true;
+  fs.writeFileSync('/root/paperclip-install/company-bootstrap-result.json',JSON.stringify(result,null,2)+'\n',{mode:0o600});
+  console.log(JSON.stringify({...result,audit:undefined}));
+}

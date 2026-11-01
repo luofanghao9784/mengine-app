@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+set -euo pipefail
+test "$(id -u)" = 0
+test "$(hostname)" = @PAPERCLIP_HOSTNAME@
+test -f /root/paperclip-install/package-lock.json
+if [ -d /opt/paperclip ] && [ ! -f /etc/mengine-paperclip-managed ]; then
+  echo 'Unknown existing installation; refusing to replace it' >&2
+  exit 1
+fi
+if systemctl is-active --quiet paperclip.service; then
+  echo "Stop the dedicated service in a maintenance window before reinstalling" >&2
+  exit 1
+fi
+touch /etc/mengine-paperclip-managed
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get install -y -qq ca-certificates curl xz-utils git python3 ripgrep openssl gnupg patch ufw libicu74 locales
+if ! id paperclip >/dev/null 2>&1; then
+  useradd --system --create-home --home-dir /var/lib/paperclip --shell /usr/sbin/nologin paperclip
+fi
+install -d -o root -g root -m 755 /opt/paperclip /opt/paperclip/runtime
+install -d -o paperclip -g paperclip -m 700 /var/lib/paperclip /var/log/paperclip
+if [ ! -x /opt/node-v24.20.0-linux-x64/bin/node ]; then
+  install -d -m 700 /root/paperclip-install/node
+  cd /root/paperclip-install/node
+  curl -fsSLO https://nodejs.org/dist/v24.20.0/node-v24.20.0-linux-x64.tar.xz
+  curl -fsSLO https://nodejs.org/dist/v24.20.0/SHASUMS256.txt
+  awk '$2 == "node-v24.20.0-linux-x64.tar.xz" {print}' SHASUMS256.txt > SHA256.selected
+  test -s SHA256.selected
+  sha256sum -c SHA256.selected
+  tar -xJf node-v24.20.0-linux-x64.tar.xz -C /opt
+fi
+export PATH=/opt/node-v24.20.0-linux-x64/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+test "$(node --version)" = v24.20.0
+cp /root/paperclip-install/package.json /root/paperclip-install/package-lock.json /opt/paperclip/runtime/
+cd /opt/paperclip/runtime
+npm ci --omit=dev --no-audit --no-fund
+node -e 'if(require("./node_modules/paperclipai/package.json").version!=="2026.1023.0")process.exit(1)'
+python3 /root/paperclip-install/patch_runtime.py --runtime /opt/paperclip/runtime --patches /root/paperclip-install/patches --port 3100 --apply
+python3 /root/paperclip-install/apply-env-hardening.py
+if [ ! -f /etc/paperclip.env ]; then
+  umask 077
+  {
+    echo 'PAPERCLIP_HOME=/var/lib/paperclip'
+    echo 'PAPERCLIP_INSTANCE_ID=default'
+    echo 'PAPERCLIP_DEPLOYMENT_MODE=authenticated'
+    echo 'PAPERCLIP_DEPLOYMENT_EXPOSURE=private'
+    echo 'PAPERCLIP_PUBLIC_URL=http://127.0.0.1:43101'
+    echo 'PAPERCLIP_ALLOWED_HOSTNAMES=127.0.0.1,localhost'
+    echo 'HOST=127.0.0.1'
+    echo 'PORT=3100'
+    echo 'SERVE_UI=true'
+    echo 'HEARTBEAT_SCHEDULER_ENABLED=false'
+    echo 'PAPERCLIP_NO_BROWSER=true'
+    echo 'PAPERCLIP_ANNOUNCEMENTS_ENABLED=false'
+    echo 'PAPERCLIP_TELEMETRY_DISABLED=1'
+    echo 'DO_NOT_TRACK=1'
+    echo 'CODEX_HOME=/var/lib/paperclip/uncredentialed-codex-home'
+    echo 'OPENAI_API_KEY='
+    echo 'ANTHROPIC_API_KEY='
+    printf 'BETTER_AUTH_SECRET=%s\n' "$(openssl rand -hex 32)"
+    printf 'PAPERCLIP_TOOL_ACTION_SIGNING_SECRET=%s\n' "$(openssl rand -hex 32)"
+  } > /etc/paperclip.env
+fi
+chmod 600 /etc/paperclip.env
+install -d -o paperclip -g paperclip -m 700 /var/lib/paperclip/uncredentialed-codex-home
+cat > /opt/paperclip/start.sh <<'START'
+#!/usr/bin/env bash
+set -euo pipefail
+if [ -f /var/lib/paperclip/instances/default/config.json ]; then
+  exec /opt/paperclip/runtime/node_modules/.bin/paperclipai run --data-dir /var/lib/paperclip --no-repair
+else
+  exec /opt/paperclip/runtime/node_modules/.bin/paperclipai onboard --data-dir /var/lib/paperclip --bind loopback --yes --no-install-service
+fi
+START
+chmod 755 /opt/paperclip/start.sh
+cat > /etc/systemd/system/paperclip.service <<'UNIT'
+[Unit]
+Description=MENGINE isolated Paperclip control service
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=paperclip
+Group=paperclip
+WorkingDirectory=/var/lib/paperclip
+Environment=PATH=/opt/node-v24.20.0-linux-x64/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOME=/var/lib/paperclip
+EnvironmentFile=/etc/paperclip.env
+ExecStart=/opt/paperclip/start.sh
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=90
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/paperclip /var/log/paperclip
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+TasksMax=2048
+MemoryMax=5G
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+cat > /etc/ssh/sshd_config.d/90-paperclip-key-only.conf <<'SSH'
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin prohibit-password
+SSH
+sshd -t
+systemctl reload ssh
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow OpenSSH
+ufw --force enable
+systemctl daemon-reload
+systemctl enable --now paperclip.service
+echo 'Pinned runtime installed; authenticated loopback service started. No model login or historical data imported.'

@@ -1,5 +1,7 @@
 # MENGINE Paperclip 本机真实模型试点报告
 
+> 本文是本机阶段证据，不能代替云端验收。当前公网部署、后续批准费用与凭据事件修复见 [云端部署验证报告](CLOUD-DEPLOYMENT-20261101.md)。
+
 更新：2026-11-01，北京时间。关联 [Issue #100](https://github.com/luofanghao9784/mengine-app/issues/100)、[Draft PR #101](https://github.com/luofanghao9784/mengine-app/pull/101)。
 
 **结论：已接通用户授权的独立 ChatGPT 订阅登录；带明确本地补丁的 Paperclip 完成两条真实编码任务及两轮独立 QA，第二条由依赖解除自动接续。当前已暂停公司和全部 19 岗并解绑执行岗位凭据。云端无人值守、正式研发接管与经营系统接入尚未验收。**

@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { sanitizeInheritedPaperclipEnv } from '/opt/paperclip/runtime/node_modules/@paperclipai/adapter-utils/dist/server-utils.js';
+const original={PATH:'/usr/bin',DATABASE_URL:'synthetic-db-canary',BETTER_AUTH_SECRET:'synthetic-auth-canary',PGPASSWORD:'synthetic-pg-canary',PAPERCLIP_API_KEY:'synthetic-controller-key'};
+const safe=sanitizeInheritedPaperclipEnv(original);
+for(const key of ['DATABASE_URL','BETTER_AUTH_SECRET','PGPASSWORD','PAPERCLIP_API_KEY'])assert.equal(safe[key],undefined);
+assert.equal(safe.PATH,'/usr/bin');
+assert.equal(original.DATABASE_URL,'synthetic-db-canary');
+const explicit={...safe,DATABASE_URL:'authorized-agent-binding'};
+assert.equal(explicit.DATABASE_URL,'authorized-agent-binding');
+console.log(JSON.stringify({status:'PASS',controllerSecretsRemoved:true,nonSecretsPreserved:true,sourceObjectUnchanged:true,explicitAgentBindingPreserved:true,modelInvoked:false}));

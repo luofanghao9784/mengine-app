@@ -40,15 +40,3 @@ enabled = true
 
 [permissions.pilot-reviewer.network.domains]
 "127.0.0.1" = "allow"
-
-# BEGIN PAPERCLIP MANAGED MCP
-# Written by Paperclip for governed MCP gateway access. Do not edit this block by hand.
-
-[mcp_servers."paperclip-projects"]
-url = "http://127.0.0.1:43100/api/mcp/project-tools"
-http_headers = { Authorization = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5NjA0Njk2YS02MzY3LTQ4YzItYjdiZi0xMzMzOWExMzk4OWUiLCJjb21wYW55X2lkIjoiNTkyM2JhZTEtYjE4MS00MGY2LWIwNjAtZTc3MmZlZjA1YjhlIiwiYWRhcHRlcl90eXBlIjoiY29kZXhfbG9jYWwiLCJydW5faWQiOiJhNDY5ZjQ1Ny1iYzg2LTRlZDQtYWRiNC00ZGVmNjQ3ODBkMTIiLCJyZXNwb25zaWJsZV91c2VyX2lkIjoibG9jYWwtYm9hcmQiLCJpYXQiOjE3OTM1MTc2OTcsImV4cCI6MTc5MzY5MDQ5NywiaXNzIjoicGFwZXJjbGlwIiwiYXVkIjoicGFwZXJjbGlwLWFwaSIsImluc3RhbmNlX2lkIjoiZGVmYXVsdCJ9.g4CASW00iFrcWdI9Q2LuFibRVYDCV4_PIkrD7zOOGn8" }
-
-[mcp_servers."paperclip-connections"]
-url = "http://127.0.0.1:43100/mcp/runtime-tools"
-http_headers = { Authorization = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5NjA0Njk2YS02MzY3LTQ4YzItYjdiZi0xMzMzOWExMzk4OWUiLCJjb21wYW55X2lkIjoiNTkyM2JhZTEtYjE4MS00MGY2LWIwNjAtZTc3MmZlZjA1YjhlIiwicnVuX2lkIjoiYTQ2OWY0NTctYmM4Ni00ZWQ0LWFkYjQtNGRlZjY0NzgwZDEyIiwicmVzcG9uc2libGVfdXNlcl9pZCI6ImxvY2FsLWJvYXJkIiwic2NvcGUiOiJjb25uZWN0aW9uX2ludGVudHMiLCJpYXQiOjE3OTM1MTc2OTcsImV4cCI6MTc5MzUyMTI5NywiaW5zdGFuY2VfaWQiOiJkZWZhdWx0In0.nBJkpcmNeM3aapzRfK-CRymmk2_So0tQesdiShty5oM" }
-# END PAPERCLIP MANAGED MCP

@@ -28,6 +28,12 @@ jobs:
         run: python3 -m unittest discover -s scripts/paperclip-pilot/sample-budget -p 'test_*.py' -v
       - name: Verify six gate job definitions exactly match existing workflows
         run: python3 scripts/paperclip-pilot/verify_ci_jobs.py
+      - name: Render cloud scripts and check syntax without contacting a server
+        run: |
+          python3 scripts/paperclip-pilot/render_cloud.py --ipv4 203.0.113.10 --hostname approved-host --output "$RUNNER_TEMP/paperclip-cloud-render"
+          for file in "$RUNNER_TEMP/paperclip-cloud-render"/*.sh; do bash -n "$file"; done
+          for file in "$RUNNER_TEMP/paperclip-cloud-render"/*.mjs; do node --check "$file"; done
+          python3 -m compileall -q "$RUNNER_TEMP/paperclip-cloud-render"
       - name: Check reconciliation module syntax
         run: node --check scripts/paperclip-pilot/reconcile_usage.mjs
   abc:

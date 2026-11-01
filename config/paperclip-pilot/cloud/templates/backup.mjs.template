@@ -1,0 +1,40 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+if (JSON.parse(fs.readFileSync('/opt/paperclip/runtime/node_modules/paperclipai/package.json')).version !== '2026.1023.0') throw Error('Unsupported runtime');
+if (!process.env.DATABASE_URL) throw Error('Missing protected database binding');
+const url = new URL(process.env.DATABASE_URL);
+if (url.hostname !== '127.0.0.1' || url.pathname !== '/paperclip') throw Error('Unexpected target');
+// The upstream client passes its URL in argv: keep the password in root's env.
+process.env.PGPASSWORD = decodeURIComponent(url.password);
+url.password = '';
+delete process.env.DATABASE_URL;
+process.env.PAPERCLIP_PG_DUMP_PATH='/usr/lib/postgresql/18/bin/pg_dump';
+if (!fs.existsSync(process.env.PAPERCLIP_PG_DUMP_PATH)) throw Error('Native backup tool required; no JavaScript fallback');
+const { runDatabaseBackup } = await import('/opt/paperclip/runtime/node_modules/@paperclipai/db/dist/backup-lib.js');
+const directory='/var/backups/paperclip';
+fs.mkdirSync(directory,{recursive:true,mode:0o700});
+fs.chmodSync(directory,0o700);
+const result = await runDatabaseBackup({connectionString:url.toString(),backupDir:directory,
+  filenamePrefix:'paperclip-native',backupEngine:'pg_dump',retention:{dailyDays:7,weeklyWeeks:4,monthlyMonths:1},
+  verifyBeforePrune: async file => {
+    if (spawnSync('gzip',['-t',file]).status !== 0) throw Error('Backup archive integrity failed');
+  }});
+fs.chmodSync(result.backupFile,0o600);
+const fileArchive=result.backupFile.replace(/\.sql\.gz$/,'.files.tar.gz');
+if(fileArchive===result.backupFile)throw Error('Unknown native backup filename');
+const files=['etc/paperclip.env','var/lib/paperclip/instances/default/config.json',
+  'var/lib/paperclip/instances/default/.env','var/lib/paperclip/instances/default/secrets',
+  'var/lib/paperclip/instances/default/data/storage'].filter(f=>fs.existsSync('/'+f));
+if (spawnSync('tar',['-czf',fileArchive,'-C','/',...files],{stdio:['ignore','ignore','pipe']}).status !== 0) throw Error('Protected file backup failed');
+fs.chmodSync(fileArchive,0o600);
+if (spawnSync('tar',['-tzf',fileArchive],{stdio:'ignore'}).status !== 0) throw Error('Protected file archive integrity failed');
+const archives=fs.readdirSync(directory).filter(f=>f.startsWith('paperclip-native-')&&f.endsWith('.files.tar.gz'));
+for (const file of archives){
+  if(!fs.existsSync(path.join(directory,file.replace(/\.files\.tar\.gz$/,'.sql.gz'))))fs.unlinkSync(path.join(directory,file));
+}
+console.log(JSON.stringify({status:'PASS',engine:'pg_dump',databaseArchive:path.basename(result.backupFile),
+  databaseBytes:result.sizeBytes,databaseSha256:crypto.createHash('sha256').update(fs.readFileSync(result.backupFile)).digest('hex'),
+  protectedFileArchive:path.basename(fileArchive),protectedFiles:files.length,
+  published:false,offsiteCopyConfigured:false}));

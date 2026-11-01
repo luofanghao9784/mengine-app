@@ -8,6 +8,8 @@ import subprocess
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--runtime", required=True)
+parser.add_argument("--patches", help="Explicit directory containing the reviewed manifest and patch")
+parser.add_argument("--port", type=int, default=43100, help="Local listener that must be stopped")
 action = parser.add_mutually_exclusive_group()
 action.add_argument("--apply", action="store_true")
 action.add_argument("--revert", action="store_true")
@@ -16,7 +18,7 @@ runtime = Path(args.runtime).resolve(strict=True)
 package = json.loads((runtime / "node_modules/paperclipai/package.json").read_text())
 if package.get("version") != "2026.1023.0":
     parser.error("Unsupported runtime version")
-patches = Path(__file__).resolve().parents[2] / "config/paperclip-pilot/patches"
+patches = Path(args.patches).resolve(strict=True) if args.patches else Path(__file__).resolve().parents[2] / "config/paperclip-pilot/patches"
 manifest = json.loads((patches / "manifest.json").read_text())
 records = [r for r in manifest["files"] if "/dist/" in r["file"]]
 package_root = runtime / "node_modules/@paperclipai"
@@ -44,7 +46,7 @@ if current == desired:
     raise SystemExit(0)
 with socket.socket() as sock:
     sock.settimeout(1)
-    if sock.connect_ex(("127.0.0.1", 43100)) == 0:
+    if sock.connect_ex(("127.0.0.1", args.port)) == 0:
         parser.error("Stop the dedicated pilot before changing its runtime")
 command = ["/usr/bin/patch", "--batch", "-p1", "-i", str(patches / "runtime.patch")]
 command.append("--reverse" if args.revert else "--forward")
